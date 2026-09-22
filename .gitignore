@@ -1,5 +1,9 @@
 .DS_Store
 node_modules
+
+# Dwarf Fortress sprites extracted from the local game install
+# (Kitfox/Bay 12 property - never commit these)
+apps/web/public/df-assets/
 .next
 .turbo
 .vscode

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { BookOpenIcon } from 'lucide-react'
 
+import { CreatureSprite } from '~/lib/df-assets/components'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
 import { useFortOverview, useFortUnit } from '~/lib/fortress/queries'
 import { getKnownFigures, getLegendsOverview } from '~/lib/legends/server'
@@ -74,6 +75,7 @@ function DwarfPage() {
         eyebrow={GROUP_EYEBROW[group]}
         title={
           <span className="flex flex-wrap items-center gap-3">
+            {unit ? <CreatureSprite unit={unit} size={48} /> : null}
             {title}
             {unit && (group === 'citizen' || group === 'resident') ? (
               <MoodBadge category={unit.stress_category} className="text-sm font-normal" />

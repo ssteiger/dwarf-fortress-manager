@@ -13,7 +13,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 1
+local DUMP_VERSION = 2
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -190,7 +190,7 @@ local UNIT_COLUMNS = arr{
     'profession', 'x', 'y', 'z', 'stress', 'stress_category', 'job_id', 'job',
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
-    'hist_figure_id', 'civ_id',
+    'hist_figure_id', 'civ_id', 'race_id', 'caste_id',
 }
 
 local UNIT_FLAG_CHECKS = {
@@ -293,6 +293,9 @@ local function unit_row(u)
     local craw = df.creature_raw.find(u.race)
     local race = craw and craw.name[0] or tostring(u.race)
     local caste = try(function() return craw.caste[u.caste].caste_name[0] end) or ''
+    -- Raw tokens (DWARF, FEMALE): what the graphics raws key sprites on.
+    local race_id = craw and craw.creature_id or nil
+    local caste_id = try(function() return craw.caste[u.caste].caste_id end)
     local visible_name = dfhack.units.getVisibleName(u)
     return row(
         u.id,
@@ -323,7 +326,9 @@ local function unit_row(u)
         unit_inventory(u),
         unit_positions(u),
         u.hist_figure_id,
-        u.civ_id
+        u.civ_id,
+        race_id,
+        caste_id
     )
 end
 

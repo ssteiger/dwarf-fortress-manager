@@ -130,6 +130,10 @@ export interface FortUnit {
 	positions: string[];
 	hist_figure_id: number;
 	civ_id: number;
+	/** Raw creature token (DWARF, BIRD_PEAFOWL_BLUE); null in dumps older than this column. */
+	race_id: string | null;
+	/** Raw caste token (MALE, FEMALE); null in older dumps. */
+	caste_id: string | null;
 }
 
 export interface FortItem {

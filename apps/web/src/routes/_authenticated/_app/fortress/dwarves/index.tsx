@@ -21,6 +21,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { BookOpenIcon, Maximize2Icon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { CreatureSprite } from '~/lib/df-assets/components'
 import {
   humanize,
   isLiving,
@@ -135,28 +136,31 @@ function DwarvesPage() {
           const legendsWorldId =
             matchingWorld && knownSet.has(unit.hist_figure_id) ? matchingWorld.id : null
           return (
-            <div>
-              <div className="flex items-center gap-2 font-medium">
-                <span className="truncate">{unitDisplayName(unit)}</span>
-                {legendsWorldId ? (
-                  <Link
-                    to="/legends/$kind/$id"
-                    params={{ kind: 'historical_figure', id: String(unit.hist_figure_id) }}
-                    search={{ world: legendsWorldId }}
-                    className="text-muted-foreground hover:text-foreground"
-                    title="Open in legends"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <BookOpenIcon className="size-3.5" />
-                  </Link>
-                ) : null}
-              </div>
-              <div className="truncate text-sm text-muted-foreground">
-                {unit.name_english && unit.name_english !== unit.name
-                  ? `${unit.name_english} · `
-                  : ''}
-                {unit.race}
-                {unit.squad ? ` · ${unit.squad}` : ''}
+            <div className="flex items-center gap-3">
+              <CreatureSprite unit={unit} size={32} className="-my-1" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 font-medium">
+                  <span className="truncate">{unitDisplayName(unit)}</span>
+                  {legendsWorldId ? (
+                    <Link
+                      to="/legends/$kind/$id"
+                      params={{ kind: 'historical_figure', id: String(unit.hist_figure_id) }}
+                      search={{ world: legendsWorldId }}
+                      className="text-muted-foreground hover:text-foreground"
+                      title="Open in legends"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <BookOpenIcon className="size-3.5" />
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="truncate text-sm text-muted-foreground">
+                  {unit.name_english && unit.name_english !== unit.name
+                    ? `${unit.name_english} · `
+                    : ''}
+                  {unit.race}
+                  {unit.squad ? ` · ${unit.squad}` : ''}
+                </div>
               </div>
             </div>
           )
@@ -328,35 +332,38 @@ function DwarvesPage() {
             <>
               <DrawerHeader className="border-b">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <DrawerTitle className="flex flex-wrap items-center gap-2">
-                      {unitDisplayName(selected)}
-                      {unitGroup(selected) === 'citizen' || unitGroup(selected) === 'resident' ? (
-                        <MoodBadge
-                          category={selected.stress_category}
-                          className="text-sm font-normal"
-                        />
-                      ) : null}
-                      {selected.mood ? (
-                        <Badge variant="outline" className="text-sm font-normal">
-                          {humanize(selected.mood)} mood
-                        </Badge>
-                      ) : null}
-                    </DrawerTitle>
-                    <DrawerDescription className="mt-1">
-                      {[
-                        selected.name_english && selected.name_english !== selected.name
-                          ? selected.name_english
-                          : null,
-                        selected.caste,
-                        sexLabel(selected.sex),
-                        selected.profession,
-                        `${Math.floor(selected.age)} years`,
-                        isLiving(selected) ? null : 'dead',
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </DrawerDescription>
+                  <div className="flex min-w-0 items-start gap-3">
+                    <CreatureSprite unit={selected} size={48} className="shrink-0" />
+                    <div className="min-w-0">
+                      <DrawerTitle className="flex flex-wrap items-center gap-2">
+                        {unitDisplayName(selected)}
+                        {unitGroup(selected) === 'citizen' || unitGroup(selected) === 'resident' ? (
+                          <MoodBadge
+                            category={selected.stress_category}
+                            className="text-sm font-normal"
+                          />
+                        ) : null}
+                        {selected.mood ? (
+                          <Badge variant="outline" className="text-sm font-normal">
+                            {humanize(selected.mood)} mood
+                          </Badge>
+                        ) : null}
+                      </DrawerTitle>
+                      <DrawerDescription className="mt-1">
+                        {[
+                          selected.name_english && selected.name_english !== selected.name
+                            ? selected.name_english
+                            : null,
+                          selected.caste,
+                          sexLabel(selected.sex),
+                          selected.profession,
+                          `${Math.floor(selected.age)} years`,
+                          isLiving(selected) ? null : 'dead',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </DrawerDescription>
+                    </div>
                   </div>
                   <DrawerClose asChild>
                     <Button size="icon" variant="ghost" aria-label="Close">

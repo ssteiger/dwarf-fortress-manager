@@ -14,6 +14,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { MapIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { CreatureSprite } from '~/lib/df-assets/components'
 import {
   formatValue,
   humanize,
@@ -178,7 +179,10 @@ export function DwarfDetails({ unitId, compact }: { unitId: number; compact?: bo
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-3')}>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">Who they are</CardTitle>
+            <CardTitle className="flex items-center justify-between gap-3 text-base">
+              Who they are
+              <CreatureSprite unit={unit} size={64} title={`${unit.race} as drawn in the game`} />
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Facts

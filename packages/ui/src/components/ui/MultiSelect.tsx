@@ -3,6 +3,7 @@ import * as React from 'react'
 
 import { cn } from '../../utils/cn'
 
+import type { ComponentProps } from 'react'
 import { Badge } from './Badge'
 import {
   Command,
@@ -15,7 +16,6 @@ import {
 } from './Command'
 import { Popover, PopoverContent, PopoverTrigger } from './Popover'
 import { Separator } from './Separator'
-import type { ComponentProps } from 'react'
 
 const BADGE_VARIANTS = {
   default: 'default',

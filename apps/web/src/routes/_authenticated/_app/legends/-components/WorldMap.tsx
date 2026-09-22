@@ -2,6 +2,14 @@ import { cn } from '@fortress/ui'
 import * as React from 'react'
 
 import {
+  type DfAssetIndex,
+  type TileSprite,
+  drawTile,
+  useDfAssets,
+  useSpriteSheets,
+} from '~/lib/df-assets'
+import { DfTile } from '~/lib/df-assets/components'
+import {
   RACE_COLORS,
   raceColor,
   regionColor,
@@ -10,6 +18,15 @@ import {
   words,
 } from '~/lib/legends/model'
 import type { LegendsMapData, MapRegion, MapSite } from '~/lib/legends/server'
+import {
+  WORLD_MAP_PAGES,
+  legendTerrain,
+  peakSprite,
+  riverSprite,
+  siteSprite,
+  terrainSprites,
+  tileSpriteByName,
+} from '~/lib/legends/worldTiles'
 
 export interface WorldMapProps {
   data: LegendsMapData
@@ -53,10 +70,40 @@ function siteRadius(type: string | null, tile: number): number {
   return tile * 0.32
 }
 
+const CHIP = 16
+
+/** Legend swatch: a terrain type's base tile with its forest/mountain overlay. */
+function TerrainChip({ index, type }: { index: DfAssetIndex; type: string }) {
+  const look = legendTerrain(index, type)
+  if (!look.base) {
+    return (
+      <span
+        className="inline-block size-3 rounded-sm border border-black/20"
+        style={{ backgroundColor: regionColor(type) }}
+      />
+    )
+  }
+  return (
+    <span className="relative inline-block" style={{ width: CHIP, height: CHIP }}>
+      <DfTile index={index} sprite={look.base} size={CHIP} className="absolute left-0 top-0" />
+      {look.overlay ? (
+        <DfTile index={index} sprite={look.overlay} size={CHIP} className="absolute left-0 top-0" />
+      ) : null}
+    </span>
+  )
+}
+
+function TileChip({ index, name }: { index: DfAssetIndex; name: string }) {
+  const sprite = tileSpriteByName(index, name)
+  return sprite ? <DfTile index={index} sprite={sprite} size={CHIP} /> : null
+}
+
 /**
- * The surface of the world: regions coloured by terrain, rivers, mountain
- * peaks, and every site as a marker in the colour of the civilization that
- * holds it. Hover for names, click to open a site or region.
+ * The surface of the world: regions drawn with the game's world-map tiles
+ * when the sprites have been extracted (flat terrain colours otherwise),
+ * rivers, mountain peaks, and every site as the game's marker or a dot in
+ * the colour of the civilization that holds it. Hover for names, click to
+ * open a site or region.
  */
 export function WorldMap({
   data,
@@ -71,6 +118,15 @@ export function WorldMap({
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const wrapRef = React.useRef<HTMLDivElement>(null)
   const [size, setSize] = React.useState(0)
+
+  // The game's own world-map sprites, when they have been extracted locally.
+  // Until then (or without them) the map is drawn with flat colours.
+  const assets = useDfAssets()
+  const sheets = useSpriteSheets(assets, WORLD_MAP_PAGES)
+  const sprites = React.useMemo(
+    () => (assets && sheets && sheets.size > 0 ? { index: assets, sheets } : null),
+    [assets, sheets],
+  )
   const [hover, setHover] = React.useState<{
     x: number
     y: number
@@ -124,43 +180,79 @@ export function WorldMap({
     const dimmed = highlightRegion !== null && highlightRegion !== undefined
     const highlightIndex = dimmed ? (regionIndexById.get(highlightRegion) ?? -1) : -1
 
+    // Pixel art stays crisp when tiles are drawn at or above their native
+    // 16px; below that, smoothing reads better than dropped pixels.
+    ctx.imageSmoothingEnabled = tile < 16
+    const blit = (sprite: TileSprite | null, x: number, y: number, w = tile, h = tile) =>
+      sprites ? drawTile(ctx, sprites.index, sprites.sheets, sprite, x, y, w, h) : false
+
     // Terrain.
     ctx.fillStyle = OCEAN
     ctx.fillRect(0, 0, size, cssHeight)
     const colors = data.regions.map(tileColor)
-    for (let y = 0; y < data.height; y++) {
-      for (let x = 0; x < data.width; x++) {
-        const index = data.tiles[y * data.width + x]
-        if (index < 0) continue
-        ctx.fillStyle = colors[index]
-        ctx.fillRect(x * tile, y * tile, tile + 0.5, tile + 0.5)
-      }
-    }
-
-    // Region seams, so neighbouring biomes of the same type still read as separate.
-    ctx.strokeStyle = 'rgba(0,0,0,0.12)'
-    ctx.lineWidth = 1
-    ctx.beginPath()
-    for (let y = 0; y < data.height; y++) {
-      for (let x = 0; x < data.width; x++) {
-        const here = data.tiles[y * data.width + x]
-        if (x + 1 < data.width && data.tiles[y * data.width + x + 1] !== here) {
-          ctx.moveTo((x + 1) * tile, y * tile)
-          ctx.lineTo((x + 1) * tile, (y + 1) * tile)
-        }
-        if (y + 1 < data.height && data.tiles[(y + 1) * data.width + x] !== here) {
-          ctx.moveTo(x * tile, (y + 1) * tile)
-          ctx.lineTo((x + 1) * tile, (y + 1) * tile)
+    if (sprites) {
+      // Base tiles first, then the 32px forest and mountain overlays so
+      // they sit above neighbouring ground.
+      const overlays: { sprite: TileSprite; x: number; y: number }[] = []
+      for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+          const index = data.tiles[y * data.width + x]
+          const region = index >= 0 ? data.regions[index] : null
+          const look = terrainSprites(sprites.index, region, x, y)
+          if (!blit(look.base, x * tile, y * tile, tile + 0.5, tile + 0.5) && region) {
+            ctx.fillStyle = colors[index]
+            ctx.fillRect(x * tile, y * tile, tile + 0.5, tile + 0.5)
+          }
+          if (look.overlay) overlays.push({ sprite: look.overlay, x, y })
         }
       }
-    }
-    ctx.stroke()
+      for (const o of overlays) blit(o.sprite, o.x * tile, o.y * tile, tile + 0.5, tile + 0.5)
+    } else {
+      for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+          const index = data.tiles[y * data.width + x]
+          if (index < 0) continue
+          ctx.fillStyle = colors[index]
+          ctx.fillRect(x * tile, y * tile, tile + 0.5, tile + 0.5)
+        }
+      }
 
-    // Rivers, wider as they grow.
+      // Region seams, so neighbouring biomes of the same type still read as separate.
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let y = 0; y < data.height; y++) {
+        for (let x = 0; x < data.width; x++) {
+          const here = data.tiles[y * data.width + x]
+          if (x + 1 < data.width && data.tiles[y * data.width + x + 1] !== here) {
+            ctx.moveTo((x + 1) * tile, y * tile)
+            ctx.lineTo((x + 1) * tile, (y + 1) * tile)
+          }
+          if (y + 1 < data.height && data.tiles[(y + 1) * data.width + x] !== here) {
+            ctx.moveTo(x * tile, (y + 1) * tile)
+            ctx.lineTo((x + 1) * tile, (y + 1) * tile)
+          }
+        }
+      }
+      ctx.stroke()
+    }
+
+    // Rivers: the game's directional tiles when sprites are on, else squares
+    // that widen as the river grows.
+    const riverTiles = new Set(data.rivers.map((r) => r.tile))
     ctx.fillStyle = 'rgba(56, 132, 214, 0.95)'
     for (const river of data.rivers) {
       const x = river.tile % data.width
       const y = Math.floor(river.tile / data.width)
+      if (sprites) {
+        const sprite = riverSprite(sprites.index, river.size, {
+          n: y > 0 && riverTiles.has(river.tile - data.width),
+          s: y + 1 < data.height && riverTiles.has(river.tile + data.width),
+          w: x > 0 && riverTiles.has(river.tile - 1),
+          e: x + 1 < data.width && riverTiles.has(river.tile + 1),
+        })
+        if (blit(sprite, x * tile, y * tile, tile + 0.5, tile + 0.5)) continue
+      }
       const riverSize = Math.max(1, tile * (river.size === 3 ? 0.7 : river.size === 2 ? 0.5 : 0.32))
       ctx.fillRect(
         x * tile + (tile - riverSize) / 2,
@@ -215,6 +307,11 @@ export function WorldMap({
     for (const peak of data.peaks) {
       const cx = peak.x * tile + tile / 2
       const cy = peak.y * tile + tile / 2
+      if (sprites) {
+        const s = Math.max(tile, 8)
+        const sprite = peakSprite(sprites.index, peak.volcano, peak.x, peak.y)
+        if (blit(sprite, cx - s / 2, cy - s / 2, s, s)) continue
+      }
       const r = tile * 0.45
       ctx.beginPath()
       ctx.moveTo(cx, cy - r)
@@ -243,6 +340,19 @@ export function WorldMap({
       const civ = site.civ !== null ? data.civs[site.civ] : null
       const strong = !emphasis || emphasis.has(site.id)
       ctx.globalAlpha = strong ? 1 : 0.2
+      if (sprites) {
+        // The game's marker, kept legible on small maps; emphasised sites get a ring.
+        const s = Math.max(tile, 11)
+        if (blit(siteSprite(sprites.index, site), cx - s / 2, cy - s / 2, s, s)) {
+          if (strong && emphasis) {
+            ctx.strokeStyle = '#fde68a'
+            ctx.lineWidth = 1.5
+            ctx.strokeRect(cx - s / 2 - 1, cy - s / 2 - 1, s + 2, s + 2)
+          }
+          ctx.globalAlpha = 1
+          continue
+        }
+      }
       ctx.beginPath()
       if (group === 'wild') {
         ctx.rect(cx - r, cy - r, r * 2, r * 2)
@@ -277,7 +387,7 @@ export function WorldMap({
       ctx.lineWidth = 1
       ctx.stroke()
     }
-  }, [data, size, highlightSites, highlightRegion, focus, regionIndexById])
+  }, [data, size, highlightSites, highlightRegion, focus, regionIndexById, sprites])
 
   const tileAt = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current
@@ -393,7 +503,45 @@ export function WorldMap({
           </div>
         ) : null}
       </div>
-      {showLegend ? (
+      {showLegend && sprites ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+          {legendTypes.map((type) => (
+            <span key={type} className="inline-flex items-center gap-1.5">
+              <TerrainChip index={sprites.index} type={type} />
+              {type}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1.5">
+            <TerrainChip index={sprites.index} type="Ocean" />
+            Sea
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <TileChip index={sprites.index} name="RIVER_NS" />
+            Rivers
+          </span>
+          <span className="mx-1 hidden border-l sm:inline" />
+          <span className="inline-flex items-center gap-1.5">
+            <TileChip index={sprites.index} name="SITE_CITY_1" />
+            <TileChip index={sprites.index} name="SITE_FORTRESS" />
+            <TileChip index={sprites.index} name="SITE_DARK_FORTRESS_1" />
+            Settlements
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <TileChip index={sprites.index} name="SITE_RUIN_VILLAGE" />
+            Ruins
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <TileChip index={sprites.index} name="SITE_CAVE" />
+            <TileChip index={sprites.index} name="SITE_LAIR_BURROW" />
+            Lairs &amp; caves
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <TileChip index={sprites.index} name="MOUNTAIN_PEAK:1" />
+            Peaks
+          </span>
+          <span className="ml-auto text-xs">Drawn with the game's own world-map tiles.</span>
+        </div>
+      ) : showLegend ? (
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
           {legendTypes.map((type) => (
             <span key={type} className="inline-flex items-center gap-1.5">
