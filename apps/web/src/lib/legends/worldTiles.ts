@@ -106,11 +106,18 @@ export function riverSprite(
 
 /** The game's world-map marker for a site; unclaimed settlements show as ruins. */
 export function siteSpriteName(site: MapSite): string | null {
-  const t = words(site.type)
-  const abandoned = site.civ === null && site.owner === null
+  return siteSpriteNameFor(site.type, site.id, site.civ === null && site.owner === null)
+}
+
+export function siteSpriteNameFor(
+  type: string | null,
+  id: number,
+  abandoned: boolean,
+): string | null {
+  const t = words(type)
   switch (t) {
     case 'town':
-      return abandoned ? 'SITE_RUIN_CITY' : `SITE_CITY_${1 + (site.id % 4)}`
+      return abandoned ? 'SITE_RUIN_CITY' : `SITE_CITY_${1 + (id % 4)}`
     case 'hamlet':
       return abandoned ? 'SITE_RUIN_VILLAGE' : 'SITE_VILLAGE'
     case 'fortress':
@@ -124,7 +131,7 @@ export function siteSpriteName(site: MapSite): string | null {
     case 'dark pits':
       return abandoned ? 'SITE_RUIN_GOBLIN' : 'SITE_DARK_FORTRESS_2'
     case 'forest retreat':
-      return `${abandoned ? 'SITE_RUIN_FOREST_RETREAT_' : 'SITE_FOREST_RETREAT_'}${1 + (site.id % 2)}`
+      return `${abandoned ? 'SITE_RUIN_FOREST_RETREAT_' : 'SITE_FOREST_RETREAT_'}${1 + (id % 2)}`
     case 'castle':
       return abandoned ? 'SITE_RUIN_CASTLE' : 'SITE_CASTLE'
     case 'fort':
@@ -136,6 +143,10 @@ export function siteSpriteName(site: MapSite): string | null {
       return 'SITE_LAIR_BURROW'
     case 'labyrinth':
       return 'SITE_LABYRINTH'
+    case 'mysterious dungeon':
+      return 'SITE_MYTHICAL_1'
+    case 'mysterious palace':
+      return 'SITE_MYTHICAL_2'
     case 'shrine':
       return 'SITE_SHRINE_TITAN'
     case 'tower':
@@ -156,6 +167,114 @@ export function siteSpriteName(site: MapSite): string | null {
 export function siteSprite(index: DfAssetIndex, site: MapSite): TileSprite | null {
   const name = siteSpriteName(site)
   return name ? tileSprite(index, name) : null
+}
+
+/** Site marker for a legends record that is not on the map (lists, headers). */
+export function siteSpriteFor(
+  index: DfAssetIndex,
+  type: string | null,
+  id: number,
+): TileSprite | null {
+  const name = siteSpriteNameFor(type, id, false)
+  return name ? tileSprite(index, name) : null
+}
+
+/**
+ * The sprite for an artifact from its legends_plus item type and subtype
+ * names. Subtype names are matched against the raws' subtype tokens in both
+ * word orders ("war hammer" -> ITEM_WEAPON_HAMMER_WAR); when nothing matches,
+ * a representative tile for the type is used (books, slabs, jewellery, ...).
+ */
+export function artifactSprite(
+  index: DfAssetIndex,
+  item: { type: string | null; subtype: string | null } | null | undefined,
+): TileSprite | null {
+  if (!item?.type) return null
+  const type = item.type
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+  const subtype = (item.subtype ?? '').trim().toLowerCase()
+  const subtypeWords = subtype
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean)
+  const candidates: string[] = []
+  const alias = SUBTYPE_ALIASES[subtype]
+  if (alias) candidates.push(alias)
+  if (subtypeWords.length) {
+    const joined = subtypeWords.join('_')
+    const reversed = [...subtypeWords].reverse().join('_')
+    candidates.push(`ITEM_${type}_${joined}`, `ITEM_${type}_${reversed}`)
+    candidates.push(`ITEM_${type}_${joined}S`, `ITEM_${type}_${reversed}S`)
+  }
+  candidates.push(...(ARTIFACT_TYPE_TILES[type] ?? [`ITEM_${type}`]))
+  for (const token of candidates) {
+    const entry = index.items[token]
+    if (entry) return entry.artifact ?? entry.default
+    const tile = tileSprite(index, token)
+    if (tile) return tile
+  }
+  return null
+}
+
+/** Legends subtype names whose raw token is not a word-order permutation. */
+const SUBTYPE_ALIASES: Record<string, string> = {
+  trousers: 'ITEM_PANTS_PANTS',
+  mitten: 'ITEM_GLOVES_MITTENS',
+  glove: 'ITEM_GLOVES_GLOVES',
+  gauntlet: 'ITEM_GLOVES_GAUNTLETS',
+  'two-handed sword': 'ITEM_WEAPON_SWORD_2H',
+  'high boot': 'ITEM_SHOES_BOOTS',
+  'low boot': 'ITEM_SHOES_BOOTS_LOW',
+  shoe: 'ITEM_SHOES_SHOES',
+  sock: 'ITEM_SHOES_SOCKS',
+  sandal: 'ITEM_SHOES_SANDAL',
+  chausse: 'ITEM_SHOES_CHAUSSE',
+  armor: 'ITEM_ARMOR_BREASTPLATE',
+  'leather armor': 'ITEM_ARMOR_LEATHER',
+  'mail shirt': 'ITEM_ARMOR_MAIL_SHIRT',
+  'large dagger': 'ITEM_WEAPON_DAGGER_LARGE',
+  'great axe': 'ITEM_WEAPON_AXE_GREAT',
+  'battle axe': 'ITEM_WEAPON_AXE_BATTLE',
+  'short sword': 'ITEM_WEAPON_SWORD_SHORT',
+  'long sword': 'ITEM_WEAPON_SWORD_LONG',
+  'war hammer': 'ITEM_WEAPON_HAMMER_WAR',
+  'training axe': 'ITEM_WEAPON_AXE_TRAINING',
+  'training sword': 'ITEM_WEAPON_SWORD_SHORT_TRAINING',
+  'training spear': 'ITEM_WEAPON_SPEAR_TRAINING',
+}
+
+/** Representative tiles per artifact item type, first available wins. */
+const ARTIFACT_TYPE_TILES: Record<string, string[]> = {
+  WEAPON: ['ITEM_WEAPON_SWORD_SHORT'],
+  ARMOR: ['ITEM_ARMOR_BREASTPLATE'],
+  HELM: ['ITEM_HELM_HELM'],
+  GLOVES: ['ITEM_GLOVES_GAUNTLETS'],
+  SHOES: ['ITEM_SHOES_BOOTS'],
+  PANTS: ['ITEM_PANTS_PANTS'],
+  SHIELD: ['ITEM_SHIELD_SHIELD'],
+  BOOK: ['ITEM_BOOK_METAL', 'ITEM_BOOK_WOOD'],
+  SLAB: ['ITEM_SLAB_ENGRAVED_SECRET', 'ITEM_SLAB_BLANK'],
+  BRACELET: ['ITEM_BRACELET_METAL_ENCRUSTED', 'ITEM_BRACELET_METAL'],
+  AMULET: ['ITEM_AMULET_METAL_ENCRUSTED', 'ITEM_AMULET_METAL'],
+  RING: ['ITEM_RING_METAL_ENCRUSTED', 'ITEM_RING_METAL'],
+  EARRING: ['ITEM_EARRING_METAL_ENCRUSTED', 'ITEM_EARRING_METAL'],
+  CROWN: ['ITEM_CROWN_METAL_ENCRUSTED', 'ITEM_CROWN_METAL'],
+  SCEPTER: ['ITEM_SCEPTER_METAL_ENCRUSTED', 'ITEM_SCEPTER_METAL'],
+  FIGURINE: ['ITEM_FIGURINE_METAL_ENCRUSTED', 'ITEM_FIGURINE_METAL'],
+  TOTEM: ['ITEM_TOTEM_ENCRUSTED', 'ITEM_TOTEM'],
+  GOBLET: ['ITEM_GOBLET_METAL_ENCRUSTED', 'ITEM_GOBLET_METAL'],
+  STATUE: ['ITEM_STATUE_ARTIFACT', 'ITEM_STATUE'],
+  COIN: ['ITEM_COINS_SINGLE'],
+  GEM: ['ITEM_GEMS'],
+  SMALLGEM: ['ITEM_GEMS'],
+  FLASK: ['ITEM_FLASK_METAL'],
+  TOY: ['ITEM_TOY'],
+  TOOL: ['ITEM_TOOL'],
+  INSTRUMENT: ['ITEM_INSTRUMENT_STRINGED_HANDHELD'],
+  QUIVER: ['ITEM_QUIVER'],
+  BACKPACK: ['ITEM_BACKPACK'],
 }
 
 /** Sample sprites for the legend under the map. */

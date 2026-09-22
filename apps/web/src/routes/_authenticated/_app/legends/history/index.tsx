@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
+import { LegendsSprite } from '~/lib/df-assets/legends'
 import { yearSpan } from '~/lib/legends/events'
 import { RACE_COLORS, titleCase, words } from '~/lib/legends/model'
 import type { LegendsWorldSummary } from '~/lib/legends/server'
@@ -73,7 +74,12 @@ function HistoryBody({
         >
           <ul className="divide-y">
             {summary.deities.map((deity) => (
-              <li key={deity.id} className="flex flex-wrap items-baseline gap-x-3 py-2">
+              <li key={deity.id} className="flex flex-wrap items-center gap-x-3 py-2">
+                <LegendsSprite
+                  subject={{ kind: 'historical_figure', id: deity.id, race: deity.raceToken }}
+                  size={24}
+                  className="-my-1"
+                />
                 <RecordLink
                   kind="historical_figure"
                   id={deity.id}
@@ -99,6 +105,11 @@ function HistoryBody({
                 <span
                   className="inline-block size-2.5 shrink-0 rounded-full"
                   style={{ backgroundColor: RACE_COLORS[row.race] ?? '#a8a29e' }}
+                />
+                <LegendsSprite
+                  subject={{ kind: 'creature', id: 0, race: row.token }}
+                  size={20}
+                  className="-my-1"
                 />
                 <button
                   type="button"
@@ -181,10 +192,15 @@ function HistoryBody({
         >
           <ul className="divide-y">
             {summary.notable.map((figure, i) => (
-              <li key={figure.id} className="flex items-baseline gap-3 py-2">
+              <li key={figure.id} className="flex items-center gap-3 py-2">
                 <span className="w-5 text-right text-sm text-muted-foreground tabular-nums">
                   {i + 1}
                 </span>
+                <LegendsSprite
+                  subject={{ kind: 'historical_figure', id: figure.id, race: figure.raceToken }}
+                  size={32}
+                  className="-my-1"
+                />
                 <div className="min-w-0 flex-1">
                   <RecordLink
                     kind="historical_figure"

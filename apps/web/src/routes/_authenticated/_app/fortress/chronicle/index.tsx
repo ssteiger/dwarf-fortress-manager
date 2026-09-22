@@ -37,8 +37,7 @@ const EVENT_COLUMNS: ColumnDef<FortEvent>[] = [
     header: 'When',
     accessorFn: (event) => (event.game_year ?? 0) * 1_000_000 + (event.game_tick ?? 0),
     meta: { cellClassName: 'whitespace-nowrap text-sm tabular-nums' },
-    cell: ({ row }) =>
-      formatGameTick(row.original.game_year, row.original.game_tick) || '—',
+    cell: ({ row }) => formatGameTick(row.original.game_year, row.original.game_tick) || '—',
   },
   {
     id: 'text',

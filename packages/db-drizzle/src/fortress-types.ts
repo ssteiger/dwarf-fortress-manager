@@ -98,6 +98,69 @@ export interface FortSummary {
 	buildings_total: number;
 }
 
+/**
+ * One tissue layer the graphics raws can condition on (skin, hair, beard,
+ * eyebrows, eyes): its colour token and, for styleable hair, its length,
+ * styling, curliness and density. `bps` lists the body part tokens sharing it.
+ */
+export interface UnitTissue {
+	bps: string[];
+	/** Body part category, e.g. HEAD. */
+	cat: string;
+	/** Layer name, e.g. HAIR, SKIN, CHIN_WHISKERS. */
+	layer: string;
+	/** Descriptor colour token, e.g. DARK_BROWN. */
+	color?: string | null;
+	length?: number | null;
+	/** NEATLY_COMBED, BRAIDED, DOUBLE_BRAIDS, PONY_TAILS, CLEAN_SHAVEN or null when unstyled. */
+	style?: string | null;
+	curly?: number | null;
+	dense?: number | null;
+}
+
+/** An item the unit wears or wields, with the facts item conditions test. */
+export interface UnitWornItem {
+	item_id: number;
+	/** Inventory mode: Worn, Weapon, Strapped, Piercing, Flask, WrappedAround. */
+	mode: string;
+	/** Body part token (RH, UB) and category (BODY_UPPER, HEAD) it is on. */
+	bp: string | null;
+	cat: string | null;
+	/** Item type token (HELM, ARMOR, GLOVES, SHOES, PANTS, SHIELD, WEAPON, ...). */
+	type: string | null;
+	/** Item subtype token (ITEM_HELM_CAP), null for items without one. */
+	subtype: string | null;
+	quality: number;
+	/** INORGANIC, PLANT, CREATURE, BUILTIN. */
+	material_type: string | null;
+	/** Descriptor colour token of the material, or of the dye when dyed. */
+	color: string | null;
+	dyed: boolean;
+	/** ANY_WOOD_MATERIAL, WOVEN_ITEM, IS_CRAFTED_ARTIFACT, NOT_ARTIFACT, GROWN_NOT_CRAFTED, ... */
+	flags: string[];
+}
+
+/**
+ * Everything the game's layered graphics read off a unit, dumped so the web
+ * app can evaluate the same layer conditions. Null in dumps older than this.
+ */
+export interface UnitLook {
+	/** Top of the profession tree: MINER, FARMER, STANDARD, CHILD, ... */
+	profession_category: string | null;
+	/** SYN_CLASS tokens of active syndromes (ZOMBIE, VAMPCURSE, NECROMANCER, ...). */
+	syn_classes: string[];
+	haul_count: number;
+	body_size: number;
+	tissues: UnitTissue[];
+	/** [body part token, category, modifier type, value], e.g. ["NOSE","NOSE","ROUND_VS_NARROW",120]. */
+	bp_modifiers: [string, string, string, number][];
+	/** [modifier type, value] for body-wide modifiers (HEIGHT, BROADNESS, LENGTH). */
+	body_modifiers: [string, number][];
+	/** [token, category, missing] for every body part of the caste. */
+	parts: [string, string, 0 | 1][];
+	worn: UnitWornItem[];
+}
+
 export interface FortUnit {
 	id: number;
 	name: string;
@@ -134,6 +197,8 @@ export interface FortUnit {
 	race_id: string | null;
 	/** Raw caste token (MALE, FEMALE); null in older dumps. */
 	caste_id: string | null;
+	/** Appearance and wardrobe for exact sprite rendering; null in older dumps. */
+	look: UnitLook | null;
 }
 
 export interface FortItem {

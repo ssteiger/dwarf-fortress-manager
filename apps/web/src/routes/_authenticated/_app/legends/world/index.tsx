@@ -3,9 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import * as React from 'react'
 
+import { useDfAssets } from '~/lib/df-assets'
+import { LegendsSprite, TerrainChip, TileChip } from '~/lib/df-assets/legends'
 import { formatNumber } from '~/lib/fortress/format'
-import { raceColor, regionColor, titleCase, words } from '~/lib/legends/model'
+import { raceColor, raceToken, regionColor, titleCase, words } from '~/lib/legends/model'
 import { type LegendsWorldSummary, getLegendsMap } from '~/lib/legends/server'
+import { siteSpriteNameFor } from '~/lib/legends/worldTiles'
 import { LegendsShell, RecordLink, Section, parseWorldSearch } from '../-components/LegendsChrome'
 import { WorldMap } from '../-components/WorldMap'
 
@@ -30,6 +33,7 @@ function WorldBody({
   counts: Record<string, number>
 }) {
   const navigate = useNavigate()
+  const assets = useDfAssets()
   const [civ, setCiv] = React.useState<number | null>(null)
   const map = useQuery({
     queryKey: ['legends', 'map', worldId],
@@ -101,6 +105,11 @@ function WorldBody({
                       style={{ backgroundColor: raceColor(c.race) }}
                       aria-label={`Show sites of ${c.name ?? 'this civilization'}`}
                     />
+                    <LegendsSprite
+                      subject={{ kind: 'entity', id: c.id, race: raceToken(c.race) }}
+                      size={28}
+                      className="-my-1"
+                    />
                     <div className="min-w-0 flex-1">
                       <RecordLink
                         kind="entity"
@@ -158,10 +167,14 @@ function WorldBody({
                   .sort((a, b) => b[1] - a[1])
                   .map(([type, n]) => (
                     <li key={type} className="flex items-center gap-2">
-                      <span
-                        className="inline-block size-3 rounded-sm border border-black/20"
-                        style={{ backgroundColor: regionColor(type) }}
-                      />
+                      {assets ? (
+                        <TerrainChip index={assets} type={type} />
+                      ) : (
+                        <span
+                          className="inline-block size-3 rounded-sm border border-black/20"
+                          style={{ backgroundColor: regionColor(type) }}
+                        />
+                      )}
                       <span className="flex-1">{type}</span>
                       <span className="tabular-nums text-muted-foreground">{n}</span>
                     </li>
@@ -175,6 +188,16 @@ function WorldBody({
                   .sort((a, b) => b[1] - a[1])
                   .map(([type, n]) => (
                     <li key={type} className="flex items-center gap-2">
+                      {assets ? (
+                        <span className="inline-flex w-4 justify-center">
+                          {siteSpriteNameFor(type, 0, false) ? (
+                            <TileChip
+                              index={assets}
+                              name={siteSpriteNameFor(type, 0, false) ?? ''}
+                            />
+                          ) : null}
+                        </span>
+                      ) : null}
                       <span className="flex-1">{titleCase(type)}s</span>
                       <span className="tabular-nums text-muted-foreground">{n}</span>
                     </li>

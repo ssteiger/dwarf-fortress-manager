@@ -1,14 +1,8 @@
 import { cn } from '@fortress/ui'
 import * as React from 'react'
 
-import {
-  type DfAssetIndex,
-  type TileSprite,
-  drawTile,
-  useDfAssets,
-  useSpriteSheets,
-} from '~/lib/df-assets'
-import { DfTile } from '~/lib/df-assets/components'
+import { type TileSprite, drawTile, useDfAssets, useSpriteSheets } from '~/lib/df-assets'
+import { TerrainChip, TileChip } from '~/lib/df-assets/legends'
 import {
   RACE_COLORS,
   raceColor,
@@ -20,12 +14,10 @@ import {
 import type { LegendsMapData, MapRegion, MapSite } from '~/lib/legends/server'
 import {
   WORLD_MAP_PAGES,
-  legendTerrain,
   peakSprite,
   riverSprite,
   siteSprite,
   terrainSprites,
-  tileSpriteByName,
 } from '~/lib/legends/worldTiles'
 
 export interface WorldMapProps {
@@ -68,34 +60,6 @@ function siteRadius(type: string | null, tile: number): number {
     return tile * 0.42
   if (siteGroup(type) === 'wild') return tile * 0.22
   return tile * 0.32
-}
-
-const CHIP = 16
-
-/** Legend swatch: a terrain type's base tile with its forest/mountain overlay. */
-function TerrainChip({ index, type }: { index: DfAssetIndex; type: string }) {
-  const look = legendTerrain(index, type)
-  if (!look.base) {
-    return (
-      <span
-        className="inline-block size-3 rounded-sm border border-black/20"
-        style={{ backgroundColor: regionColor(type) }}
-      />
-    )
-  }
-  return (
-    <span className="relative inline-block" style={{ width: CHIP, height: CHIP }}>
-      <DfTile index={index} sprite={look.base} size={CHIP} className="absolute left-0 top-0" />
-      {look.overlay ? (
-        <DfTile index={index} sprite={look.overlay} size={CHIP} className="absolute left-0 top-0" />
-      ) : null}
-    </span>
-  )
-}
-
-function TileChip({ index, name }: { index: DfAssetIndex; name: string }) {
-  const sprite = tileSpriteByName(index, name)
-  return sprite ? <DfTile index={index} sprite={sprite} size={CHIP} /> : null
 }
 
 /**

@@ -18,6 +18,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { ChevronRightIcon, GlobeIcon, HourglassIcon, LibraryIcon } from 'lucide-react'
 import type * as React from 'react'
 
+import { LegendsSprite } from '~/lib/df-assets/legends'
 import { formatNumber } from '~/lib/fortress/format'
 import { useFortOverview } from '~/lib/fortress/queries'
 import {
@@ -48,11 +49,7 @@ export function useLegendsWorlds() {
 
 export function parseWorldParam(raw: unknown): number | undefined {
   const world =
-    typeof raw === 'number'
-      ? raw
-      : typeof raw === 'string'
-        ? Number.parseInt(raw, 10)
-        : Number.NaN
+    typeof raw === 'number' ? raw : typeof raw === 'string' ? Number.parseInt(raw, 10) : Number.NaN
   return Number.isFinite(world) ? world : undefined
 }
 
@@ -118,8 +115,7 @@ export function LegendsShell({
   })
   const years = summary.data?.years ?? null
 
-  const setWorld = (id: number) =>
-    navigate({ to: '.', search: (prev) => ({ ...prev, world: id }) })
+  const setWorld = (id: number) => navigate({ to: '.', search: (prev) => ({ ...prev, world: id }) })
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
@@ -390,8 +386,9 @@ export function HitRows({
       {hits.map((hit) => (
         <li
           key={`${hit.kind}-${hit.id}`}
-          className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2"
+          className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2"
         >
+          <LegendsSprite subject={hit} size={24} className="-my-1" />
           <RecordLink
             kind={hit.kind}
             id={hit.id}

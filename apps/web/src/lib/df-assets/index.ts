@@ -2,9 +2,18 @@ import type { FortUnit } from '@fortress/db-drizzle'
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
 
-import type { DfAssetIndex, LayerSprite, TilePage, TileSprite } from './types'
+import type { DfAssetIndex, TilePage, TileSprite } from './types'
 
-export type { DfAssetIndex, LayerSprite, TilePage, TileSprite } from './types'
+export type {
+  CreatureLayerRules,
+  DfAssetIndex,
+  LayerGroupRule,
+  LayerRule,
+  LayerSetRule,
+  NamedPalette,
+  TilePage,
+  TileSprite,
+} from './types'
 
 export const DF_ASSETS_BASE = '/df-assets'
 
@@ -66,59 +75,34 @@ export function tileVariantAt(
 }
 
 // ---------------------------------------------------------------------------
-// Creatures
+// Creatures with a single sprite per state (animals, beasts, undead)
 
-export type UnitLook = Pick<FortUnit, 'race_id' | 'caste_id' | 'flags'>
+export type SpriteUnit = Pick<FortUnit, 'race_id' | 'caste_id' | 'flags'>
 
-/** Graphics states to try, most specific first, for both simple and layered creatures. */
-function lookStates(unit: UnitLook): { simple: string[]; layered: string[] } {
+/** Simple graphics states to try, most specific first. */
+function simpleStates(unit: SpriteUnit): string[] {
   const f = unit.flags
-  if (f.includes('dead')) return { simple: ['CORPSE', 'DEFAULT'], layered: ['CORPSE', 'DEFAULT'] }
-  if (f.includes('undead')) {
-    return { simple: ['ANIMATED', 'DEFAULT'], layered: ['ANIMATED', 'DEFAULT'] }
-  }
-  if (f.includes('baby')) {
-    return {
-      simple: ['BABY', 'CHILD', 'DEFAULT'],
-      layered: ['BABY:DEFAULT', 'CHILD:DEFAULT', 'DEFAULT'],
-    }
-  }
-  if (f.includes('child')) {
-    return { simple: ['CHILD', 'DEFAULT'], layered: ['CHILD:DEFAULT', 'DEFAULT'] }
-  }
-  if (f.includes('war')) return { simple: ['TRAINED_WAR', 'DEFAULT'], layered: ['DEFAULT'] }
-  if (f.includes('hunter')) return { simple: ['TRAINED_HUNTER', 'DEFAULT'], layered: ['DEFAULT'] }
-  return { simple: ['DEFAULT'], layered: ['DEFAULT'] }
+  if (f.includes('dead')) return ['CORPSE', 'DEFAULT']
+  if (f.includes('undead')) return ['ANIMATED', 'DEFAULT']
+  if (f.includes('baby')) return ['BABY', 'CHILD', 'DEFAULT']
+  if (f.includes('child')) return ['CHILD', 'DEFAULT']
+  if (f.includes('war')) return ['TRAINED_WAR', 'DEFAULT']
+  if (f.includes('hunter')) return ['TRAINED_HUNTER', 'DEFAULT']
+  return ['DEFAULT']
 }
-
-function creatureKeys(unit: UnitLook): string[] {
-  if (!unit.race_id) return []
-  return unit.caste_id ? [`${unit.race_id}:${unit.caste_id}`, unit.race_id] : [unit.race_id]
-}
-
-export type CreatureLook =
-  | { kind: 'sprite'; sprite: TileSprite }
-  | { kind: 'layers'; layers: LayerSprite[] }
 
 /**
- * What the game would draw for this unit: a single sprite for most creatures,
- * a stack of layers for civilized races. Null when the race has no graphics
- * in the index or the dump predates the race_id column.
+ * The single sprite the game draws for a non-layered creature in the unit's
+ * state, or null when the race has none (civilized races are layered; see
+ * layers.ts) or the dump predates the race_id column.
  */
-export function creatureLook(index: DfAssetIndex, unit: UnitLook): CreatureLook | null {
-  const keys = creatureKeys(unit)
-  if (!keys.length) return null
-  const states = lookStates(unit)
-  for (const state of states.simple) {
+export function simpleCreatureSprite(index: DfAssetIndex, unit: SpriteUnit): TileSprite | null {
+  if (!unit.race_id) return null
+  const keys = unit.caste_id ? [`${unit.race_id}:${unit.caste_id}`, unit.race_id] : [unit.race_id]
+  for (const state of simpleStates(unit)) {
     for (const key of keys) {
       const sprite = index.creatures[key]?.[state]
-      if (sprite && index.pages[sprite.page]) return { kind: 'sprite', sprite }
-    }
-  }
-  for (const set of states.layered) {
-    for (const key of keys) {
-      const layers = index.layered[key]?.[set]
-      if (layers?.length) return { kind: 'layers', layers }
+      if (sprite && index.pages[sprite.page]) return sprite
     }
   }
   return null

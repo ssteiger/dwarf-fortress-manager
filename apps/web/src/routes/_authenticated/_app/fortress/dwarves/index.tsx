@@ -21,7 +21,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { BookOpenIcon, Maximize2Icon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { CreatureSprite } from '~/lib/df-assets/components'
+import { CreatureSprite, UnitPortrait } from '~/lib/df-assets/components'
 import {
   humanize,
   isLiving,
@@ -333,7 +333,13 @@ function DwarvesPage() {
               <DrawerHeader className="border-b">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-3">
-                    <CreatureSprite unit={selected} size={48} className="shrink-0" />
+                    <UnitPortrait
+                      unit={selected}
+                      size={72}
+                      fallbackToSprite
+                      className="shrink-0 rounded-md border bg-muted/40"
+                      title={`${selected.race} as drawn in the game`}
+                    />
                     <div className="min-w-0">
                       <DrawerTitle className="flex flex-wrap items-center gap-2">
                         {unitDisplayName(selected)}

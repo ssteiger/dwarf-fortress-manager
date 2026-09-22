@@ -140,6 +140,21 @@ export const RACE_COLORS: Record<string, string> = {
   kobold: '#78716c',
 }
 
+/**
+ * "black bear" -> BLACK_BEAR: the best guess at a raw creature token from a
+ * legends name. Exact for civilized races (dwarf, human, elf, goblin, kobold);
+ * the raws order some animal names differently (BEAR_BLACK).
+ */
+export function raceToken(name: string | null | undefined): string | null {
+  if (!name) return null
+  const token = name
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+  return token || null
+}
+
 export function raceColor(race: string | null | undefined): string {
   if (!race) return '#71717a'
   return RACE_COLORS[words(race)] ?? '#0891b2'

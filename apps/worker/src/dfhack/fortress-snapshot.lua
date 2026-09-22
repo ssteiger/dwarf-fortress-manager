@@ -13,7 +13,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 2
+local DUMP_VERSION = 3
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -190,7 +190,7 @@ local UNIT_COLUMNS = arr{
     'profession', 'x', 'y', 'z', 'stress', 'stress_category', 'job_id', 'job',
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
-    'hist_figure_id', 'civ_id', 'race_id', 'caste_id',
+    'hist_figure_id', 'civ_id', 'race_id', 'caste_id', 'look',
 }
 
 local UNIT_FLAG_CHECKS = {
@@ -277,6 +277,347 @@ local function unit_positions(u)
     return names
 end
 
+-- ---------------------------------------------------------------------------
+-- Unit look: everything the graphics raws' layer conditions read, so the web
+-- app can composite a unit exactly like the game does (see
+-- apps/worker/src/scripts/extract-assets.ts for the rule side).
+-- ---------------------------------------------------------------------------
+
+-- Descriptor colour index -> token such as DARK_BROWN.
+local function color_token(idx)
+    if idx == nil or idx < 0 then return nil end
+    local c = try(function() return df.global.world.raws.descriptors.colors[idx] end)
+    return c and c.id or nil
+end
+
+-- Colour pattern id -> the token the graphics raws compare against.
+local function pattern_color_token(pattern_id)
+    local pattern = try(function() return df.global.world.raws.descriptors.patterns[pattern_id] end)
+    if not pattern then return nil end
+    local ptype = tonumber(pattern.pattern) or 0
+    -- Eye patterns list sclera, pupil, iris; the iris is the colour people mean.
+    local slot = (ptype == 2 or ptype == 4) and 2 or 0
+    local idx = try(function() return pattern.colors[slot] end)
+    if idx == nil then idx = try(function() return pattern.colors[0] end) end
+    return color_token(idx)
+end
+
+-- CONDITION_PROFESSION_CATEGORY compares against the top of the profession
+-- tree (MINER, FARMER, STANDARD, CHILD, ...), reached through parent links.
+local function profession_category(u)
+    local pid = u.profession
+    for _ = 1, 8 do
+        local parent = try(function() return df.profession.attrs[pid].parent end)
+        if parent == nil or parent < 0 then break end
+        pid = parent
+    end
+    return enum_name(df.profession, pid)
+end
+
+local function syn_classes(u)
+    local out, seen = arr{}, {}
+    local active = try(function() return u.syndromes.active end)
+    if not active then return out end
+    for _, us in ipairs(active) do
+        local syn = df.syndrome.find(us.type)
+        if syn then
+            for _, c in ipairs(syn.syn_class) do
+                local v = tostring(c.value)
+                if not seen[v] then
+                    seen[v] = true
+                    out[#out + 1] = v
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function body_part_ref(caste, idx)
+    local bp = try(function() return caste.body_info.body_parts[idx] end)
+    if not bp then return nil, nil end
+    return tostring(bp.token), tostring(bp.category)
+end
+
+local function layer_name(caste, bp_idx, layer_idx)
+    return try(function() return caste.body_info.body_parts[bp_idx].layers[layer_idx].layer_name end)
+end
+
+-- Body parts as [token, category, missing] so BP_PRESENT / BP_MISSING can be
+-- answered for parts the creature has, and denied for parts it never had.
+local function unit_parts(u, caste)
+    local parts = arr{}
+    local bps = try(function() return caste.body_info.body_parts end)
+    if not bps then return parts end
+    for i, bp in ipairs(bps) do
+        local missing = try(function() return u.body.components.body_part_status[i].missing end) == true
+        parts[#parts + 1] = arr{tostring(bp.token), tostring(bp.category), missing and 1 or 0}
+    end
+    return parts
+end
+
+-- Tissue layers with a colour and/or a style: skin, hair, beard, eyebrows,
+-- eyes. Each entry: {bps = {tokens}, cat, layer, color, length, style, curly, dense}.
+local function unit_tissues(u, caste)
+    local entries = {}
+    local order = {}
+    local function entry_for(bp_idx, l_idx)
+        local key = bp_idx .. ':' .. l_idx
+        local e = entries[key]
+        if not e then
+            local token, cat = body_part_ref(caste, bp_idx)
+            if not token then return nil end
+            e = {bp = token, cat = cat, layer = tostring(layer_name(caste, bp_idx, l_idx) or '')}
+            entries[key] = e
+            order[#order + 1] = key
+        end
+        return e
+    end
+
+    -- Colours: caste.color_modifiers[k] paints (body_part_id[j], tissue_layer_id[j])
+    -- with pattern_index[unit.appearance.colors[k]]. Several modifiers can
+    -- cover the same layer with a start/end age in days (hair greys at 80,
+    -- whitens at 130); the one whose window holds the unit's age wins, and
+    -- a 0..0 window is the lifelong default.
+    local age_days = math.floor((try(dfhack.units.getAge, u, true) or 0) * 336)
+    local mods = try(function() return caste.color_modifiers end)
+    if mods then
+        local applied = {}
+        for k, mod in ipairs(mods) do
+            local start_day = tonumber(mod.start_date) or 0
+            local end_day = tonumber(mod.end_date) or 0
+            local timed = not (start_day == 0 and end_day == 0)
+            local active = not timed or (age_days >= start_day and (end_day <= 0 or age_days < end_day))
+            if active then
+                local choice = try(function() return u.appearance.colors[k] end)
+                local pattern_id = choice and try(function() return mod.pattern_index[choice] end)
+                local color = pattern_id and pattern_color_token(pattern_id) or nil
+                local n = try(function() return #mod.body_part_id end) or 0
+                for j = 0, n - 1 do
+                    local e = entry_for(mod.body_part_id[j], mod.tissue_layer_id[j])
+                    if e then
+                        local key = mod.body_part_id[j] .. ':' .. mod.tissue_layer_id[j]
+                        -- A timed window beats the lifelong default.
+                        if timed or not applied[key] then
+                            e.color = color
+                            applied[key] = timed
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Length and styling: unit.appearance.tissue_length/tissue_style[i] belong
+    -- to the layer at bp_appearance.style_part_idx[i] / style_layer_idx[i].
+    -- Style is the tissue_style_type enum (-1 when unstyled); a negative
+    -- length means the layer is not grown.
+    local bpa = try(function() return caste.bp_appearance end)
+    if bpa then
+        local n = try(function() return #bpa.style_part_idx end) or 0
+        for i = 0, n - 1 do
+            local e = entry_for(bpa.style_part_idx[i], bpa.style_layer_idx[i])
+            if e then
+                local length = try(function() return u.appearance.tissue_length[i] end)
+                local style = try(function() return u.appearance.tissue_style[i] end)
+                e.length = (length ~= nil and length >= 0) and length or nil
+                e.style = (style ~= nil and style >= 0) and enum_name(df.tissue_style_type, style) or nil
+            end
+        end
+    end
+
+    -- CURLY / DENSE are body-part appearance modifiers bound to a tissue layer.
+    if bpa then
+        local n = try(function() return #bpa.modifier_idx end) or 0
+        for i = 0, n - 1 do
+            local mod = try(function() return bpa.modifiers[bpa.modifier_idx[i]] end)
+            local mtype = mod and enum_name(df.appearance_modifier_type, mod.modifier.type)
+            if mtype == 'CURLY' or mtype == 'DENSE' then
+                local l_idx = try(function() return bpa.layer_idx[i] end) or -1
+                if l_idx >= 0 then
+                    local e = entry_for(bpa.part_idx[i], l_idx)
+                    if e then
+                        e[mtype == 'CURLY' and 'curly' or 'dense'] = try(function() return u.appearance.bp_modifiers[i] end)
+                    end
+                end
+            end
+        end
+    end
+
+    -- Collapse identical parts (every skin patch shares one colour) into one
+    -- entry that lists the body part tokens it covers.
+    local merged, out = {}, arr{}
+    for _, key in ipairs(order) do
+        local e = entries[key]
+        local sig = table.concat({e.cat, e.layer, tostring(e.color), tostring(e.length),
+            tostring(e.style), tostring(e.curly), tostring(e.dense)}, '|')
+        local m = merged[sig]
+        if not m then
+            m = {bps = arr{}, cat = e.cat, layer = e.layer, color = e.color, length = e.length,
+                style = e.style, curly = e.curly, dense = e.dense}
+            merged[sig] = m
+            out[#out + 1] = m
+        end
+        m.bps[#m.bps + 1] = e.bp
+    end
+    return out
+end
+
+-- Body part appearance modifiers (ROUND_VS_NARROW on the nose, ...) as
+-- [bp token, category, type, value]; body-wide ones as [type, value].
+local function unit_modifiers(u, caste)
+    local bp_mods, body_mods = arr{}, arr{}
+    local bpa = try(function() return caste.bp_appearance end)
+    if bpa then
+        local n = try(function() return #bpa.modifier_idx end) or 0
+        for i = 0, n - 1 do
+            local mod = try(function() return bpa.modifiers[bpa.modifier_idx[i]] end)
+            local mtype = mod and enum_name(df.appearance_modifier_type, mod.modifier.type)
+            local token, cat = body_part_ref(caste, try(function() return bpa.part_idx[i] end) or -1)
+            local value = try(function() return u.appearance.bp_modifiers[i] end)
+            if mtype and token and value ~= nil then
+                bp_mods[#bp_mods + 1] = arr{token, cat, mtype, value}
+            end
+        end
+    end
+    local body = try(function() return caste.body_appearance_modifiers end)
+    if body then
+        for i, mod in ipairs(body) do
+            local value = try(function() return u.appearance.body_modifiers[i] end)
+            local mtype = try(function() return mod.modifier.type end)
+            if value ~= nil and mtype ~= nil then
+                body_mods[#body_mods + 1] = arr{enum_name(df.appearance_modifier_type, mtype), value}
+            end
+        end
+    end
+    return bp_mods, body_mods
+end
+
+-- Material facts the graphics raws test with CONDITION_MATERIAL_FLAG / _TYPE
+-- and the colour USE_STANDARD_PALETTE_FROM_ITEM paints with.
+local MATERIAL_FLAG_NAMES = {
+    {'WOOD', 'ANY_WOOD_MATERIAL'},
+    {'LEATHER', 'ANY_LEATHER_MATERIAL'},
+    {'BONE', 'ANY_BONE_MATERIAL'},
+    {'SHELL', 'ANY_SHELL_MATERIAL'},
+    {'IS_STONE', 'ANY_STONE_MATERIAL'},
+    {'IS_METAL', 'ANY_METAL_MATERIAL'},
+    {'IS_GEM', 'ANY_GEM_MATERIAL'},
+    {'HORN', 'ANY_HORN_MATERIAL'},
+    {'TOOTH', 'ANY_TOOTH_MATERIAL'},
+    {'PEARL', 'ANY_PEARL_MATERIAL'},
+    {'SILK', 'ANY_SILK_MATERIAL'},
+    {'YARN', 'ANY_YARN_MATERIAL'},
+    {'THREAD_PLANT', 'ANY_PLANT_CLOTH_MATERIAL'},
+}
+
+local function item_dye_color(item)
+    local imps = try(function() return item.improvements end)
+    if not imps then return nil end
+    for _, imp in ipairs(imps) do
+        local mat_type = try(function() return imp.dye.mat_type end)
+        local mat_index = try(function() return imp.dye.mat_index end)
+        if mat_type ~= nil and mat_type >= 0 then
+            local mi = try(dfhack.matinfo.decode, mat_type, mat_index)
+            local idx = mi and try(function() return mi.material.powder_dye end)
+            local token = color_token(idx)
+            if token then return token end
+        end
+    end
+    return nil
+end
+
+local WORN_MODES = {Weapon = true, Worn = true, Piercing = true, Flask = true,
+    WrappedAround = true, Strapped = true}
+
+local function unit_worn(u, caste)
+    local worn = arr{}
+    local mode_enum = try(function() return df.unit_inventory_item.T_mode end)
+    for _, entry in ipairs(u.inventory) do
+        local item = entry.item
+        local mode = tonumber(entry.mode) or -1
+        local mode_name = (mode_enum and try(function() return mode_enum[mode] end))
+            or INVENTORY_MODES[mode] or tostring(mode)
+        if item and WORN_MODES[tostring(mode_name)] then
+            local token, cat = body_part_ref(caste, entry.body_part_id)
+            local flags = arr{}
+            local mtype, color = nil, nil
+            local mi = try(dfhack.matinfo.decode, item)
+            if mi then
+                mtype = mi.mode and tostring(mi.mode):upper() or nil
+                local mat = mi.material
+                if mat then
+                    color = color_token(try(function() return mat.state_color.Solid end))
+                    local woven = false
+                    for _, pair in ipairs(MATERIAL_FLAG_NAMES) do
+                        if try(function() return mat.flags[pair[1]] end) == true then
+                            flags[#flags + 1] = pair[2]
+                            if pair[1] == 'SILK' or pair[1] == 'YARN' or pair[1] == 'THREAD_PLANT' then
+                                woven = true
+                            end
+                        end
+                    end
+                    -- Cloth of any fibre: what the raws call a woven item.
+                    if woven then flags[#flags + 1] = 'WOVEN_ITEM' end
+                end
+            end
+            if try(function() return item.flags.artifact end) == true then
+                flags[#flags + 1] = 'IS_CRAFTED_ARTIFACT'
+            else
+                flags[#flags + 1] = 'NOT_ARTIFACT'
+            end
+            if try(function() return item.flags2.grown end) == true then
+                flags[#flags + 1] = 'GROWN_NOT_CRAFTED'
+            end
+            local dye = item_dye_color(item)
+            worn[#worn + 1] = {
+                item_id = item.id,
+                mode = tostring(mode_name),
+                bp = token,
+                cat = cat,
+                type = enum_name(df.item_type, item:getType()),
+                subtype = try(function() return item.subtype.id end),
+                quality = try(function() return item:getQuality() end) or 0,
+                material_type = mtype,
+                color = dye or color,
+                dyed = dye ~= nil,
+                flags = flags,
+            }
+        end
+    end
+    return worn
+end
+
+local function unit_look_inner(u, craw)
+    local caste = try(function() return craw.caste[u.caste] end)
+    if not caste then return nil end
+    local haul = 0
+    for _, entry in ipairs(u.inventory) do
+        if tonumber(entry.mode) == 0 then haul = haul + 1 end
+    end
+    local bp_mods, body_mods = unit_modifiers(u, caste)
+    return {
+        profession_category = profession_category(u),
+        syn_classes = syn_classes(u),
+        haul_count = haul,
+        body_size = try(function() return u.body.size_info.size_cur end) or 0,
+        tissues = unit_tissues(u, caste),
+        bp_modifiers = bp_mods,
+        body_modifiers = body_mods,
+        parts = unit_parts(u, caste),
+        worn = unit_worn(u, caste),
+    }
+end
+
+-- A failure here must not lose the unit; record why instead so the web app
+-- can fall back and the problem is visible in the dump.
+local function unit_look(u, craw)
+    if not craw then return nil end
+    local ok, res = pcall(unit_look_inner, u, craw)
+    if ok then return res end
+    return {error = tostring(res)}
+end
+
 local function unit_row(u)
     local x, y, z = dfhack.units.getPosition(u)
     local soul = u.status.current_soul
@@ -328,7 +669,8 @@ local function unit_row(u)
         u.hist_figure_id,
         u.civ_id,
         race_id,
-        caste_id
+        caste_id,
+        unit_look(u, craw)
     )
 end
 

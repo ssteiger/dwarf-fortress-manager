@@ -10,7 +10,8 @@
       "node_modules",
       "next-env.d",
       "src/routeTree.gen.ts",
-      "src/lib/styles/app.css"
+      "src/lib/styles/app.css",
+      "public/df-assets"
     ]
   }
 }

@@ -21,12 +21,20 @@
  *       -> where a creature's sprites sit.
  *     [LAYER_SET:DEFAULT] ... [LAYER_GROUP] [LAYER:NAME:PAGE:col:row] [CONDITION_*...]
  *       -> civilized races (dwarves, humans, elves, goblins, kobolds, animal
- *          people) are composited from layers: one layer per group is drawn,
- *          the first whose conditions hold. Conditions cover caste, curses,
- *          skin and hair colour, worn items, profession, and so on. The index
- *          resolves each group for a plain creature of each caste (no curse,
- *          nothing worn, first listed skin/hair variant) so the web app can
- *          draw a creature's default look without knowing its wardrobe.
+ *          people) are composited from layers. Each explicit group draws the
+ *          first layer whose conditions all hold; layers outside a group draw
+ *          on their own. Conditions read caste, curses, skin/hair colour and
+ *          length, worn items and their materials, profession, missing body
+ *          parts, face shape, and so on. [USE_PALETTE:NAME:row] recolours a
+ *          layer from row 0 of an LS_PALETTE image to another row, and
+ *          [USE_STANDARD_PALETTE_FROM_ITEM] does the same with the global
+ *          palette and the worn item's material colour. The index exports
+ *          these rules verbatim (one JSON per creature under layers/) so the
+ *          web app can evaluate them for a real unit exactly like the game.
+ *     [LAYER_SET_TEMPLATE:NAME] ... [USE_LAYER_SET_TEMPLATE:NAME] + [ARG_X:...]
+ *       -> animal people share one template; the ARG values are spliced in here.
+ *     [PALETTE:DEFAULT] + [PALETTE_COLOR:NAME:row]
+ *       -> the global palette: which row of palettes.png a colour token is.
  * - `<game>/data/art/` holds the classic tilesets and UI art (curses_*.png etc.).
  *
  * Everything lands in apps/web/public/df-assets/, which is gitignored: the
@@ -42,7 +50,7 @@ const workerRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.
 const OUT_DIR = process.env.DF_ASSETS_OUT_DIR || path.resolve(workerRoot, '../web/public/df-assets')
 
 // ---------------------------------------------------------------------------
-// Raw parsing
+// Index shape (mirrored in apps/web/src/lib/df-assets/types.ts)
 
 interface TilePage {
   /** TILE_PAGE name, e.g. CREATURES_DOMESTIC. */
@@ -59,14 +67,18 @@ interface TileSprite {
   page: string
   x: number
   y: number
+  /** Size in tiles; present (>1) only for LARGE_IMAGE sprites. */
+  w?: number
+  h?: number
 }
 
-/** One fallback layer of a layered creature, in tiles of its page. */
-interface LayerSprite extends TileSprite {
-  name: string
-  /** Size in tiles; >1 only for LARGE_IMAGE layers. */
-  w: number
-  h: number
+interface NamedPalette {
+  /** Palette PNG relative to df-assets/; one colour per column, one variant per row. */
+  file: string
+  /** Row the sprite sheets are painted in. */
+  defaultRow: number
+  /** Colour token (DARK_BROWN) -> row; used by USE_STANDARD_PALETTE_FROM_ITEM. */
+  colors: Record<string, number>
 }
 
 interface AssetIndex {
@@ -77,14 +89,69 @@ interface AssetIndex {
   tiles: Record<string, TileSprite>
   /** "CREATURE" or "CREATURE:CASTE" -> state (DEFAULT, CHILD, CORPSE, ...) -> sprite. */
   creatures: Record<string, Record<string, TileSprite>>
+  /** Creatures with a layers/<CREATURE>.json rule file. */
+  layeredCreatures: string[]
+  /** [PALETTE:NAME] blocks; "DEFAULT" is the one item colours refer to. */
+  palettes: Record<string, NamedPalette>
   /**
-   * Layered creatures: "CREATURE" or "CREATURE:CASTE" -> layer set
-   * ("DEFAULT", "CHILD:DEFAULT", "BABY:DEFAULT", "CORPSE", "ANIMATED",
-   * "PORTRAIT", ...) -> one layer per layer group for a plain creature,
-   * bottom to top. Groups that only draw worn items or curses are left out.
+   * Item subtype token (ITEM_WEAPON_PICK, ITEM_HELM_CAP) -> its sprite, from
+   * [WEAPON_GRAPHICS:TOKEN] + [WEAPON_GRAPHICS_DEFAULT:PAGE:x:y] blocks and
+   * [ARMOR_GRAPHICS:PAGE:x:y:TOKEN]-style tags. `artifact` is the variant
+   * drawn for artifacts when the raws define one.
    */
-  layered: Record<string, Record<string, LayerSprite[]>>
+  items: Record<string, { default: TileSprite; artifact?: TileSprite }>
 }
+
+// ---------------------------------------------------------------------------
+// Layer rules (mirrored in apps/web/src/lib/df-assets/types.ts)
+
+interface LayerRule {
+  name: string
+  page: string
+  x: number
+  y: number
+  w: number
+  h: number
+  /**
+   * The raw condition tags in order, tag first: e.g.
+   * ["CONDITION_TISSUE_LAYER","BY_CATEGORY","HEAD","HAIR"] followed by its
+   * nested ["TISSUE_MIN_LENGTH","50"]. Order matters: TISSUE_* and ITEM_*
+   * tags refer to the tissue/item selected by the tag before them.
+   */
+  conditions: string[][]
+  /** [USE_PALETTE:NAME:row]: recolour from the palette's default row to `row`. */
+  palette?: { name: string; row: number }
+  /** [USE_STANDARD_PALETTE_FROM_ITEM]: recolour with the worn item's material colour. */
+  itemPalette?: boolean
+}
+
+interface LayerGroupRule {
+  /** Opened by [LAYER_GROUP]; false for a layer that stands on its own. */
+  explicit: boolean
+  /** [LG_OFFSET:x:y] in pixels, from templates. */
+  offset?: [number, number]
+  /** Group-level conditions ([LG_CONDITION_BP:...] + [BP_PRESENT] ...). */
+  conditions: string[][]
+  layers: LayerRule[]
+}
+
+interface LayerSetRule {
+  /** "DEFAULT", "CHILD:DEFAULT", "BABY:DEFAULT", "CORPSE", "ANIMATED", "PORTRAIT", "CHILD:PORTRAIT", ... */
+  key: string
+  /** Set when the set came from [CREATURE_CASTE_GRAPHICS:ID:CASTE]. */
+  caste: string | null
+  /** LS_PALETTE name -> palette image and the row the sheets are painted in. */
+  palettes: Record<string, { file: string; defaultRow: number }>
+  groups: LayerGroupRule[]
+}
+
+interface CreatureLayerRules {
+  creature: string
+  sets: LayerSetRule[]
+}
+
+// ---------------------------------------------------------------------------
+// Raw parsing
 
 /** Pull every [TAG:arg:arg] out of a raw file, in order. */
 function* rawTags(text: string): Generator<string[]> {
@@ -92,6 +159,37 @@ function* rawTags(text: string): Generator<string[]> {
     yield match[1].split(':').map((part) => part.trim())
   }
 }
+
+/** Tags that start a new top-level block and therefore end a layer set. */
+const BLOCK_OPENERS = new Set([
+  'TILE_PAGE',
+  'PAGE',
+  'OBJECT',
+  'CREATURE_GRAPHICS',
+  'CREATURE_CASTE_GRAPHICS',
+  'STATUE_CREATURE_GRAPHICS',
+  'STATUE_CREATURE_CASTE_GRAPHICS',
+  'LAYER_SET',
+  'LAYER_SET_TEMPLATE',
+  'PALETTE',
+])
+
+/** [X_GRAPHICS:PAGE:x:y:TOKEN(:material)] - one sprite per subtype, inline. */
+const INLINE_ITEM_GRAPHICS = new Set([
+  'ARMOR_GRAPHICS',
+  'HELM_GRAPHICS',
+  'SHOES_GRAPHICS',
+  'GLOVES_GRAPHICS',
+  'PANTS_GRAPHICS',
+  'SHIELD_GRAPHICS',
+  'TOOL_GRAPHICS',
+  'TRAPCOMP_GRAPHICS',
+  'TOY_GRAPHICS',
+  'INSTRUMENT_GRAPHICS',
+])
+
+/** [X_GRAPHICS:TOKEN] opens a block of [X_GRAPHICS_VARIANT:PAGE:x:y] lines. */
+const BLOCK_ITEM_GRAPHICS = new Set(['WEAPON_GRAPHICS', 'AMMO_GRAPHICS', 'SIEGEAMMO_GRAPHICS'])
 
 const CREATURE_STATE_SKIP = new Set([
   'LAYER_SET',
@@ -104,239 +202,278 @@ const CREATURE_STATE_SKIP = new Set([
   'USE_PALETTE',
   'BODY_UPPER',
   'CONDITION_GHOST',
-  // Portrait layer plumbing, not a sprite state.
   'BP_APPEARANCE_MODIFIER_RANGE',
 ])
 
-/** Tags inside a layer set that describe how to draw, not when to draw. */
-const LAYER_NON_CONDITION = new Set([
-  'LS_PALETTE',
-  'LS_PALETTE_FILE',
-  'LS_PALETTE_DEFAULT',
-  'USE_PALETTE',
-  'USE_STANDARD_PALETTE_FROM_ITEM',
-])
-
-/**
- * The "plain" creature the layers are resolved for: healthy, nothing worn,
- * average build, short unstyled hair, the first face variant, and one colour
- * per tissue. Every appearance condition is evaluated against this the way
- * the game evaluates it against a real unit, so exactly one variant of each
- * body part passes. Lengths: 1-49 stubble, 50-99 short, 100-199 mid, 200+ long.
- */
-const PLAIN_TISSUE_LENGTH = 75
-const PLAIN_MODIFIER_VALUE = 100
-const PREFERRED_COLORS = ['DARK_BROWN', 'BROWN', 'CHESTNUT', 'TAN', 'PALE_BROWN', 'BLACK', 'GRAY']
-
-interface RawLayer {
-  sprite: LayerSprite
-  conditions: string[][]
-}
-
-interface RawLayerGroup {
-  /** Opened by [LAYER_GROUP]; layers outside any group each draw on their own. */
-  explicit: boolean
-  conditioned: boolean
-  layers: RawLayer[]
-}
-
-/** Default colour per tissue key ("BY_CATEGORY:HEAD:HAIR"), chosen from the colours the raws offer. */
-type TissueColors = Map<string, string>
-
-function pickTissueColors(groups: RawLayerGroup[]): TissueColors {
-  const offered = new Map<string, string[]>()
-  for (const group of groups) {
-    for (const layer of group.layers) {
-      let tissue: string | null = null
-      for (const cond of layer.conditions) {
-        if (cond[0] === 'CONDITION_TISSUE_LAYER') tissue = cond.slice(1).join(':')
-        else if (cond[0] === 'TISSUE_MAY_HAVE_COLOR' && tissue) {
-          const list = offered.get(tissue) ?? []
-          list.push(...cond.slice(1))
-          offered.set(tissue, list)
-        }
-      }
-    }
+/** Parse [STATE:PAGE:x:y...] or [STATE:PAGE:LARGE_IMAGE:x1:y1:x2:y2...] into a sprite. */
+function spriteFromArgs(args: string[], from: number): TileSprite | null {
+  const page = args[from]
+  if (!page) return null
+  if (args[from + 1] === 'LARGE_IMAGE') {
+    const x = Number(args[from + 2])
+    const y = Number(args[from + 3])
+    const x2 = Number(args[from + 4])
+    const y2 = Number(args[from + 5])
+    if (![x, y, x2, y2].every(Number.isInteger)) return null
+    return { page, x, y, w: x2 - x + 1, h: y2 - y + 1 }
   }
-  const chosen: TissueColors = new Map()
-  for (const [tissue, colors] of offered) {
-    chosen.set(tissue, PREFERRED_COLORS.find((c) => colors.includes(c)) ?? colors[0])
-  }
-  return chosen
+  const x = Number(args[from + 1])
+  const y = Number(args[from + 2])
+  if (!Number.isInteger(x) || !Number.isInteger(y)) return null
+  return { page, x, y }
 }
 
-function layerPasses(layer: RawLayer, caste: string | null, colors: TissueColors): boolean {
-  let tissue: string | null = null
-  for (const cond of layer.conditions) {
-    const tag = cond[0]
-    switch (tag) {
-      case 'CONDITION_CASTE':
-        if (caste === null || !cond.slice(1).includes(caste)) return false
-        break
-      case 'CONDITION_TISSUE_LAYER':
-        tissue = cond.slice(1).join(':')
-        break
-      case 'TISSUE_MAY_HAVE_COLOR': {
-        const want = tissue ? colors.get(tissue) : undefined
-        if (!want || !cond.slice(1).includes(want)) return false
-        break
-      }
-      case 'TISSUE_MIN_LENGTH':
-        if (PLAIN_TISSUE_LENGTH < Number(cond[1])) return false
-        break
-      case 'TISSUE_MAX_LENGTH':
-        if (PLAIN_TISSUE_LENGTH > Number(cond[1])) return false
-        break
-      case 'TISSUE_MAY_HAVE_SHAPING':
-        // Plain hair is not styled.
-        return false
-      case 'CONDITION_RANDOM_PART_INDEX':
-        // [..:PART:index:count] - always the first variant.
-        if (Number(cond[2]) !== 1) return false
-        break
-      case 'BP_APPEARANCE_MODIFIER_RANGE':
-      case 'CONDITION_BP_APPEARANCE_MODIFIER_RANGE': {
-        // [..:MODIFIER:min:max] (portraits may prefix a body part).
-        const max = Number(cond.at(-1))
-        const min = Number(cond.at(-2))
-        if (Number.isFinite(min) && Number.isFinite(max)) {
-          if (PLAIN_MODIFIER_VALUE < min || PLAIN_MODIFIER_VALUE > max) return false
-        }
-        break
-      }
-      case 'TISSUE_NOT_SHAPED':
-      case 'TISSUE_SWAP':
-      case 'CONDITION_NOT_CHILD':
-      // "Hide when a helmet/cloak is worn": nothing is worn, so it passes.
-      case 'SHUT_OFF_IF_ITEM_PRESENT':
-        break
-      default:
-        // Curses, ghosts, worn items, professions, dyes, materials: not plain.
-        return false
-    }
-  }
-  return true
-}
+/** Collects one LAYER_SET's groups and layers from the raw tag stream. */
+class LayerSetBuilder {
+  readonly set: LayerSetRule
+  private group: LayerGroupRule | null = null
+  private layer: LayerRule | null = null
+  private palette: string | null = null
+  /** Set by LG_PERMITTED when a template arg says the group is off. */
+  private groupDropped = false
 
-class LayerSetParser {
-  private readonly groups: RawLayerGroup[] = []
-  private group: RawLayerGroup | null = null
-  readonly castes = new Set<string>()
+  constructor(
+    key: string,
+    caste: string | null,
+    private readonly packName: string,
+  ) {
+    this.set = { key, caste, palettes: {}, groups: [] }
+  }
 
   private openGroup(explicit: boolean) {
-    this.group = { explicit, conditioned: false, layers: [] }
-    this.groups.push(this.group)
+    this.group = { explicit, conditions: [], layers: [] }
+    this.layer = null
+    this.groupDropped = false
+    this.set.groups.push(this.group)
+  }
+
+  private closeGroup() {
+    if (this.group && this.groupDropped) this.set.groups.pop()
+    this.group = null
+    this.layer = null
+    this.groupDropped = false
   }
 
   handle(args: string[]) {
     const tag = args[0]
-    if (tag === 'LAYER_GROUP') {
-      this.openGroup(true)
-      return
+    switch (tag) {
+      case 'LS_PALETTE':
+        this.palette = args[1]
+        this.set.palettes[args[1]] ??= { file: '', defaultRow: 0 }
+        return
+      case 'LS_PALETTE_FILE':
+        if (this.palette)
+          this.set.palettes[this.palette].file = path.posix.join(this.packName, args[1])
+        return
+      case 'LS_PALETTE_DEFAULT':
+        if (this.palette) this.set.palettes[this.palette].defaultRow = Number(args[1])
+        return
+      case 'LAYER_GROUP':
+        this.closeGroup()
+        this.openGroup(true)
+        return
+      case 'END_LAYER_GROUP':
+        this.closeGroup()
+        return
+      case 'LAYER': {
+        // [LAYER:NAME:PAGE:x:y] or [LAYER:NAME:PAGE:LARGE_IMAGE:x1:y1:x2:y2]
+        const sprite = spriteFromArgs(args, 2)
+        if (!sprite) return
+        if (!this.group?.explicit) {
+          this.closeGroup()
+          this.openGroup(false)
+        }
+        this.layer = {
+          name: args[1],
+          page: sprite.page,
+          x: sprite.x,
+          y: sprite.y,
+          w: sprite.w ?? 1,
+          h: sprite.h ?? 1,
+          conditions: [],
+        }
+        this.group?.layers.push(this.layer)
+        return
+      }
+      case 'LG_PERMITTED':
+        // From templates: the arg has been substituted; anything but YES drops the group.
+        if (this.group && args[1] !== 'YES') this.groupDropped = true
+        return
+      case 'LG_OFFSET':
+        if (this.group) this.group.offset = [Number(args[1]) || 0, Number(args[2]) || 0]
+        return
+      case 'USE_PALETTE':
+        if (this.layer) this.layer.palette = { name: args[1], row: Number(args[2]) }
+        return
+      case 'USE_STANDARD_PALETTE_FROM_ITEM':
+        if (this.layer) this.layer.itemPalette = true
+        return
+      default:
+        if (this.layer) this.layer.conditions.push(args)
+        else if (this.group) this.group.conditions.push(args)
     }
-    if (tag === 'END_LAYER_GROUP') {
-      this.group = null
-      return
-    }
-    if (tag === 'LAYER') {
-      if (!this.group?.explicit) this.openGroup(false)
-      // [LAYER:NAME:PAGE:x:y] or [LAYER:NAME:PAGE:LARGE_IMAGE:x1:y1:x2:y2]
-      const large = args[3] === 'LARGE_IMAGE'
-      const x = Number(args[large ? 4 : 3])
-      const y = Number(args[large ? 5 : 4])
-      const w = large ? Number(args[6]) - x + 1 : 1
-      const h = large ? Number(args[7]) - y + 1 : 1
-      if (!Number.isInteger(x) || !Number.isInteger(y)) return
-      this.group?.layers.push({
-        sprite: { name: args[1], page: args[2], x, y, w, h },
-        conditions: [],
-      })
-      return
-    }
-    if (tag.startsWith('LG_')) {
-      if (this.group) this.group.conditioned = true
-      return
-    }
-    if (LAYER_NON_CONDITION.has(tag)) return
-    const layer = this.group?.layers.at(-1)
-    if (!layer) return
-    layer.conditions.push(args)
-    if (tag === 'CONDITION_CASTE') for (const c of args.slice(1)) this.castes.add(c)
   }
 
-  /**
-   * The layers a plain creature of the given caste shows, bottom to top: the
-   * first passing layer of each explicit group, and every passing ungrouped
-   * layer (that is how the game treats layers outside a LAYER_GROUP).
-   */
-  resolve(caste: string | null): LayerSprite[] {
-    const colors = pickTissueColors(this.groups)
-    const out: LayerSprite[] = []
-    for (const group of this.groups) {
-      if (group.conditioned) continue
-      if (group.explicit) {
-        const layer = group.layers.find((l) => layerPasses(l, caste, colors))
-        if (layer) out.push(layer.sprite)
-      } else {
-        for (const layer of group.layers) {
-          if (layerPasses(layer, caste, colors)) out.push(layer.sprite)
-        }
-      }
-    }
-    return out
+  finish(): LayerSetRule {
+    this.closeGroup()
+    return this.set
   }
 }
 
-function parseRawFile(text: string, packName: string, index: AssetIndex) {
+interface ParseContext {
+  index: AssetIndex
+  /** LAYER_SET_TEMPLATE name -> its raw tags. */
+  templates: Map<string, string[][]>
+  /** Creature id -> rules, filled while parsing. */
+  rules: Map<string, CreatureLayerRules>
+}
+
+/** First pass: collect [LAYER_SET_TEMPLATE] bodies so uses in other files resolve. */
+function collectTemplates(text: string, templates: Map<string, string[][]>) {
+  let current: string[][] | null = null
+  for (const args of rawTags(text)) {
+    if (args[0] === 'LAYER_SET_TEMPLATE') {
+      current = []
+      templates.set(args[1], current)
+      continue
+    }
+    if (BLOCK_OPENERS.has(args[0])) {
+      current = null
+      continue
+    }
+    current?.push(args)
+  }
+}
+
+/** Splice template ARG values into a template tag: [LAYER:X:ARG_HEAD_TEXTURE] -> [LAYER:X:PAGE:0:0]. */
+function substituteArgs(tag: string[], values: Map<string, string[]>): string[] {
+  return tag.flatMap((part) => {
+    if (!part.startsWith('ARG_')) return [part]
+    return values.get(part) ?? [part]
+  })
+}
+
+function parseRawFile(text: string, packName: string, ctx: ParseContext) {
+  const { index } = ctx
   let currentPage: TilePage | null = null
   let currentCreature: string | null = null
-  let layerSet: { key: string; parser: LayerSetParser } | null = null
+  let currentCaste: string | null = null
+  let builder: LayerSetBuilder | null = null
+  let stdPalette: NamedPalette | null = null
+  let templateArgs: { name: string; values: Map<string, string[]> } | null = null
+  let inTemplateDefinition = false
+  /** Subtype token of the open [WEAPON_GRAPHICS:...] style block. */
+  let currentItem: string | null = null
 
   const endLayerSet = () => {
-    if (!layerSet || !currentCreature) {
-      layerSet = null
+    flushTemplate()
+    if (builder && currentCreature) {
+      const set = builder.finish()
+      if (set.groups.length) {
+        const rules = ctx.rules.get(currentCreature) ?? { creature: currentCreature, sets: [] }
+        rules.sets.push(set)
+        ctx.rules.set(currentCreature, rules)
+      }
+    }
+    builder = null
+  }
+
+  const flushTemplate = () => {
+    if (!templateArgs || !builder) {
+      templateArgs = null
       return
     }
-    const { key, parser } = layerSet
-    const store = (creatureKey: string, layers: LayerSprite[]) => {
-      if (!layers.length) return
-      index.layered[creatureKey] ??= {}
-      index.layered[creatureKey][key] = layers
-    }
-    const castes = [...parser.castes]
-    if (castes.length === 0) {
-      store(currentCreature, parser.resolve(null))
-    } else {
-      // Per-caste variants, plus the first caste as the fallback when the
-      // unit's caste is unknown or has no graphics of its own.
-      for (const caste of castes) store(`${currentCreature}:${caste}`, parser.resolve(caste))
-      store(currentCreature, parser.resolve(castes[0]))
-    }
-    layerSet = null
+    const body = ctx.templates.get(templateArgs.name)
+    if (body) for (const tag of body) builder.handle(substituteArgs(tag, templateArgs.values))
+    templateArgs = null
   }
 
   for (const args of rawTags(text)) {
     const tag = args[0]
 
-    if (tag === 'LAYER_SET') {
+    // Template definitions were collected in the first pass; skip their body here.
+    if (tag === 'LAYER_SET_TEMPLATE') {
       endLayerSet()
-      layerSet = { key: args.slice(1).join(':'), parser: new LayerSetParser() }
+      inTemplateDefinition = true
       continue
     }
-    if (layerSet) {
-      const opensBlock =
-        tag === 'TILE_PAGE' ||
-        tag === 'PAGE' ||
-        tag === 'OBJECT' ||
-        tag === 'CREATURE_GRAPHICS' ||
-        tag === 'CREATURE_CASTE_GRAPHICS' ||
-        tag === 'STATUE_CREATURE_GRAPHICS' ||
-        tag === 'STATUE_CREATURE_CASTE_GRAPHICS'
-      if (!opensBlock) {
-        layerSet.parser.handle(args)
+    if (inTemplateDefinition) {
+      if (!BLOCK_OPENERS.has(tag)) continue
+      inTemplateDefinition = false
+    }
+
+    if (tag === 'LAYER_SET') {
+      endLayerSet()
+      builder = new LayerSetBuilder(args.slice(1).join(':'), currentCaste, packName)
+      continue
+    }
+    if (builder) {
+      if (tag === 'USE_LAYER_SET_TEMPLATE') {
+        flushTemplate()
+        templateArgs = { name: args[1], values: new Map() }
+        continue
+      }
+      if (templateArgs && tag.startsWith('ARG_')) {
+        templateArgs.values.set(tag, args.slice(1))
+        continue
+      }
+      if (templateArgs) flushTemplate()
+      if (!BLOCK_OPENERS.has(tag)) {
+        builder.handle(args)
         continue
       }
       endLayerSet()
+    }
+
+    // Item sprites: inline [ARMOR_GRAPHICS:PAGE:x:y:TOKEN] or a
+    // [WEAPON_GRAPHICS:TOKEN] block with DEFAULT / ARTIFACT variants.
+    if (INLINE_ITEM_GRAPHICS.has(tag)) {
+      currentItem = null
+      const sprite = spriteFromArgs(args, 1)
+      const token = args[sprite?.w ? 7 : 4]
+      if (sprite && token?.startsWith('ITEM_')) index.items[token] ??= { default: sprite }
+      continue
+    }
+    if (BLOCK_ITEM_GRAPHICS.has(tag)) {
+      currentItem = args[1] ?? null
+      continue
+    }
+    if (currentItem) {
+      const variant = /^(?:WEAPON|AMMO|SIEGEAMMO)_GRAPHICS_(.+)$/.exec(tag)?.[1]
+      if (variant) {
+        const sprite = spriteFromArgs(args, 1)
+        if (sprite) {
+          if (variant === 'DEFAULT' || variant === 'STRAIGHT_DEFAULT') {
+            index.items[currentItem] = { ...index.items[currentItem], default: sprite }
+          } else if (variant === 'ARTIFACT' || variant === 'STRAIGHT_ARTIFACT') {
+            const entry = index.items[currentItem] ?? { default: sprite }
+            entry.artifact = sprite
+            index.items[currentItem] = entry
+          }
+        }
+        continue
+      }
+      currentItem = null
+    }
+
+    if (tag === 'PALETTE') {
+      stdPalette = { file: '', defaultRow: 0, colors: {} }
+      index.palettes[args[1]] = stdPalette
+      currentPage = null
+      currentCreature = null
+      continue
+    }
+    if (stdPalette && tag === 'FILE' && !currentPage) {
+      stdPalette.file = path.posix.join(packName, args[1])
+      continue
+    }
+    if (stdPalette && tag === 'PALETTE_DEFAULT') {
+      stdPalette.defaultRow = Number(args[1])
+      continue
+    }
+    if (stdPalette && tag === 'PALETTE_COLOR') {
+      stdPalette.colors[args[1]] = Number(args[2])
+      continue
     }
 
     if (tag === 'TILE_PAGE' || tag === 'PAGE') {
@@ -377,33 +514,41 @@ function parseRawFile(text: string, packName: string, index: AssetIndex) {
 
     if (tag === 'CREATURE_GRAPHICS') {
       currentCreature = args[1]
+      currentCaste = null
       currentPage = null
       index.creatures[currentCreature] ??= {}
       continue
     }
     if (tag === 'CREATURE_CASTE_GRAPHICS') {
-      currentCreature = `${args[1]}:${args[2]}`
+      // Simple states stay keyed by "CREATURE:CASTE"; layer sets are stored
+      // on the creature with the caste recorded on the set.
+      currentCreature = args[1]
+      currentCaste = args[2]
       currentPage = null
-      index.creatures[currentCreature] ??= {}
+      index.creatures[`${args[1]}:${args[2]}`] ??= {}
       continue
     }
     // Statues are separate sprites; keep them from overwriting the creature's
     // real DEFAULT state by namespacing the key.
     if (tag === 'STATUE_CREATURE_GRAPHICS') {
       currentCreature = `STATUE:${args[1]}`
+      currentCaste = null
       currentPage = null
       index.creatures[currentCreature] ??= {}
       continue
     }
     if (tag === 'STATUE_CREATURE_CASTE_GRAPHICS') {
       currentCreature = `STATUE:${args[1]}:${args[2]}`
+      currentCaste = null
       currentPage = null
       index.creatures[currentCreature] ??= {}
       continue
     }
     if (tag === 'OBJECT') {
       currentCreature = null
+      currentCaste = null
       currentPage = null
+      stdPalette = null
       continue
     }
 
@@ -415,14 +560,13 @@ function parseRawFile(text: string, packName: string, index: AssetIndex) {
       !CREATURE_STATE_SKIP.has(tag) &&
       !tag.startsWith('CONDITION_') &&
       !tag.startsWith('TISSUE_') &&
-      !tag.startsWith('LG_') &&
-      Number.isInteger(Number(args[2])) &&
-      Number.isInteger(Number(args[3]))
+      !tag.startsWith('LG_')
     ) {
-      index.creatures[currentCreature][tag] = {
-        page: args[1],
-        x: Number(args[2]),
-        y: Number(args[3]),
+      const sprite = spriteFromArgs(args, 1)
+      if (sprite) {
+        const key = currentCaste ? `${currentCreature}:${currentCaste}` : currentCreature
+        index.creatures[key] ??= {}
+        index.creatures[key][tag] = sprite
       }
     }
   }
@@ -458,19 +602,24 @@ function main() {
   }
 
   fs.rmSync(OUT_DIR, { recursive: true, force: true })
-  fs.mkdirSync(OUT_DIR, { recursive: true })
+  fs.mkdirSync(path.join(OUT_DIR, 'layers'), { recursive: true })
 
-  const index: AssetIndex = {
-    gameDir,
-    extractedAt: new Date().toISOString(),
-    pages: {},
-    tiles: {},
-    creatures: {},
-    layered: {},
+  const ctx: ParseContext = {
+    index: {
+      gameDir,
+      extractedAt: new Date().toISOString(),
+      pages: {},
+      tiles: {},
+      creatures: {},
+      layeredCreatures: [],
+      palettes: {},
+      items: {},
+    },
+    templates: new Map(),
+    rules: new Map(),
   }
 
   let pngCount = 0
-  let rawCount = 0
 
   // Every vanilla pack that ships a graphics/ folder: creatures (incl. the
   // dwarf sprites and portraits), items, buildings, plants, map tiles
@@ -480,6 +629,7 @@ function main() {
     .filter((e) => e.isDirectory() && fs.existsSync(path.join(vanillaDir, e.name, 'graphics')))
     .map((e) => e.name)
 
+  const raws: { pack: string; text: string }[] = []
   for (const pack of packs) {
     const graphicsDir = path.join(vanillaDir, pack, 'graphics')
     for (const file of listFiles(graphicsDir)) {
@@ -489,11 +639,15 @@ function main() {
         copyInto(file, path.join(pack, rel))
         pngCount++
       } else if (ext === '.txt') {
-        parseRawFile(fs.readFileSync(file, 'utf8'), pack, index)
-        rawCount++
+        raws.push({ pack, text: fs.readFileSync(file, 'utf8') })
       }
     }
   }
+
+  // Templates first, then everything else, so a template defined in a later
+  // file still expands.
+  for (const raw of raws) collectTemplates(raw.text, ctx.templates)
+  for (const raw of raws) parseRawFile(raw.text, raw.pack, ctx)
 
   // Classic tilesets and UI art (curses_*.png, logos, cursors).
   if (fs.existsSync(artDir)) {
@@ -504,12 +658,26 @@ function main() {
     }
   }
 
-  fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify(index, null, 2))
+  let layerCount = 0
+  for (const [creature, rules] of ctx.rules) {
+    fs.writeFileSync(path.join(OUT_DIR, 'layers', `${creature}.json`), JSON.stringify(rules))
+    ctx.index.layeredCreatures.push(creature)
+    for (const set of rules.sets) for (const group of set.groups) layerCount += group.layers.length
+  }
+  ctx.index.layeredCreatures.sort()
 
+  fs.writeFileSync(path.join(OUT_DIR, 'index.json'), JSON.stringify(ctx.index, null, 2))
+
+  const { index } = ctx
   console.log(`Extracted DF assets from ${gameDir}`)
-  console.log(`  ${pngCount} PNGs copied, ${rawCount} raws parsed from packs: ${packs.join(', ')}`)
   console.log(
-    `  ${Object.keys(index.pages).length} sprite sheets, ${Object.keys(index.tiles).length} named tiles, ${Object.keys(index.creatures).length} creature entries, ${Object.keys(index.layered).length} layered creatures`,
+    `  ${pngCount} PNGs copied, ${raws.length} raws parsed from packs: ${packs.join(', ')}`,
+  )
+  console.log(
+    `  ${Object.keys(index.pages).length} sprite sheets, ${Object.keys(index.tiles).length} named tiles, ${Object.keys(index.creatures).length} creature entries, ${Object.keys(index.items).length} item sprites`,
+  )
+  console.log(
+    `  ${index.layeredCreatures.length} layered creatures with ${layerCount} layer rules (${ctx.templates.size} templates expanded), ${Object.keys(index.palettes.DEFAULT?.colors ?? {}).length} standard palette colours`,
   )
   console.log(`  -> ${OUT_DIR} (gitignored, local only)`)
 }

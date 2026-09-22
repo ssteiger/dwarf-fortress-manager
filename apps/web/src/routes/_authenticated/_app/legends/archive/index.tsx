@@ -4,6 +4,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import * as React from 'react'
 
+import { LegendsSprite } from '~/lib/df-assets/legends'
 import { yearSpan } from '~/lib/legends/events'
 import { BROWSE_TABS, kindLabel, titleCase, words } from '~/lib/legends/model'
 import { type LegendsHit, type LegendsSortKey, browseLegends } from '~/lib/legends/server'
@@ -52,15 +53,18 @@ const ARCHIVE_COLUMNS: (worldId: number) => ColumnDef<LegendsHit>[] = (worldId) 
     accessorFn: (hit) => hit.name ?? '',
     meta: { cellClassName: 'max-w-[320px]' },
     cell: ({ row }) => (
-      <RecordLink
-        kind={row.original.kind}
-        id={row.original.id}
-        name={row.original.name}
-        type={row.original.type}
-        worldId={worldId}
-      >
-        {recordName(row.original)}
-      </RecordLink>
+      <span className="flex items-center gap-2">
+        <LegendsSprite subject={row.original} size={24} className="-my-1" />
+        <RecordLink
+          kind={row.original.kind}
+          id={row.original.id}
+          name={row.original.name}
+          type={row.original.type}
+          worldId={worldId}
+        >
+          {recordName(row.original)}
+        </RecordLink>
+      </span>
     ),
   },
   {

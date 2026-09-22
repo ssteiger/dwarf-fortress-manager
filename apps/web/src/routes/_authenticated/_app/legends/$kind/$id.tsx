@@ -3,8 +3,16 @@ import { Badge, Skeleton } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 
-import { plusOf } from '~/lib/legends/events'
-import { browseTabForKind, kindLabel, kindPlural, titleCase, words } from '~/lib/legends/model'
+import { LegendsSprite } from '~/lib/df-assets/legends'
+import { plusOf, str } from '~/lib/legends/events'
+import {
+  browseTabForKind,
+  kindLabel,
+  kindPlural,
+  raceToken,
+  titleCase,
+  words,
+} from '~/lib/legends/model'
 import { getLegendsMap, getLegendsRecord } from '~/lib/legends/server'
 import {
   Breadcrumbs,
@@ -85,6 +93,23 @@ function RecordPage() {
   const subtitle = record ? describeRecord(kind, payload, names) : ''
   const tab = browseTabForKind(kind)
 
+  // What the game draws for this record, beside the title.
+  const spriteSubject = record
+    ? {
+        kind,
+        id: numericId,
+        race:
+          kind === 'historical_figure'
+            ? (record.type ?? str(payload.race))
+            : kind === 'creature'
+              ? str(plus.creature_id)
+              : raceToken(str(plus.race) ?? str(payload.race)),
+        caste: str(payload.caste),
+        type: record.type,
+        item: { type: str(plus.item_type), subtype: str(plus.item_subtype) },
+      }
+    : null
+
   const chips: string[] = []
   if (record?.type && kind !== 'historical_figure') chips.push(words(record.type))
   if (kind === 'historical_figure' && payload.deity === true) chips.push('deity')
@@ -119,6 +144,13 @@ function RecordPage() {
         eyebrow={kindLabel(kind)}
         title={
           <span className="flex flex-wrap items-center gap-3">
+            {spriteSubject ? (
+              <LegendsSprite
+                subject={spriteSubject}
+                size={48}
+                title={`${title} as drawn in the game`}
+              />
+            ) : null}
             {title}
             {chips.map((chip) => (
               <Badge key={chip} variant="outline" className="text-sm font-normal">

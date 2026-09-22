@@ -7,10 +7,22 @@ import {
   schema,
 } from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
-import { type SQL, and, asc, desc, eq, ilike, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
+import {
+  type SQL,
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  sql,
+} from 'drizzle-orm'
 
 import { EVENT_CATEGORIES, num, numList, objList, plusOf, str } from './events'
-import { words } from './model'
+import { raceToken, words } from './model'
 
 const R = schema.legends_records
 
@@ -171,6 +183,12 @@ export interface LegendsHit {
   endYear?: number | null
   /** One line of context: race and lifespan, owner, author, outcome. */
   detail?: string
+  /** Raw creature token (DWARF, BEAR_BLACK) for figures, groups, and creatures, so the game's sprite can be drawn. */
+  race?: string | null
+  /** Caste token (MALE, FEMALE, DEFAULT) for figures. */
+  caste?: string | null
+  /** Artifact item type and subtype names from legends_plus ("weapon", "war hammer"). */
+  item?: { type: string | null; subtype: string | null } | null
 }
 
 export interface LegendsBrowseResult {
@@ -419,17 +437,31 @@ async function describeRows(
   for (const row of rows) rowRefs(row.kind, row.payload as LegendsPayload, refs)
   const names = await lookupNames(worldId, refs)
   return rows.map((row) => {
-    const detail = rowDetail(row.kind, row.type, row.payload as LegendsPayload, names)
+    const payload = row.payload as LegendsPayload
+    const plus = plusOf(payload)
+    const detail = rowDetail(row.kind, row.type, payload, names)
     const extra = decorate?.(row)
-    return {
+    const hit: LegendsHit = {
       kind: row.kind,
       id: row.id,
       name: row.name,
       type: row.type,
       year: row.year,
-      endYear: endYearOf(row.payload as LegendsPayload),
+      endYear: endYearOf(payload),
       detail: [extra, detail].filter(Boolean).join(' · '),
     }
+    // What the game would draw for the row.
+    if (row.kind === 'historical_figure') {
+      hit.race = row.type ?? str(payload.race)
+      hit.caste = str(payload.caste)
+    } else if (row.kind === 'entity' || row.kind === 'entity_population') {
+      hit.race = raceToken(str(plus.race) ?? str(payload.race))
+    } else if (row.kind === 'creature') {
+      hit.race = str(plus.creature_id)
+    } else if (row.kind === 'artifact') {
+      hit.item = { type: str(plus.item_type), subtype: str(plus.item_subtype) }
+    }
+    return hit
   })
 }
 
@@ -538,6 +570,8 @@ export interface TimelineBin {
 
 export interface FigureSummary extends LegendsRef {
   race: string | null
+  /** Raw creature token for the sprite. */
+  raceToken: string | null
   birthYear: number | null
   deathYear: number | null
   events: number
@@ -545,6 +579,7 @@ export interface FigureSummary extends LegendsRef {
 
 export interface DeitySummary extends LegendsRef {
   race: string | null
+  raceToken: string | null
   spheres: string[]
 }
 
@@ -555,7 +590,7 @@ export interface LegendsWorldSummary {
   wars: WarSummary[]
   timeline: TimelineBin[]
   binYears: number
-  races: { race: string; total: number; alive: number }[]
+  races: { race: string; token: string | null; total: number; alive: number }[]
   deities: DeitySummary[]
   deitiesTotal: number
   notable: FigureSummary[]
@@ -650,6 +685,8 @@ export const getLegendsWorldSummary = createServerFn({ method: 'GET' })
       postgres_db
         .select({
           race: sql<string>`coalesce(${R.payload}->'plus'->>'race', lower(replace(coalesce(${R.type}, 'unknown'), '_', ' ')))`,
+          // The raw creature token behind the name (the type column holds it for figures).
+          token: sql<string | null>`min(${R.type})`,
           total: sql<number>`count(*)::int`,
           alive: sql<number>`count(*) filter (where (${R.payload}->>'death_year')::int = -1)::int`,
         })
@@ -776,6 +813,7 @@ export const getLegendsWorldSummary = createServerFn({ method: 'GET' })
       binYears,
       races: raceRows.map((row) => ({
         race: row.race,
+        token: row.token ?? null,
         total: Number(row.total),
         alive: Number(row.alive),
       })),
@@ -785,6 +823,7 @@ export const getLegendsWorldSummary = createServerFn({ method: 'GET' })
           id: row.id,
           name: row.name,
           race: str(plusOf(p).race),
+          raceToken: str(p.race) ?? raceToken(str(plusOf(p).race)),
           spheres: Array.isArray(p.sphere) ? p.sphere.map(String) : [],
         }
       }),
@@ -796,6 +835,7 @@ export const getLegendsWorldSummary = createServerFn({ method: 'GET' })
           id: row.hf,
           name: record?.name ?? names.historical_figure?.[row.hf] ?? null,
           race: str(plusOf(p).race) ?? (record?.type ? words(record.type) : null),
+          raceToken: record?.type ?? str(p.race),
           birthYear: num(p.birth_year),
           deathYear: num(p.death_year),
           events: row.c,
