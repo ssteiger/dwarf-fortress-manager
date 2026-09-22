@@ -1,0 +1,31 @@
+{
+	"name": "fortress",
+	"description": "Live web overview of a running Dwarf Fortress game, fed by a DFHack worker",
+	"version": "0.1.0",
+	"authors": ["Sören Steiger <ssteiger@users.noreply.github.com>"],
+	"private": true,
+	"packageManager": "bun@1.2.23",
+	"workspaces": ["apps/*", "packages/*"],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ssteiger/dwarf-fortress-manager"
+	},
+	"scripts": {
+		"build": "turbo run build",
+		"dev": "bun run env:check && bun run dev:db && bun run env:sync && bun run db:migrate && turbo run dev --parallel",
+		"dev:db": "cd apps/supabase && npx supabase start",
+		"db:migrate": "cd apps/supabase && npx supabase migration up --local",
+		"db:reset": "cd apps/supabase && npx supabase db reset",
+		"dev:web": "turbo run dev --filter=@fortress/web",
+		"dev:worker": "turbo run dev --filter=@fortress/worker",
+		"typecheck": "turbo run typecheck",
+		"lint": "turbo run biome:check",
+		"format": "turbo run biome:format",
+		"env:check": "node scripts.js env:check",
+		"env:sync": "node scripts.js env:sync"
+	},
+	"devDependencies": {
+		"supabase": "^2.20.5",
+		"turbo": "^2.4.4"
+	}
+}
