@@ -96,6 +96,13 @@ const ARCHIVE_COLUMNS: (worldId: number) => ColumnDef<LegendsHit>[] = (worldId) 
     meta: { align: 'right', cellClassName: 'tabular-nums text-sm' },
     cell: ({ row }) => yearSpan(row.original.year, row.original.endYear) || '—',
   },
+  {
+    id: 'events',
+    header: 'Events',
+    accessorFn: (hit) => hit.events,
+    meta: { align: 'right', cellClassName: 'tabular-nums text-sm' },
+    cell: ({ row }) => (row.original.events == null ? '—' : row.original.events.toLocaleString()),
+  },
 ]
 
 function ArchivePage() {

@@ -88,7 +88,54 @@ function loadPalette(file: string): Promise<number[][]> {
 }
 
 function recolorKey(recolor: Recolor | null): string {
-  return recolor ? `${recolor.file}#${recolor.fromRow}>${recolor.toRow}` : ''
+  if (!recolor) return ''
+  const target = recolor.match
+    ? `~${recolor.match.file}#${recolor.match.row}`
+    : String(recolor.toRow)
+  return `${recolor.file}#${recolor.fromRow}>${target}`
+}
+
+/** Mean colour of a palette row's opaque cells, as [r, g, b]. */
+function rowMean(row: number[]): [number, number, number] {
+  let r = 0
+  let g = 0
+  let b = 0
+  let n = 0
+  for (const c of row) {
+    if (c < 0) continue
+    r += (c >> 16) & 255
+    g += (c >> 8) & 255
+    b += c & 255
+    n++
+  }
+  return n ? [r / n, g / n, b / n] : [0, 0, 0]
+}
+
+/** The row of `rows` whose mean colour is nearest to `target`, skipping the template row. */
+function nearestRow(rows: number[][], target: [number, number, number], skip: number): number {
+  let best = -1
+  let bestDist = Number.POSITIVE_INFINITY
+  rows.forEach((row, i) => {
+    if (i === skip) return
+    const [r, g, b] = rowMean(row)
+    const dist = (r - target[0]) ** 2 + (g - target[1]) ** 2 + (b - target[2]) ** 2
+    if (dist < bestDist) {
+      bestDist = dist
+      best = i
+    }
+  })
+  return best
+}
+
+async function targetRow(recolor: Recolor): Promise<number> {
+  if (!recolor.match) return recolor.toRow
+  const [rows, source] = await Promise.all([
+    loadPalette(recolor.file),
+    loadPalette(recolor.match.file),
+  ])
+  const wanted = source[recolor.match.row]
+  if (!wanted) return -1
+  return nearestRow(rows, rowMean(wanted), recolor.fromRow)
 }
 
 const layerCanvases = new Map<string, Promise<HTMLCanvasElement | null>>()
@@ -112,7 +159,7 @@ function layerCanvas(index: DfAssetIndex, layer: ResolvedLayer): Promise<HTMLCan
       if (layer.recolor) {
         const rows = await loadPalette(layer.recolor.file)
         const from = rows[layer.recolor.fromRow]
-        const to = rows[layer.recolor.toRow]
+        const to = rows[await targetRow(layer.recolor)]
         if (from && to) {
           const swap = new Map<number, number>()
           for (let c = 0; c < from.length; c++) {
@@ -147,9 +194,11 @@ export interface Composite {
 }
 
 /**
- * Stack the layers on one tile of the first layer's sheet. Wider LARGE_IMAGE
- * layers (shields, wielded weapons) are centred on the tile; group offsets
- * shift in pixels like the game's LG_OFFSET.
+ * Stack the layers around one tile of the first layer's sheet. The canvas
+ * grows to fit wider or taller pieces (a wielded pick, a beast's wings):
+ * everything is centred horizontally and bottom-aligned, so a two-tile-tall
+ * wing rises above the body it belongs to. Group offsets shift in pixels
+ * like the game's LG_OFFSET.
  */
 export async function composeLayers(
   index: DfAssetIndex,
@@ -159,14 +208,21 @@ export async function composeLayers(
   const base = index.pages[layers[0].page]
   if (!base) return null
   const canvases = await Promise.all(layers.map((layer) => layerCanvas(index, layer)))
-  const canvas = makeCanvas(base.tileWidth, base.tileHeight)
+  let width = base.tileWidth
+  let height = base.tileHeight
+  for (const c of canvases) {
+    if (!c) continue
+    width = Math.max(width, c.width)
+    height = Math.max(height, c.height)
+  }
+  const canvas = makeCanvas(width, height)
   const ctx = context2d(canvas)
   layers.forEach((layer, i) => {
     const c = canvases[i]
     if (!c) return
-    const dx = layer.offset[0] + Math.round((base.tileWidth - c.width) / 2)
-    const dy = layer.offset[1] + Math.round((base.tileHeight - c.height) / 2)
+    const dx = layer.offset[0] + Math.round((width - c.width) / 2)
+    const dy = layer.offset[1] + (height - c.height)
     ctx.drawImage(c, dx, dy)
   })
-  return { canvas, tileWidth: base.tileWidth, tileHeight: base.tileHeight }
+  return { canvas, tileWidth: width, tileHeight: height }
 }

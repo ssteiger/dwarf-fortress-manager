@@ -79,9 +79,16 @@ export function tileVariantAt(
 
 export type SpriteUnit = Pick<FortUnit, 'race_id' | 'caste_id' | 'flags'>
 
-/** Simple graphics states to try, most specific first. */
+/**
+ * Simple graphics states to try, most specific first. Besides unit flags,
+ * items use the pseudo-flags `vermin` (a live vermin item) and `remains`
+ * (a dead vermin item) to reach those creature states.
+ */
 function simpleStates(unit: SpriteUnit): string[] {
   const f = unit.flags
+  if (f.includes('skeleton')) return ['SKELETON_WITH_SKULL', 'SKELETON', 'CORPSE', 'DEFAULT']
+  if (f.includes('remains')) return ['REMAINS', 'CORPSE', 'VERMIN', 'DEFAULT']
+  if (f.includes('vermin')) return ['VERMIN', 'DEFAULT', 'CORPSE']
   if (f.includes('dead')) return ['CORPSE', 'DEFAULT']
   if (f.includes('undead')) return ['ANIMATED', 'DEFAULT']
   if (f.includes('baby')) return ['BABY', 'CHILD', 'DEFAULT']

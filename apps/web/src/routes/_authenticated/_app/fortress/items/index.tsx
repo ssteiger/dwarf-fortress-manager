@@ -15,6 +15,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import * as React from 'react'
 
+import { ItemSprite } from '~/lib/df-assets/components'
 import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
 import { FORT_SLOW_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { type ItemSortKey, getFortItems } from '~/lib/fortress/server'
@@ -38,7 +39,13 @@ const ITEM_COLUMNS: ColumnDef<FortItem>[] = [
     id: 'item',
     header: 'Item',
     accessorFn: (item) => item.description,
-    meta: { cellClassName: 'max-w-[320px] truncate font-medium' },
+    meta: { cellClassName: 'max-w-[320px] font-medium' },
+    cell: ({ row }) => (
+      <span className="flex items-center gap-2">
+        <ItemSprite item={row.original} size={24} className="-my-1" />
+        <span className="truncate">{row.original.description}</span>
+      </span>
+    ),
   },
   {
     id: 'type',

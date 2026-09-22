@@ -28,7 +28,14 @@ export interface Recolor {
   /** Palette PNG relative to /df-assets/. */
   file: string
   fromRow: number
+  /** Target row; -1 when `match` picks it. */
   toRow: number
+  /**
+   * Pick the target row as the one whose colours are nearest to `row` of
+   * another palette (how a beast's material colour lands on the 7-row beast
+   * palette).
+   */
+  match?: { file: string; row: number }
 }
 
 export interface ResolvedLayer {
@@ -91,7 +98,10 @@ function setKeysFor(kind: LayerSetKind, unit: LookUnit): string[] {
     if (child) return ['CHILD:PORTRAIT', 'PORTRAIT']
     return ['PORTRAIT']
   }
-  if (f.includes('dead')) return ['CORPSE']
+  // Vermin states are simple sprites, never layer sets; a skeleton falls back
+  // to the layered corpse when the creature has no SKELETON sprite.
+  if (f.includes('remains') || f.includes('vermin')) return []
+  if (f.includes('dead') || f.includes('skeleton')) return ['CORPSE']
   if (f.includes('undead')) return ['ANIMATED', 'DEFAULT']
   if (baby) return ['BABY:DEFAULT', 'CHILD:DEFAULT', 'DEFAULT']
   if (child) return ['CHILD:DEFAULT', 'DEFAULT']

@@ -141,6 +141,23 @@ export interface UnitWornItem {
 }
 
 /**
+ * Facts about a procedurally generated race (forgotten beast, titan, demon,
+ * night creature), from which its sprite is assembled out of the beast kit.
+ */
+export interface GeneratedLook {
+	kind: "FEATURE_BEAST" | "TITAN" | "DEMON" | "NIGHT_CREATURE" | "MEGABEAST" | "OTHER";
+	/** The generator's description, e.g. "An enormous hairy tarantula. It has a long, swinging trunk ...". */
+	description: string;
+	/** Body part category -> count (LEG_REAR: 6, WING: 2, SHELL: 1, EYE: 2, ...). */
+	cats: Record<string, number>;
+	/** Tissue ids (SKIN, FEATHER, SCALE, CHITIN, ...; UNIFORM_TIS when "composed of" a material). */
+	tissues: string[];
+	/** Descriptor colour token of the outer covering or body material. */
+	color: string | null;
+	flier: boolean;
+}
+
+/**
  * Everything the game's layered graphics read off a unit, dumped so the web
  * app can evaluate the same layer conditions. Null in dumps older than this.
  */
@@ -159,6 +176,8 @@ export interface UnitLook {
 	/** [token, category, missing] for every body part of the caste. */
 	parts: [string, string, 0 | 1][];
 	worn: UnitWornItem[];
+	/** Present for procedurally generated races. */
+	generated?: GeneratedLook | null;
 }
 
 export interface FortUnit {
@@ -218,6 +237,19 @@ export interface FortItem {
 	holder_unit_id: number | null;
 	holder_building_id: number | null;
 	value: number;
+	/** Raw subtype token (ITEM_WEAPON_PICK), for the item's sprite; null in older dumps. */
+	subtype_id: string | null;
+	/** METAL, STONE, WOOD, GLASS, GEM, LEATHER, BONE, SHELL, CLOTH, SOAP, PLANT; null in older dumps. */
+	mat_class: string | null;
+	/** Descriptor colour token of the material (COPPER, GRAY); null in older dumps. */
+	color: string | null;
+	/** Creature token for corpses, body parts, remains, fish, vermin, eggs; null otherwise or in older dumps. */
+	race_id: string | null;
+	caste_id: string | null;
+	/** Plant token for seeds, plants, growths, and plant-based drinks; null otherwise or in older dumps. */
+	plant_id: string | null;
+	/** Set corpse_flags of a body part (bone, skull, skin, horn, ...); null otherwise or in older dumps. */
+	corpse_flags: string[] | null;
 }
 
 export interface FortBuilding {

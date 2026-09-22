@@ -48,6 +48,11 @@ export interface DfAssetIndex {
   palettes: Record<string, NamedPalette>
   /** Item subtype token (ITEM_WEAPON_PICK) -> sprite, with the artifact variant when the raws have one. */
   items: Record<string, { default: TileSprite; artifact?: TileSprite }>
+  /** Plant token -> seed, harvested plant, shrub, and picked growth sprites. */
+  plants: Record<
+    string,
+    { seed?: TileSprite; picked?: TileSprite; shrub?: TileSprite; growth?: TileSprite }
+  >
 }
 
 // ---------------------------------------------------------------------------

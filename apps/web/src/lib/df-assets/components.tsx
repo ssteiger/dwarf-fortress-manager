@@ -2,6 +2,7 @@ import type { FortUnit } from '@fortress/db-drizzle'
 import { cn } from '@fortress/ui'
 import * as React from 'react'
 
+import { beastLayers, generatedIcon } from './beasts'
 import { composeLayers } from './compose'
 import {
   type DfAssetIndex,
@@ -11,6 +12,7 @@ import {
   simpleCreatureSprite,
   useDfAssets,
 } from './index'
+import { type SpriteItem, itemLook } from './items'
 import {
   type LayerSetKind,
   type ResolvedLayer,
@@ -64,7 +66,7 @@ export function DfTile({
 }
 
 /** A resolved layer stack composited onto a canvas, drawn crisp at `size` px tall. */
-function LayerCanvas({
+export function LayerCanvas({
   index,
   layers,
   size,
@@ -125,7 +127,11 @@ function useUnitLayers(
 ): ResolvedLayer[] {
   const rules = useCreatureRules(index, unit.race_id)
   return React.useMemo(() => {
-    if (!index || !rules) return []
+    if (!index) return []
+    // Generated races are assembled from the beast kit, not from rules.
+    const generated = unit.look?.generated
+    if (generated) return kind === 'sprite' ? beastLayers(index, generated) : []
+    if (!rules) return []
     const set = selectLayerSet(rules, kind, unit)
     return set ? resolveLayers(set, unit, index) : []
   }, [index, rules, kind, unit])
@@ -143,22 +149,31 @@ export function CreatureSprite({
   size = 32,
   className,
   title,
+  fallbackSprite = null,
 }: {
   unit: LookUnitProps & SpriteUnit
   size?: number
   className?: string
   title?: string
+  /** Drawn when the race has no graphics for this state. */
+  fallbackSprite?: TileSprite | null
 }) {
   const index = useDfAssets()
   const layers = useUnitLayers(index, unit, 'sprite')
   if (!index) return null
   const ghost = unit.flags.includes('ghost')
-  if (layers.length) {
+  // Item states (skeleton, remains, vermin) are dedicated simple sprites and
+  // win over a layer set; otherwise the layered composite comes first.
+  const simple = simpleCreatureSprite(index, unit)
+  const preferSimple = unit.flags.some((f) => f === 'skeleton' || f === 'remains' || f === 'vermin')
+  if (layers.length && !(preferSimple && simple)) {
     return (
       <LayerCanvas index={index} layers={layers} size={size} className={className} title={title} />
     )
   }
-  const sprite = simpleCreatureSprite(index, unit)
+  // Generated races without a body on record (legends figures, corpses)
+  // get the game's list icon for their class.
+  const sprite = simple ?? fallbackSprite ?? generatedIcon(index, unit.race_id)
   if (!sprite) return null
   return (
     <DfTile
@@ -168,6 +183,67 @@ export function CreatureSprite({
       title={title}
       className={cn(ghost && 'opacity-50', className)}
     />
+  )
+}
+
+/**
+ * An item as the game draws it: subtype sprites (weapons, armour, tools)
+ * coloured by their material, and typed tiles with material variants for
+ * everything else. Renders nothing for items the raws have no tile for
+ * (corpses, raw food) or when the sprites are not extracted.
+ */
+export function ItemSprite({
+  item,
+  size = 24,
+  className,
+  title,
+}: {
+  item: SpriteItem
+  size?: number
+  className?: string
+  title?: string
+}) {
+  const index = useDfAssets()
+  const look = React.useMemo(() => (index ? itemLook(index, item) : null), [index, item])
+  const layers = React.useMemo<ResolvedLayer[]>(
+    () =>
+      look?.kind === 'sprite' && look.recolor
+        ? [
+            {
+              name: item.subtype_id ?? item.type,
+              page: look.sprite.page,
+              x: look.sprite.x,
+              y: look.sprite.y,
+              w: look.sprite.w ?? 1,
+              h: look.sprite.h ?? 1,
+              offset: [0, 0],
+              recolor: look.recolor,
+            },
+          ]
+        : [],
+    [look, item.subtype_id, item.type],
+  )
+  if (!index || !look) return null
+  if (look.kind === 'creature') {
+    // A corpse, remains, fish or vermin: the creature's own graphics in the
+    // state the item stands for (CORPSE / REMAINS / VERMIN).
+    return (
+      <CreatureSprite
+        unit={{ id: 0, race_id: look.race, caste_id: look.caste, flags: look.flags, look: null }}
+        size={size}
+        className={className}
+        title={title}
+        fallbackSprite={item.type === 'REMAINS' ? (index.tiles.ITEM_REMAINS ?? null) : null}
+      />
+    )
+  }
+  if (layers.length) {
+    return (
+      <LayerCanvas index={index} layers={layers} size={size} className={className} title={title} />
+    )
+  }
+  return (
+    <DfTile index={index} sprite={look.sprite} size={size} className={className} title={title} />
   )
 }
 

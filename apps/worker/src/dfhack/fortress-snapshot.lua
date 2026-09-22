@@ -13,7 +13,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 3
+local DUMP_VERSION = 6
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -588,6 +588,72 @@ local function unit_worn(u, caste)
     return worn
 end
 
+-- Procedurally generated races (forgotten beasts, titans, demons, night
+-- creatures) have no sprite in the raws; the game assembles one from a body
+-- plan silhouette plus overlays. These are the facts that assembly reads:
+-- what kind of thing it is, its body part categories, its tissues, the
+-- colour of its outer material, and the generator's own description.
+local GENERATED_KIND_FLAGS = {
+    {'TITAN', 'TITAN'},
+    {'UNIQUE_DEMON', 'DEMON'},
+    {'DEMON', 'DEMON'},
+    {'NIGHT_CREATURE_HUNTER', 'NIGHT_CREATURE'},
+    {'NIGHT_CREATURE_BOGEYMAN', 'NIGHT_CREATURE'},
+    {'NIGHT_CREATURE_EXPERIMENTER', 'NIGHT_CREATURE'},
+    {'NIGHT_CREATURE', 'NIGHT_CREATURE'},
+    {'FEATURE_BEAST', 'FEATURE_BEAST'},
+    {'MEGABEAST', 'MEGABEAST'},
+    {'SEMIMEGABEAST', 'MEGABEAST'},
+}
+
+-- Outer covering first: the tissue whose colour the beast shows.
+local OUTER_TISSUES = {'UNIFORM_TIS', 'FEATHER', 'SCALE', 'CHITIN', 'SHELL', 'HAIR', 'SKIN', 'FAT', 'MUSCLE'}
+
+local function generated_look(craw, caste)
+    local kind = 'OTHER'
+    for _, pair in ipairs(GENERATED_KIND_FLAGS) do
+        if try(function() return caste.flags[pair[1]] end) == true then
+            kind = pair[2]
+            break
+        end
+    end
+    local cats = {}
+    local bps = try(function() return caste.body_info.body_parts end)
+    if bps then
+        for _, bp in ipairs(bps) do
+            local c = tostring(bp.category)
+            cats[c] = (cats[c] or 0) + 1
+        end
+    end
+    local tissues = arr{}
+    local by_id = {}
+    local list = try(function() return craw.tissue end)
+    if list then
+        for _, t in ipairs(list) do
+            local id = tostring(t.id)
+            tissues[#tissues + 1] = id
+            by_id[id] = t
+        end
+    end
+    local color = nil
+    for _, id in ipairs(OUTER_TISSUES) do
+        local t = by_id[id]
+        if t then
+            local mi = try(dfhack.matinfo.decode, t.mat_type, t.mat_index)
+            color = mi and color_token(try(function() return mi.material.state_color.Solid end)) or nil
+            if color then break end
+        end
+    end
+    return {
+        kind = kind,
+        description = tostring(try(function() return caste.description end) or ''),
+        cats = cats,
+        tissues = tissues,
+        color = color,
+        flier = try(function() return caste.flags.FLIER end) == true,
+    }
+end
+
 local function unit_look_inner(u, craw)
     local caste = try(function() return craw.caste[u.caste] end)
     if not caste then return nil end
@@ -606,6 +672,8 @@ local function unit_look_inner(u, craw)
         body_modifiers = body_mods,
         parts = unit_parts(u, caste),
         worn = unit_worn(u, caste),
+        generated = (try(function() return craw.flags.GENERATED end) == true)
+            and generated_look(craw, caste) or nil,
     }
 end
 
@@ -681,8 +749,58 @@ end
 local ITEM_COLUMNS = arr{
     'id', 'type', 'subtype', 'description', 'material', 'stack', 'quality',
     'wear', 'x', 'y', 'z', 'flags', 'container_id', 'holder_unit_id',
-    'holder_building_id', 'value',
+    'holder_building_id', 'value', 'subtype_id', 'mat_class', 'color',
+    'race_id', 'caste_id', 'plant_id', 'corpse_flags',
 }
+
+-- Corpses, body parts, remains, fish, vermin, eggs and pets carry the
+-- creature they came from; the graphics for them are the creature's.
+local function item_creature(it)
+    local race = try(function() return it.race end)
+    if race == nil or race < 0 then return nil, nil end
+    local craw = df.creature_raw.find(race)
+    if not craw then return nil, nil end
+    local caste = try(function() return it.caste end)
+    local caste_id = (caste ~= nil and caste >= 0)
+        and try(function() return craw.caste[caste].caste_id end) or nil
+    return craw.creature_id, caste_id
+end
+
+-- Which part of a butchered creature a body part item is (bone, skull,
+-- skin, horn, ...): the set corpse_flags, by name.
+local function item_corpse_flags(it)
+    local flags = try(function() return it.corpse_flags end)
+    if not flags then return nil end
+    local out = arr{}
+    local ok = pcall(function()
+        for name, set in pairs(flags) do
+            if set == true then out[#out + 1] = tostring(name) end
+        end
+    end)
+    if not ok then return nil end
+    table.sort(out)
+    return out
+end
+
+-- The material family the item graphics choose a variant by
+-- (ITEM_DOOR_STONE, ITEM_BOOK_METAL, ITEM_FLASK_LEATHER).
+local function material_class(mi)
+    local mat = mi and mi.material
+    if not mat then return nil end
+    local function has(name) return try(function() return mat.flags[name] end) == true end
+    if has('IS_METAL') then return 'METAL' end
+    if has('IS_GLASS') then return 'GLASS' end
+    if has('IS_GEM') then return 'GEM' end
+    if has('IS_STONE') then return 'STONE' end
+    if has('WOOD') then return 'WOOD' end
+    if has('LEATHER') then return 'LEATHER' end
+    if has('BONE') then return 'BONE' end
+    if has('SHELL') then return 'SHELL' end
+    if has('SOAP') then return 'SOAP' end
+    if has('SILK') or has('YARN') or has('THREAD_PLANT') then return 'CLOTH' end
+    if mi.mode == 'plant' then return 'PLANT' end
+    return nil
+end
 
 local ITEM_FLAG_NAMES = {
     'forbid', 'dump', 'melt', 'rotten', 'owned', 'in_inventory', 'in_building',
@@ -705,11 +823,19 @@ local function item_row(it)
     local x, y, z = dfhack.items.getPosition(it)
     local itype = it:getType()
     local subtype = nil
+    local subtype_id = nil
     local def = try(dfhack.items.getSubtypeDef, itype, it:getSubtype())
-    if def then subtype = try(function() return def.name end) end
+    if def then
+        subtype = try(function() return def.name end)
+        -- Raw token (ITEM_WEAPON_PICK): what the item graphics are keyed on.
+        subtype_id = try(function() return def.id end)
+    end
     local material = ''
     local mi = try(dfhack.matinfo.decode, it)
     if mi then material = try(function() return mi:toString() end) or '' end
+    local color = mi and color_token(try(function() return mi.material.state_color.Solid end)) or nil
+    local plant_id = mi and try(function() return mi.plant.id end) or nil
+    local race_id, caste_id = item_creature(it)
     local container = try(dfhack.items.getContainer, it)
     local holder_unit = try(dfhack.items.getHolderUnit, it)
     local holder_building = try(dfhack.items.getHolderBuilding, it)
@@ -727,7 +853,14 @@ local function item_row(it)
         container and container.id or nil,
         holder_unit and holder_unit.id or nil,
         holder_building and holder_building.id or nil,
-        try(dfhack.items.getValue, it) or 0
+        try(dfhack.items.getValue, it) or 0,
+        subtype_id,
+        material_class(mi),
+        color,
+        race_id,
+        caste_id,
+        plant_id,
+        item_corpse_flags(it)
     )
 end
 

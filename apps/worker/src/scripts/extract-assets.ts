@@ -100,6 +100,15 @@ interface AssetIndex {
    * drawn for artifacts when the raws define one.
    */
   items: Record<string, { default: TileSprite; artifact?: TileSprite }>
+  /**
+   * Plant token (MUSHROOM_HELMET_PLUMP) -> sprites from its [PLANT_GRAPHICS]
+   * block: the seed item, the harvested plant, the growing shrub, and the
+   * first picked growth (fruit, leaves).
+   */
+  plants: Record<
+    string,
+    { seed?: TileSprite; picked?: TileSprite; shrub?: TileSprite; growth?: TileSprite }
+  >
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +373,8 @@ function parseRawFile(text: string, packName: string, ctx: ParseContext) {
   let inTemplateDefinition = false
   /** Subtype token of the open [WEAPON_GRAPHICS:...] style block. */
   let currentItem: string | null = null
+  /** Plant token of the open [PLANT_GRAPHICS:...] block. */
+  let currentPlant: string | null = null
 
   const endLayerSet = () => {
     flushTemplate()
@@ -423,6 +434,34 @@ function parseRawFile(text: string, packName: string, ctx: ParseContext) {
         continue
       }
       endLayerSet()
+    }
+
+    // Plant sprites: [PLANT_GRAPHICS:TOKEN] then [SEED:PAGE:x:y], [PICKED:...],
+    // [SHRUB:...], [GROWTH_PICKED:...] and the growing stages.
+    if (tag === 'PLANT_GRAPHICS') {
+      currentPlant = args[1] ?? null
+      if (currentPlant) index.plants[currentPlant] ??= {}
+      continue
+    }
+    if (currentPlant) {
+      const slot =
+        tag === 'SEED'
+          ? 'seed'
+          : tag === 'PICKED'
+            ? 'picked'
+            : tag === 'SHRUB'
+              ? 'shrub'
+              : tag === 'GROWTH_PICKED'
+                ? 'growth'
+                : null
+      if (slot) {
+        const sprite = spriteFromArgs(args, 1)
+        const entry = index.plants[currentPlant]
+        if (sprite && entry && !entry[slot]) entry[slot] = sprite
+        continue
+      }
+      if (BLOCK_OPENERS.has(tag) || tag === 'PLANT_GRAPHICS') currentPlant = null
+      else continue
     }
 
     // Item sprites: inline [ARMOR_GRAPHICS:PAGE:x:y:TOKEN] or a
@@ -509,6 +548,12 @@ function parseRawFile(text: string, packName: string, ctx: ParseContext) {
       const [, page, x, y, name, frame] = args
       const key = frame ? `${name}:${frame}` : name
       index.tiles[key] = { page, x: Number(x), y: Number(y) }
+      continue
+    }
+    // [TILE_GRAPHICS_RECTANGLE:PAGE:col:row:w:h:NAME] - a sprite spanning several tiles.
+    if (tag === 'TILE_GRAPHICS_RECTANGLE' && args.length >= 7) {
+      const [, page, x, y, w, h, name] = args
+      index.tiles[name] = { page, x: Number(x), y: Number(y), w: Number(w), h: Number(h) }
       continue
     }
 
@@ -614,6 +659,7 @@ function main() {
       layeredCreatures: [],
       palettes: {},
       items: {},
+      plants: {},
     },
     templates: new Map(),
     rules: new Map(),
@@ -674,7 +720,7 @@ function main() {
     `  ${pngCount} PNGs copied, ${raws.length} raws parsed from packs: ${packs.join(', ')}`,
   )
   console.log(
-    `  ${Object.keys(index.pages).length} sprite sheets, ${Object.keys(index.tiles).length} named tiles, ${Object.keys(index.creatures).length} creature entries, ${Object.keys(index.items).length} item sprites`,
+    `  ${Object.keys(index.pages).length} sprite sheets, ${Object.keys(index.tiles).length} named tiles, ${Object.keys(index.creatures).length} creature entries, ${Object.keys(index.items).length} item sprites, ${Object.keys(index.plants).length} plants`,
   )
   console.log(
     `  ${index.layeredCreatures.length} layered creatures with ${layerCount} layer rules (${ctx.templates.size} templates expanded), ${Object.keys(index.palettes.DEFAULT?.colors ?? {}).length} standard palette colours`,

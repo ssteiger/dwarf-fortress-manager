@@ -14,7 +14,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import { MapIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-import { CreatureSprite } from '~/lib/df-assets/components'
+import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
 import {
   formatValue,
   humanize,
@@ -49,7 +49,17 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
     id: 'item',
     header: 'Item',
     accessorFn: (row) => row.item?.description ?? `#${row.itemId}`,
-    meta: { cellClassName: 'max-w-[320px] truncate font-medium' },
+    meta: { cellClassName: 'max-w-[320px] font-medium' },
+    cell: ({ row }) => (
+      <span className="flex items-center gap-2">
+        {row.original.item ? (
+          <ItemSprite item={row.original.item} size={24} className="-my-1" />
+        ) : null}
+        <span className="truncate">
+          {row.original.item?.description ?? `#${row.original.itemId}`}
+        </span>
+      </span>
+    ),
   },
   {
     id: 'mode',
