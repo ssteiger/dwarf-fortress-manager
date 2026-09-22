@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
-import { getFortOverview } from './server'
+import { getFortOverview, getFortUnit } from './server'
 
 /** Shared polling cadence for the fortress pages (reads Postgres, not the game). */
 export const FORT_REFRESH_MS = 5_000
@@ -11,6 +11,15 @@ export function useFortOverview() {
     queryKey: ['fort', 'overview'],
     queryFn: () => getFortOverview(),
     refetchInterval: FORT_REFRESH_MS,
+  })
+}
+
+export function useFortUnit(id: number) {
+  return useQuery({
+    queryKey: ['fort', 'unit', id],
+    queryFn: () => getFortUnit({ data: { id } }),
+    enabled: Number.isFinite(id),
+    refetchInterval: FORT_REFRESH_MS * 2,
   })
 }
 

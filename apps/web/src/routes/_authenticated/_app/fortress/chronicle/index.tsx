@@ -1,13 +1,14 @@
 import type { FortEvent } from '@fortress/db-drizzle'
-import { Badge, Card, Input, cn } from '@fortress/ui'
+import { Badge, Card, DataTable, cn } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import type { ColumnDef } from '@tanstack/react-table'
 import * as React from 'react'
 
-import { formatGameTick } from '~/lib/fortress/format'
+import { formatGameTick, humanize } from '~/lib/fortress/format'
 import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortEvents } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/fort-chrome'
+import { PageHeader, StatusBanner } from '../-components/FortChrome'
 
 type Filter = 'all' | 'notable' | 'cancellations' | 'combat'
 
@@ -30,6 +31,43 @@ function classify(event: FortEvent): Filter[] {
   return out
 }
 
+const EVENT_COLUMNS: ColumnDef<FortEvent>[] = [
+  {
+    id: 'when',
+    header: 'When',
+    accessorFn: (event) => (event.game_year ?? 0) * 1_000_000 + (event.game_tick ?? 0),
+    meta: { cellClassName: 'whitespace-nowrap text-sm tabular-nums' },
+    cell: ({ row }) =>
+      formatGameTick(row.original.game_year, row.original.game_tick) || '—',
+  },
+  {
+    id: 'text',
+    header: 'Announcement',
+    accessorFn: (event) => event.text,
+    meta: { cellClassName: 'max-w-[52rem]' },
+    cell: ({ row }) => {
+      const combat = classify(row.original).includes('combat')
+      return (
+        <span className="flex items-start gap-2">
+          {combat ? (
+            <Badge variant="destructive" className="mt-0.5 shrink-0">
+              !
+            </Badge>
+          ) : null}
+          <span>{row.original.text}</span>
+        </span>
+      )
+    },
+  },
+  {
+    id: 'kind',
+    header: 'Kind',
+    accessorFn: (event) => event.type ?? '',
+    meta: { cellClassName: 'whitespace-nowrap text-sm text-muted-foreground' },
+    cell: ({ row }) => (row.original.type ? humanize(row.original.type) : '—'),
+  },
+]
+
 function ChroniclePage() {
   const overview = useFortOverview()
   const [search, setSearch] = React.useState('')
@@ -48,21 +86,9 @@ function ChroniclePage() {
   })
 
   const events = React.useMemo(
-    () => (data ?? []).filter((e) => classify(e).includes(filter)),
+    () => (data ?? []).filter((event) => classify(event).includes(filter)),
     [data, filter],
   )
-
-  // Group by in-game day so the chronicle reads like a journal.
-  const days = React.useMemo(() => {
-    const groups: { key: string; label: string; events: FortEvent[] }[] = []
-    for (const event of events) {
-      const label = formatGameTick(event.game_year, event.game_tick) || 'Unknown day'
-      const last = groups[groups.length - 1]
-      if (last && last.label === label) last.events.push(event)
-      else groups.push({ key: `${label}-${event.id}`, label, events: [event] })
-    }
-    return groups
-  }, [events])
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
@@ -73,14 +99,6 @@ function ChroniclePage() {
         updatedAt={dataUpdatedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
-        actions={
-          <Input
-            placeholder="Search the chronicle…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-56"
-          />
-        }
       />
       <StatusBanner state={overview.data?.state} />
 
@@ -91,7 +109,7 @@ function ChroniclePage() {
             key={key}
             onClick={() => setFilter(key)}
             className={cn(
-              'rounded-full border px-3 py-1 text-xs transition-colors hover:bg-accent',
+              'rounded-full border px-3 py-1.5 text-sm transition-colors hover:bg-accent',
               filter === key &&
                 'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
             )}
@@ -99,46 +117,34 @@ function ChroniclePage() {
             {FILTERS[key]}
           </button>
         ))}
-        <span className="self-center text-xs text-muted-foreground">
+        <span className="self-center text-sm text-muted-foreground">
           {events.length.toLocaleString()} entries
         </span>
       </div>
 
-      {days.length === 0 ? (
-        <EmptyState title="The chronicle is empty">
-          Announcements are recorded each time the worker dumps the game. Play a little and come
-          back.
-        </EmptyState>
-      ) : (
-        <Card className="p-0">
-          <ol className="divide-y">
-            {days.map((day) => (
-              <li key={day.key} className="grid gap-2 p-4 sm:grid-cols-[160px_1fr]">
-                <div className="text-sm font-semibold text-muted-foreground">{day.label}</div>
-                <ul className="flex flex-col gap-1.5 text-sm">
-                  {day.events.map((event) => {
-                    const cancel = classify(event).includes('cancellations')
-                    const combat = classify(event).includes('combat')
-                    return (
-                      <li
-                        key={event.id}
-                        className={cn('flex items-start gap-2', cancel && 'text-muted-foreground')}
-                      >
-                        {combat ? (
-                          <Badge variant="destructive" className="mt-0.5 shrink-0">
-                            !
-                          </Badge>
-                        ) : null}
-                        <span>{event.text}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
-              </li>
-            ))}
-          </ol>
-        </Card>
-      )}
+      <Card className="overflow-hidden p-0">
+        <DataTable
+          data={events}
+          columns={EVENT_COLUMNS}
+          showSelectColumn={false}
+          showActionsColumn={false}
+          showToolbar={false}
+          enableSortingRemoval={false}
+          defaultSort={[{ id: 'when', desc: true }]}
+          search={search}
+          onSearch={setSearch}
+          getRowId={(event) => String(event.id)}
+          rowClassName={(event) =>
+            classify(event).includes('cancellations') ? 'text-muted-foreground' : undefined
+          }
+          emptyState={{
+            title: 'The chronicle is empty',
+            subtitle: q
+              ? 'Nothing matches this search.'
+              : 'Announcements are recorded each time the worker dumps the game. Play a little and come back.',
+          }}
+        />
+      </Card>
     </div>
   )
 }

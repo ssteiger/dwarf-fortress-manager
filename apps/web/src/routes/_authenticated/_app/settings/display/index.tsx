@@ -1,6 +1,6 @@
 import { Separator } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
-import { DisplayForm } from './-components/display-form'
+import { DisplayForm } from './-components/DisplayForm'
 
 const SettingsDisplayPage = () => {
   return (

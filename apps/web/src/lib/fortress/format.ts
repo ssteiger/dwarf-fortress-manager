@@ -69,6 +69,16 @@ export function unitNeeds(unit: FortUnit): NeedState[] {
   )
 }
 
+export function unitDisplayName(unit: Pick<FortUnit, 'name' | 'readable'>): string {
+  return unit.name || unit.readable
+}
+
+export function sexLabel(sex: number): string {
+  if (sex === 1) return 'male'
+  if (sex === 0) return 'female'
+  return 'no sex'
+}
+
 export function isCitizen(unit: FortUnit): boolean {
   return unit.flags.includes('citizen')
 }

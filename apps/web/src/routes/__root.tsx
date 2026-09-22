@@ -34,7 +34,7 @@ export const Route = createRootRouteWithContext<{
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'Strike the Earth',
+        title: 'Dwarf Fortress Manager',
       },
     ],
     links: [

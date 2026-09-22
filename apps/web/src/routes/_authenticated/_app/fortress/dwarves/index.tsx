@@ -1,35 +1,57 @@
 import type { FortUnit } from '@fortress/db-drizzle'
 import {
   Badge,
+  Button,
   Card,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  DataTable,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
   Tabs,
   TabsList,
   TabsTrigger,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-  cn,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { BookOpenIcon } from 'lucide-react'
+import type { ColumnDef } from '@tanstack/react-table'
+import { BookOpenIcon, Maximize2Icon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { humanize, isLiving, skillRank, unitGroup, unitNeeds } from '~/lib/fortress/format'
+import {
+  humanize,
+  isLiving,
+  sexLabel,
+  stressLabel,
+  unitDisplayName,
+  unitGroup,
+  unitNeeds,
+} from '~/lib/fortress/format'
 import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortUnits } from '~/lib/fortress/server'
 import { getKnownFigures, getLegendsOverview } from '~/lib/legends/server'
-import { EmptyState, MoodBadge, PageHeader, StatusBanner } from '../-components/fort-chrome'
+import {
+  EmptyState,
+  MoodBadge,
+  PageHeader,
+  StatusBanner,
+  UnitConditionBadges,
+} from '../-components/FortChrome'
+import { DwarfDetails } from './-components/DwarfDetails'
 
 type Group = ReturnType<typeof unitGroup> | 'all'
+
+function conditionScore(unit: FortUnit): number {
+  const needs = unitNeeds(unit)
+  let score = unit.wounds * 100
+  for (const need of needs) score += need.severity === 'danger' ? 10 : 1
+  if (unit.flags.includes('insane')) score += 50
+  if (unit.flags.includes('caged') || unit.flags.includes('chained')) score += 5
+  return score
+}
 
 const GROUP_LABELS: Record<Group, string> = {
   citizen: 'Citizens',
@@ -49,8 +71,8 @@ function DwarvesPage() {
     refetchInterval: FORT_REFRESH_MS * 2,
   })
   const [group, setGroup] = React.useState<Group>('citizen')
-  const [search, setSearch] = React.useState('')
   const [showDead, setShowDead] = React.useState(false)
+  const [selected, setSelected] = React.useState<FortUnit | null>(null)
 
   const units = data?.units ?? []
   const counts = React.useMemo(() => {
@@ -71,26 +93,13 @@ function DwarvesPage() {
     return c
   }, [units, showDead])
 
-  const rows = React.useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return units
-      .filter((u) => (showDead ? true : isLiving(u)))
-      .filter((u) => group === 'all' || unitGroup(u) === group)
-      .filter(
-        (u) =>
-          !q ||
-          u.readable.toLowerCase().includes(q) ||
-          u.profession.toLowerCase().includes(q) ||
-          (u.job ?? '').toLowerCase().includes(q) ||
-          u.race.toLowerCase().includes(q),
-      )
-      .sort(
-        (a, b) =>
-          a.stress_category - b.stress_category ||
-          b.stress - a.stress ||
-          a.name.localeCompare(b.name),
-      )
-  }, [units, group, search, showDead])
+  const rows = React.useMemo(
+    () =>
+      units
+        .filter((u) => (showDead ? true : isLiving(u)))
+        .filter((u) => group === 'all' || unitGroup(u) === group),
+    [units, group, showDead],
+  )
 
   // Legends cross-link: only when the imported world is the one being played.
   const legends = useQuery({
@@ -114,103 +123,21 @@ function DwarvesPage() {
   })
   const knownSet = React.useMemo(() => new Set(known.data ?? []), [known.data])
 
-  return (
-    <TooltipProvider delayDuration={150}>
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-        <PageHeader
-          eyebrow="Fortress"
-          title="Dwarves and creatures"
-          description="Every unit on the map, worst mood first. Hover a name for skills, hunger, and wounds."
-          updatedAt={data?.capturedAt}
-          isFetching={isFetching}
-          onRefresh={() => refetch()}
-        />
-        <StatusBanner state={overview.data?.state} />
-
-        <Card className="overflow-hidden p-0">
-          <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-            <Tabs value={group} onValueChange={(v) => setGroup(v as Group)}>
-              <TabsList className="flex-wrap">
-                {(Object.keys(GROUP_LABELS) as Group[]).map((key) => (
-                  <TabsTrigger key={key} value={key} className="gap-1.5">
-                    {GROUP_LABELS[key]}
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {counts[key]}
-                    </span>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={showDead}
-                  onChange={(e) => setShowDead(e.target.checked)}
-                />
-                include the dead
-              </label>
-              <Input
-                placeholder="Search name, job, profession…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 w-64"
-              />
-            </div>
-          </div>
-
-          {rows.length === 0 ? (
-            <div className="p-6">
-              <EmptyState title="Nobody here">
-                {units.length === 0
-                  ? 'No dump has been taken yet.'
-                  : 'No unit matches this filter.'}
-              </EmptyState>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Profession</TableHead>
-                  <TableHead>Mood</TableHead>
-                  <TableHead>Doing</TableHead>
-                  <TableHead>Condition</TableHead>
-                  <TableHead className="text-right">Age</TableHead>
-                  <TableHead className="text-right">Where</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((unit) => (
-                  <UnitRow
-                    key={unit.id}
-                    unit={unit}
-                    legendsWorldId={
-                      matchingWorld && knownSet.has(unit.hist_figure_id) ? matchingWorld.id : null
-                    }
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Card>
-      </div>
-    </TooltipProvider>
-  )
-}
-
-function UnitRow({ unit, legendsWorldId }: { unit: FortUnit; legendsWorldId: number | null }) {
-  const needs = unitNeeds(unit)
-  const living = isLiving(unit)
-  const groupKind = unitGroup(unit)
-  return (
-    <TableRow className={cn(!living && 'opacity-50')}>
-      <TableCell className="max-w-[280px]">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="cursor-default">
+  const columns = React.useMemo<ColumnDef<FortUnit>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Name',
+        accessorFn: (unit) => unitDisplayName(unit),
+        meta: { cellClassName: 'max-w-[280px]' },
+        cell: ({ row }) => {
+          const unit = row.original
+          const legendsWorldId =
+            matchingWorld && knownSet.has(unit.hist_figure_id) ? matchingWorld.id : null
+          return (
+            <div>
               <div className="flex items-center gap-2 font-medium">
-                <span className="truncate">{unit.name || unit.readable}</span>
+                <span className="truncate">{unitDisplayName(unit)}</span>
                 {legendsWorldId ? (
                   <Link
                     to="/legends/$kind/$id"
@@ -218,12 +145,13 @@ function UnitRow({ unit, legendsWorldId }: { unit: FortUnit; legendsWorldId: num
                     search={{ world: legendsWorldId }}
                     className="text-muted-foreground hover:text-foreground"
                     title="Open in legends"
+                    onClick={(event) => event.stopPropagation()}
                   >
                     <BookOpenIcon className="size-3.5" />
                   </Link>
                 ) : null}
               </div>
-              <div className="truncate text-xs text-muted-foreground">
+              <div className="truncate text-sm text-muted-foreground">
                 {unit.name_english && unit.name_english !== unit.name
                   ? `${unit.name_english} · `
                   : ''}
@@ -231,94 +159,227 @@ function UnitRow({ unit, legendsWorldId }: { unit: FortUnit; legendsWorldId: num
                 {unit.squad ? ` · ${unit.squad}` : ''}
               </div>
             </div>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-sm">
-            <UnitDetails unit={unit} />
-          </TooltipContent>
-        </Tooltip>
-      </TableCell>
-      <TableCell>
-        <div>{unit.profession}</div>
-        {unit.positions.length ? (
-          <div className="text-xs text-muted-foreground">{unit.positions.join(', ')}</div>
-        ) : null}
-      </TableCell>
-      <TableCell>
-        {groupKind === 'citizen' || groupKind === 'resident' ? (
-          <MoodBadge category={unit.stress_category} />
-        ) : null}
-        {unit.mood ? (
-          <Badge variant="outline" className="ml-1">
-            {humanize(unit.mood)} mood
-          </Badge>
-        ) : null}
-      </TableCell>
-      <TableCell className="max-w-[260px] truncate text-sm">
-        {!living ? (
-          <span className="text-muted-foreground">Dead</span>
-        ) : (
-          (unit.job ?? <span className="text-muted-foreground">Idle</span>)
-        )}
-      </TableCell>
-      <TableCell>
-        <div className="flex flex-wrap gap-1">
-          {unit.wounds > 0 ? (
-            <Badge variant="destructive">
-              {unit.wounds} wound{unit.wounds === 1 ? '' : 's'}
-            </Badge>
-          ) : null}
-          {needs.map((n) => (
-            <Badge
-              key={n.label}
-              variant={n.severity === 'danger' ? 'destructive' : 'secondary'}
-              className={cn(
-                n.severity === 'warning' &&
-                  'bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200',
-              )}
-            >
-              {n.label}
-            </Badge>
-          ))}
-          {unit.flags.includes('caged') ? <Badge variant="outline">Caged</Badge> : null}
-          {unit.flags.includes('chained') ? <Badge variant="outline">Chained</Badge> : null}
-          {unit.flags.includes('insane') && living ? (
-            <Badge variant="destructive">Insane</Badge>
-          ) : null}
-          {unit.flags.includes('ghost') ? <Badge variant="outline">Ghost</Badge> : null}
-        </div>
-      </TableCell>
-      <TableCell className="text-right tabular-nums">{Math.floor(unit.age)}</TableCell>
-      <TableCell className="text-right font-mono text-xs text-muted-foreground">
-        {unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '—'}
-      </TableCell>
-    </TableRow>
+          )
+        },
+      },
+      {
+        id: 'profession',
+        header: 'Profession',
+        accessorFn: (unit) => unit.profession,
+        cell: ({ row }) => (
+          <>
+            <div>{row.original.profession}</div>
+            {row.original.positions.length ? (
+              <div className="text-sm text-muted-foreground">
+                {row.original.positions.join(', ')}
+              </div>
+            ) : null}
+          </>
+        ),
+      },
+      {
+        id: 'mood',
+        header: 'Mood',
+        accessorFn: (unit) => unit.stress_category,
+        meta: {
+          searchText: (unit) =>
+            [stressLabel(unit.stress_category), unit.mood ? `${humanize(unit.mood)} mood` : '']
+              .filter(Boolean)
+              .join(' '),
+        },
+        sortingFn: (a, b) => {
+          const category = a.original.stress_category - b.original.stress_category
+          if (category !== 0) return category
+          return b.original.stress - a.original.stress
+        },
+        cell: ({ row }) => {
+          const unit = row.original
+          const kind = unitGroup(unit)
+          return (
+            <>
+              {kind === 'citizen' || kind === 'resident' ? (
+                <MoodBadge category={unit.stress_category} />
+              ) : null}
+              {unit.mood ? (
+                <Badge variant="outline" className="ml-1">
+                  {humanize(unit.mood)} mood
+                </Badge>
+              ) : null}
+            </>
+          )
+        },
+      },
+      {
+        id: 'doing',
+        header: 'Doing',
+        accessorFn: (unit) => (isLiving(unit) ? (unit.job ?? 'Idle') : 'Dead'),
+        meta: { cellClassName: 'max-w-[260px] text-sm' },
+        cell: ({ row }) =>
+          isLiving(row.original) ? (
+            (row.original.job ?? <span className="text-muted-foreground">Idle</span>)
+          ) : (
+            <span className="text-muted-foreground">Dead</span>
+          ),
+      },
+      {
+        id: 'condition',
+        header: 'Condition',
+        accessorFn: (unit) => conditionScore(unit),
+        meta: {
+          searchText: (unit) =>
+            [
+              unit.wounds > 0 ? `${unit.wounds} wound${unit.wounds === 1 ? '' : 's'}` : '',
+              ...unitNeeds(unit).map((need) => need.label),
+              unit.flags.includes('insane') ? 'insane' : '',
+              unit.flags.includes('ghost') ? 'ghost' : '',
+            ]
+              .filter(Boolean)
+              .join(' '),
+        },
+        cell: ({ row }) => <UnitConditionBadges unit={row.original} />,
+      },
+      {
+        id: 'age',
+        header: 'Age',
+        accessorFn: (unit) => unit.age,
+        meta: { align: 'right' },
+        cell: ({ row }) => <span className="tabular-nums">{Math.floor(row.original.age)}</span>,
+      },
+      {
+        id: 'where',
+        header: 'Where',
+        accessorFn: (unit) => (unit.x === null ? null : `${unit.z} ${unit.y} ${unit.x}`),
+        sortUndefined: 'last',
+        meta: { align: 'right', cellClassName: 'font-mono text-sm text-muted-foreground' },
+        cell: ({ row }) => {
+          const unit = row.original
+          return unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '—'
+        },
+      },
+    ],
+    [knownSet, matchingWorld],
   )
-}
 
-function UnitDetails({ unit }: { unit: FortUnit }) {
   return (
-    <div className="flex flex-col gap-2 text-xs">
-      <div className="font-medium">{unit.readable}</div>
-      <div className="text-muted-foreground">
-        {unit.caste} · {unit.sex === 1 ? 'male' : unit.sex === 0 ? 'female' : 'no sex'} · stress{' '}
-        {unit.stress.toLocaleString()}
-      </div>
-      {unit.skills.length ? (
-        <ul className="grid grid-cols-2 gap-x-3">
-          {unit.skills.slice(0, 8).map(([skill, rating]) => (
-            <li key={skill} className="flex justify-between gap-2">
-              <span>{humanize(skill)}</span>
-              <span className="text-muted-foreground">{skillRank(rating)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {unit.blood !== null && unit.blood_max ? (
-        <div className="text-muted-foreground">
-          Blood {Math.round((unit.blood / unit.blood_max) * 100)}% · {unit.inventory.length} items
-          carried
+    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <PageHeader
+        eyebrow="Fortress"
+        title="Dwarves and creatures"
+        description="Every unit on the map, worst mood first. Click a row for skills, hunger, and what they carry."
+        updatedAt={data?.capturedAt}
+        isFetching={isFetching}
+        onRefresh={() => refetch()}
+      />
+      <StatusBanner state={overview.data?.state} />
+
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+          <Tabs value={group} onValueChange={(v) => setGroup(v as Group)}>
+            <TabsList className="flex-wrap">
+              {(Object.keys(GROUP_LABELS) as Group[]).map((key) => (
+                <TabsTrigger key={key} value={key} className="gap-1.5">
+                  {GROUP_LABELS[key]}
+                  <span className="text-xs text-muted-foreground tabular-nums">{counts[key]}</span>
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={showDead}
+              onChange={(e) => setShowDead(e.target.checked)}
+            />
+            include the dead
+          </label>
         </div>
-      ) : null}
+
+        {rows.length === 0 ? (
+          <div className="p-6">
+            <EmptyState title="Nobody here">
+              {units.length === 0 ? 'No dump has been taken yet.' : 'No unit matches this filter.'}
+            </EmptyState>
+          </div>
+        ) : (
+          <DataTable
+            data={rows}
+            columns={columns}
+            showSelectColumn={false}
+            showActionsColumn={false}
+            showToolbar={false}
+            enableSortingRemoval={false}
+            defaultSort={[{ id: 'mood', desc: false }]}
+            getRowId={(unit) => String(unit.id)}
+            rowClassName={(unit) => (isLiving(unit) ? undefined : 'opacity-50')}
+            onRowClick={setSelected}
+          />
+        )}
+      </Card>
+
+      <Drawer
+        direction="right"
+        open={selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+      >
+        <DrawerContent className="data-[vaul-drawer-direction=right]:h-full data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:sm:max-w-xl">
+          {selected ? (
+            <>
+              <DrawerHeader className="border-b">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <DrawerTitle className="flex flex-wrap items-center gap-2">
+                      {unitDisplayName(selected)}
+                      {unitGroup(selected) === 'citizen' || unitGroup(selected) === 'resident' ? (
+                        <MoodBadge
+                          category={selected.stress_category}
+                          className="text-sm font-normal"
+                        />
+                      ) : null}
+                      {selected.mood ? (
+                        <Badge variant="outline" className="text-sm font-normal">
+                          {humanize(selected.mood)} mood
+                        </Badge>
+                      ) : null}
+                    </DrawerTitle>
+                    <DrawerDescription className="mt-1">
+                      {[
+                        selected.name_english && selected.name_english !== selected.name
+                          ? selected.name_english
+                          : null,
+                        selected.caste,
+                        sexLabel(selected.sex),
+                        selected.profession,
+                        `${Math.floor(selected.age)} years`,
+                        isLiving(selected) ? null : 'dead',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </DrawerDescription>
+                  </div>
+                  <DrawerClose asChild>
+                    <Button size="icon" variant="ghost" aria-label="Close">
+                      <XIcon className="size-4" />
+                    </Button>
+                  </DrawerClose>
+                </div>
+              </DrawerHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <DwarfDetails unitId={selected.id} compact />
+              </div>
+              <DrawerFooter className="border-t">
+                <Button asChild>
+                  <Link to="/fortress/dwarves/$id" params={{ id: String(selected.id) }}>
+                    <Maximize2Icon className="size-4" />
+                    Show full page
+                  </Link>
+                </Button>
+              </DrawerFooter>
+            </>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 }

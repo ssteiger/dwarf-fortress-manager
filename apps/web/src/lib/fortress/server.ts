@@ -14,6 +14,8 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { desc, eq, sql } from 'drizzle-orm'
 
+import { type SortDirection, type SortValue, compareSortValues } from './sort'
+
 const SINGLETON_ID = 1
 
 /**
@@ -75,12 +77,182 @@ export const getFortUnits = createServerFn({ method: 'GET' }).handler(
   },
 )
 
+export interface FortUnitQuery {
+  id: number
+}
+
+export interface CarriedItem {
+  itemId: number
+  mode: string
+  item: FortItem | null
+}
+
+export interface FortUnitDetail {
+  capturedAt: string | null
+  unit: FortUnit | null
+  inventory: CarriedItem[]
+  buildings: FortBuilding[]
+  job: FortJob | null
+}
+
+export const getFortUnit = createServerFn({ method: 'GET' })
+  .inputValidator((input: FortUnitQuery) => input)
+  .handler(async ({ data }): Promise<FortUnitDetail> => {
+    const rows = await postgres_db
+      .select({
+        captured_at: schema.fort_dump.captured_at,
+        units: schema.fort_dump.units,
+        items: schema.fort_dump.items,
+        buildings: schema.fort_dump.buildings,
+        jobs: schema.fort_dump.jobs,
+      })
+      .from(schema.fort_dump)
+      .where(eq(schema.fort_dump.id, SINGLETON_ID))
+      .limit(1)
+    const row = rows[0]
+    const empty: FortUnitDetail = {
+      capturedAt: row?.captured_at ?? null,
+      unit: null,
+      inventory: [],
+      buildings: [],
+      job: null,
+    }
+    if (!row) return empty
+    const unit = decodeTable<FortUnit>(row.units).find((u) => u.id === data.id) ?? null
+    if (!unit) return empty
+
+    const items = decodeTable<FortItem>(row.items)
+    const byId = new Map(items.map((item) => [item.id, item]))
+    const seen = new Set<number>()
+    const inventory: CarriedItem[] = []
+    for (const [itemId, mode] of unit.inventory) {
+      seen.add(itemId)
+      inventory.push({ itemId, mode, item: byId.get(itemId) ?? null })
+    }
+    for (const item of items) {
+      if (item.holder_unit_id === unit.id && !seen.has(item.id)) {
+        inventory.push({ itemId: item.id, mode: 'Carried', item })
+      }
+    }
+
+    return {
+      capturedAt: row.captured_at ?? null,
+      unit,
+      inventory,
+      buildings: decodeTable<FortBuilding>(row.buildings).filter((b) =>
+        b.assigned_units.includes(unit.id),
+      ),
+      job:
+        unit.job_id !== null
+          ? (decodeTable<FortJob>(row.jobs).find((j) => j.id === unit.job_id) ?? null)
+          : null,
+    }
+  })
+
+export type ItemSortKey =
+  | 'item'
+  | 'type'
+  | 'material'
+  | 'qty'
+  | 'quality'
+  | 'status'
+  | 'value'
+  | 'where'
+
+const ITEM_SORT_KEYS = new Set<ItemSortKey>([
+  'item',
+  'type',
+  'material',
+  'qty',
+  'quality',
+  'status',
+  'value',
+  'where',
+])
+
+const QUALITY_RANK: Record<string, number> = {
+  Ordinary: 0,
+  WellCrafted: 1,
+  FinelyCrafted: 2,
+  Superior: 3,
+  Exceptional: 4,
+  Masterful: 5,
+  Artifact: 6,
+}
+
+const STATUS_FLAGS = ['artifact', 'forbid', 'dump', 'melt', 'rotten', 'owned', 'trader', 'foreign']
+
+const STATUS_WORDS: Record<string, string> = {
+  artifact: 'artifact',
+  forbid: 'forbidden',
+  dump: 'dump',
+  melt: 'melt',
+  rotten: 'rotten',
+  owned: 'owned',
+  trader: 'merchant',
+  foreign: 'foreign',
+}
+
+function itemSearchText(item: FortItem): string {
+  const where =
+    item.holder_unit_id !== null
+      ? 'carried'
+      : item.holder_building_id !== null
+        ? 'in building'
+        : item.container_id !== null
+          ? 'in container'
+          : item.x !== null
+            ? `${item.x} ${item.y} ${item.z}`
+            : ''
+  return [
+    item.description,
+    item.type,
+    item.subtype ?? '',
+    item.material,
+    item.quality,
+    item.stack,
+    item.value,
+    item.wear > 0 ? `worn ${item.wear}` : '',
+    ...item.flags.map((flag) => STATUS_WORDS[flag] ?? flag),
+    where,
+  ]
+    .join(' ')
+    .toLowerCase()
+}
+
+function itemSortValue(item: FortItem, key: ItemSortKey): SortValue {
+  switch (key) {
+    case 'item':
+      return item.description
+    case 'type':
+      return `${item.type}\u0000${item.subtype ?? ''}`
+    case 'material':
+      return item.material
+    case 'qty':
+      return item.stack
+    case 'quality':
+      return (QUALITY_RANK[item.quality] ?? -1) * 100 + item.wear
+    case 'status':
+      return STATUS_FLAGS.filter((flag) => item.flags.includes(flag)).join(' ')
+    case 'value':
+      return item.value
+    case 'where':
+      if (item.holder_unit_id !== null) return 'carried'
+      if (item.holder_building_id !== null) return 'in building'
+      if (item.container_id !== null) return 'in container'
+      if (item.x !== null) return `map ${item.z} ${item.y} ${item.x}`
+      return null
+  }
+}
+
 export interface ItemsQuery {
   q?: string
   type?: string
   page?: number
   pageSize?: number
   onlyForbidden?: boolean
+  sortKey?: ItemSortKey
+  sortDir?: SortDirection
 }
 
 export interface FortItemsResult {
@@ -116,17 +288,18 @@ export const getFortItems = createServerFn({ method: 'GET' })
     let filtered = all
     if (data.type) filtered = filtered.filter((i) => i.type === data.type)
     if (data.onlyForbidden) filtered = filtered.filter((i) => i.flags.includes('forbid'))
-    if (q) {
-      filtered = filtered.filter(
-        (i) =>
-          i.description.toLowerCase().includes(q) ||
-          i.material.toLowerCase().includes(q) ||
-          i.type.toLowerCase().includes(q) ||
-          (i.subtype ?? '').toLowerCase().includes(q),
+    if (q) filtered = filtered.filter((item) => itemSearchText(item).includes(q))
+    const sortKey = data.sortKey && ITEM_SORT_KEYS.has(data.sortKey) ? data.sortKey : 'value'
+    const sortDir: SortDirection = data.sortDir === 'asc' ? 'asc' : 'desc'
+    filtered.sort((a, b) => {
+      const primary = compareSortValues(
+        itemSortValue(a, sortKey),
+        itemSortValue(b, sortKey),
+        sortDir,
       )
-    }
-    filtered.sort((a, b) => b.value - a.value || a.description.localeCompare(b.description))
-    const pageSize = Math.min(Math.max(data.pageSize ?? 100, 10), 500)
+      return primary !== 0 ? primary : a.description.localeCompare(b.description) || a.id - b.id
+    })
+    const pageSize = Math.min(Math.max(data.pageSize ?? 100, 10), 5000)
     const page = Math.max(data.page ?? 0, 0)
     return {
       capturedAt: row?.captured_at ?? null,

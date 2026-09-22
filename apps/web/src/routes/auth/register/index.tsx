@@ -1,8 +1,8 @@
 import { AuthLayout } from '@fortress/ui'
 import { Link, createFileRoute } from '@tanstack/react-router'
 
-import { AuthLogo } from '../-components/auth-logo'
-import { UserAuthFormRegister } from './-components/user-auth-form'
+import { AuthLogo } from '../-components/AuthLogo'
+import { UserAuthFormRegister } from './-components/UserAuthForm'
 
 const RegisterPage = () => {
   return (
@@ -17,7 +17,7 @@ const RegisterPage = () => {
         </Link>
       }
       quote={{
-        text: 'Strike the earth!',
+        text: 'Dwarf Fortress Manager!',
         author: 'Dwarf Fortress',
       }}
       footer={

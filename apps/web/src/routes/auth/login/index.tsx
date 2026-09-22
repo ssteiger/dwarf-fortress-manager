@@ -1,8 +1,8 @@
 import { AuthLayout } from '@fortress/ui'
 import { Link, createFileRoute } from '@tanstack/react-router'
 
-import { AuthLogo } from '../-components/auth-logo'
-import { UserAuthFormLogin } from './-components/user-auth-form'
+import { AuthLogo } from '../-components/AuthLogo'
+import { UserAuthFormLogin } from './-components/UserAuthForm'
 
 const LoginPage = () => {
   return (

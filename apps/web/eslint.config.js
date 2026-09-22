@@ -14,7 +14,7 @@ import tseslint from 'typescript-eslint'
 const vendoredShadcnGlobs = [
   'src/lib/components/ui/**',
   'src/lib/hooks/use-mobile.ts',
-  'src/routes/_authenticated/_app/settings/account/-components/account-form.tsx',
+  'src/routes/_authenticated/_app/settings/account/-components/AccountForm.tsx',
 ]
 
 export default tseslint.config(

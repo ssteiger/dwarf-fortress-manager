@@ -138,7 +138,7 @@ const columns: ColumnDef<LogRow>[] = [
     header: 'ID',
     size: 80,
     cell: ({ row }) => (
-      <span className="font-mono text-xs text-muted-foreground tabular-nums">
+      <span className="font-mono text-sm text-muted-foreground tabular-nums">
         #{row.getValue<number>('id')}
       </span>
     ),
@@ -174,7 +174,7 @@ const columns: ColumnDef<LogRow>[] = [
       return (
         <span
           className={cn(
-            'whitespace-pre-wrap break-words font-mono text-xs',
+            'block whitespace-pre-wrap break-words text-base leading-relaxed',
             level === 'error' && 'text-destructive',
           )}
         >
@@ -207,7 +207,9 @@ function StatCard({
           {value.toLocaleString()}
         </CardTitle>
       </CardHeader>
-      <CardContent className="pt-0 text-xs text-muted-foreground">{description}</CardContent>
+      <CardContent className="pt-0 text-sm leading-snug text-muted-foreground">
+        {description}
+      </CardContent>
     </Card>
   )
 }
@@ -265,18 +267,18 @@ const LogsPage = () => {
         {/* Hero */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-muted-foreground">
+            <div className="flex items-center gap-2 text-primary">
               <ScrollTextIcon className="size-4" />
-              <span className="text-xs uppercase tracking-wide">System</span>
+              <span className="text-sm font-medium">System</span>
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight">Activity logs</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">Activity logs</h1>
+            <p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">
               Most recent 1,000 entries from{' '}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">public.logs</code>, refreshed
               every {REFRESH_INTERVAL_MS / 1000} seconds.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span className="hidden sm:inline">Last update {lastRefreshLabel}</span>
             <Button
               size="sm"
@@ -343,7 +345,7 @@ const LogsPage = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="text-xs text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               Showing {filteredLogs.length.toLocaleString()} of {counts.total.toLocaleString()}{' '}
               entries
             </div>
@@ -354,7 +356,6 @@ const LogsPage = () => {
               columns={columns}
               isLoading={isLoading}
               showSelectColumn={false}
-              searchableColumns={['body']}
               defaultSort={[{ id: 'created_at', desc: true }]}
               emptyState={{
                 title: 'No log entries yet',

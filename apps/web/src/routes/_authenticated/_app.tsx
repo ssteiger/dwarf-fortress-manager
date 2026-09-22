@@ -19,12 +19,12 @@ import { logoutFn } from '~/lib/auth/server'
 
 const NAV = [
   { title: 'Overview', url: '/fortress', icon: MountainIcon },
-  { title: 'Dwarves', url: '/fortress/dwarves', icon: UsersIcon },
+  { title: 'Dwarves', url: '/fortress/dwarves', icon: UsersIcon, matchPrefix: true },
   { title: 'Items', url: '/fortress/items', icon: PackageIcon },
   { title: 'Work', url: '/fortress/work', icon: HammerIcon },
   { title: 'Map', url: '/fortress/map', icon: MapIcon },
   { title: 'Chronicle', url: '/fortress/chronicle', icon: ScrollTextIcon },
-  { title: 'Legends', url: '/legends', icon: BookOpenIcon },
+  { title: 'Legends', url: '/legends', icon: BookOpenIcon, matchPrefix: true },
 ]
 
 function headerTitle(pathname: string): string {
@@ -63,7 +63,7 @@ const Layout = () => {
     <AppLayout
       headerProps={{ title: headerTitle(location.pathname) }}
       sidebarProps={{
-        brand: '☺ Strike the Earth',
+        brand: '☺ Dwarf Fortress Manager',
         brandHref: '/fortress',
         user: sidebarUser,
         onLogout: () => logOutMutation.mutate(undefined),

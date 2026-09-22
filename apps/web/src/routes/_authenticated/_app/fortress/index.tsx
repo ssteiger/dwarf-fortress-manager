@@ -14,7 +14,7 @@ import {
 
 import { STRESS_BAR_COLORS, formatGameTick, formatNumber, formatValue } from '~/lib/fortress/format'
 import { useFortOverview } from '~/lib/fortress/queries'
-import { EmptyState, PageHeader, StatCard, StatusBanner } from './-components/fort-chrome'
+import { EmptyState, PageHeader, StatCard, StatusBanner } from './-components/FortChrome'
 
 const SEVERITY_CLASSES = {
   danger: 'border-red-500/40 bg-red-500/10',
@@ -60,7 +60,7 @@ function OverviewPage() {
             <>
               {world.day} {world.month_name}, {world.year} · {world.season} · {world.name}
               {world.name_native ? (
-                <span className="text-muted-foreground/70"> ({world.name_native})</span>
+                <span className="text-muted-foreground"> ({world.name_native})</span>
               ) : null}
             </>
           ) : (
@@ -221,10 +221,10 @@ function OverviewPage() {
             </CardHeader>
             <CardContent>
               {data?.events.length ? (
-                <ul className="divide-y text-sm">
+                <ul className="divide-y text-base leading-relaxed">
                   {data.events.slice(0, 12).map((event) => (
-                    <li key={event.id} className="flex gap-3 py-1.5">
-                      <span className="w-32 shrink-0 text-xs text-muted-foreground tabular-nums">
+                    <li key={event.id} className="flex gap-4 py-2.5">
+                      <span className="w-36 shrink-0 pt-0.5 text-sm text-muted-foreground tabular-nums">
                         {formatGameTick(event.game_year, event.game_tick)}
                       </span>
                       <span className={cn(event.type === 'CANCEL_JOB' && 'text-muted-foreground')}>
@@ -266,7 +266,7 @@ function MoodBar({ counts }: { counts: number[] }) {
           ) : null,
         )}
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
         {counts.map((count, i) =>
           count > 0 ? (
             <span key={STRESS_LABELS[i]} className="flex items-center gap-1.5">

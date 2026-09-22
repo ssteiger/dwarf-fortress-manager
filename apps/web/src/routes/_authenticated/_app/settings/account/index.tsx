@@ -1,6 +1,6 @@
 import { Separator } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
-import { AccountForm } from './-components/account-form'
+import { AccountForm } from './-components/AccountForm'
 
 const SettingsAccountPage = () => {
   return (

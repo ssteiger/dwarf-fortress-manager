@@ -1,4 +1,5 @@
-/* Self-hosted Geist Mono (variable weight; latin subsets load on demand). */
+/* Self-hosted DM Sans (variable; latin subsets load on demand). */
+@import "@fontsource-variable/dm-sans";
 @import "@fontsource-variable/geist-mono";
 
 @import "tailwindcss" source("../../");
@@ -8,90 +9,58 @@
 @source "../../../../../packages/ui/src";
 
 @theme {
-  /* One face for the whole interface. */
-  --font-geist: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-sans: var(--font-geist);
-  --font-mono: var(--font-geist);
-  --font-heading: var(--font-geist);
+  /* Proportional text for the interface; mono only for code and coordinates. */
+  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-heading: var(--font-sans);
 }
 
 /* shadcn/typeset preset for rendered markdown and long-form content. */
 .typeset-docs {
-  --typeset-font-body: var(--font-geist);
-  --typeset-font-heading: var(--font-geist);
-  --typeset-font-mono: var(--font-geist);
-  --typeset-size: 15px;
-  --typeset-leading: 1.75;
-  --typeset-flow: 1.25em;
+  --typeset-font-body: var(--font-sans);
+  --typeset-font-heading: var(--font-heading);
+  --typeset-font-mono: var(--font-mono);
+  --typeset-size: 16px;
+  --typeset-leading: 1.65;
+  --typeset-flow: 1.15em;
 }
 
 /*
- * Dwarf Fortress skin.
- * These rules are deliberately unlayered so they win over Tailwind utilities
- * baked into the shared shadcn components without editing those sources.
+ * Reading adjustments.
+ * Unlayered so they win over Tailwind utilities on shared components.
  */
 
-/* Text selection in the game's yellow. */
 ::selection {
   background: var(--highlight);
-  color: var(--primary-foreground);
+  color: var(--foreground);
 }
 
-/* Faint stone texture behind the panels. */
-[data-slot="sidebar-wrapper"],
-[data-slot="sidebar-inner"] {
-  background-color: var(--sidebar);
-  background-image:
-    linear-gradient(
-      45deg,
-      color-mix(in oklab, var(--foreground) 3.5%, transparent) 25%,
-      transparent 25%,
-      transparent 75%,
-      color-mix(in oklab, var(--foreground) 3.5%, transparent) 75%
-    ),
-    linear-gradient(
-      45deg,
-      color-mix(in oklab, var(--foreground) 3.5%, transparent) 25%,
-      transparent 25%,
-      transparent 75%,
-      color-mix(in oklab, var(--foreground) 3.5%, transparent) 75%
-    );
-  background-size: 8px 8px;
-  background-position:
-    0 0,
-    4px 4px;
-}
-
-/* Pixel frames: a 2px stone border with a 1px inner line, like the game's window borders. */
-[data-slot="card"],
-[data-slot="alert"],
-[data-slot="sidebar-inset"] {
-  border: 2px solid var(--frame);
-  border-radius: var(--radius);
-  box-shadow:
-    inset 0 0 0 1px var(--frame-inner),
-    0 2px 0 0 color-mix(in oklab, var(--frame) 45%, transparent);
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-mono);
 }
 
 [data-slot="sidebar-inset"] {
   overflow: hidden;
 }
 
-[data-slot="sidebar-inner"] {
-  border-right: 2px solid var(--sidebar-border);
+[data-slot="table"] {
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
-/* Square corners everywhere the game would have them. */
-[data-slot="button"],
-[data-slot="input"],
-[data-slot="badge"] {
-  border-radius: var(--radius);
-}
-
-/* Table headers as the game labels its columns: small caps. */
 [data-slot="table"] th {
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--muted-foreground);
+}
+
+[data-slot="table"] td {
+  white-space: normal;
+  overflow-wrap: break-word;
+  vertical-align: top;
 }

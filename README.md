@@ -1,4 +1,4 @@
-# Strike the Earth
+# Dwarf Fortress Manager
 
 A live overview of a running Dwarf Fortress game. A small worker asks DFHack for a full dump of the loaded fortress on a timer, stores it in Postgres, and a web app renders it: population and mood, every dwarf, every item, workshops and jobs, the map one z-level at a time, the announcement chronicle, and a browser for the world's exported legends.
 
@@ -15,6 +15,10 @@ flowchart LR
   Web -->|"reads, refetching every few seconds"| DB
 ```
 
+![The legends world map for Ngutegoram](apps/web/public/screenshot-1.jpg)
+
+![Gods, peoples, wars, and chronicle figures in legends](apps/web/public/screenshot-2.jpg)
+
 ## What each app does
 
 | App | Package | Role |
@@ -29,14 +33,14 @@ Shared packages: `@fortress/db-drizzle` (hand-written Drizzle schema, the `postg
 
 | Concern | Choice | Why |
 | --- | --- | --- |
-| Server + router + data fetching | **TanStack Start** | File-based routes, typed `Link`s, and `createServerFn` so a route file can hold both its Postgres query and the component that renders it. |
-| DB access | **Drizzle ORM** (`postgres-js`) | The schema in [packages/db-drizzle/src/schema.ts](packages/db-drizzle/src/schema.ts) is the single source of truth; tables, columns, and query results are typed end to end with no codegen. SQL migrations in `apps/supabase/migrations/` are kept in sync by hand. |
-| Database + auth | **Supabase** (CLI, local) | One container set for Postgres, auth, Storage, and Studio. Auth goes through `@supabase/ssr` so it works inside server functions. |
-| Client state | **TanStack Query** | Caches the user and polls the fortress reads every few seconds. |
-| UI | **shadcn/ui** + Tailwind v4 + lucide-react + sonner | Owned source in `packages/ui`, no runtime UI dependency. |
-| Monorepo | **Bun workspaces** + **Turborepo** | Fast installs, cached typecheck/lint, parallel `dev`. |
-| Lint / format | **Biome** + **ESLint** | Biome is the fast default; ESLint adds the React, Query, and Router plugins. |
-| Game side | **DFHack** remote console + Lua | The Lua script walks units, items, buildings, jobs, announcements, and map blocks and writes one JSON file; the worker talks to DFHack over TCP on `127.0.0.1:5000`. |
+| Server + router + data fetching | TanStack Start | File-based routes, typed `Link`s, and `createServerFn` so a route file can hold both its Postgres query and the component that renders it. |
+| DB access | Drizzle ORM (`postgres-js`) | The schema in [packages/db-drizzle/src/schema.ts](packages/db-drizzle/src/schema.ts) is the single source of truth; tables, columns, and query results are typed end to end with no codegen. SQL migrations in `apps/supabase/migrations/` are kept in sync by hand. |
+| Database + auth | Supabase (CLI, local) | One container set for Postgres, auth, Storage, and Studio. Auth goes through `@supabase/ssr` so it works inside server functions. |
+| Client state | TanStack Query | Caches the user and polls the fortress reads every few seconds. |
+| UI | shadcn/ui + Tailwind v4 + lucide-react + sonner | Owned source in `packages/ui`, no runtime UI dependency. |
+| Monorepo | Bun workspaces + Turborepo | Fast installs, cached typecheck/lint, parallel `dev`. |
+| Lint / format | Biome + ESLint | Biome is the fast default; ESLint adds the React, Query, and Router plugins. |
+| Game side | DFHack remote console + Lua | The Lua script walks units, items, buildings, jobs, announcements, and map blocks and writes one JSON file; the worker talks to DFHack over TCP on `127.0.0.1:5000`. |
 
 ---
 

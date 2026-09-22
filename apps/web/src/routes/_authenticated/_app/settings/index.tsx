@@ -1,6 +1,6 @@
 import { Separator } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
-import { ProfileForm } from './-components/profile-form'
+import { ProfileForm } from './-components/ProfileForm'
 
 const SettingsProfilePage = () => {
   return (

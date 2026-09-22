@@ -20,7 +20,7 @@ import {
   isHidden,
   tileStyle,
 } from '~/lib/fortress/tiles'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/fort-chrome'
+import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 
 const UNIT_COLORS = {
   citizen: '#facc15',
@@ -85,7 +85,7 @@ function MapPage() {
           </Card>
           <div className="flex flex-col gap-4">
             <Card className="flex flex-col gap-3 p-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">Level</div>
+              <div className="text-sm font-medium text-muted-foreground">Level</div>
               <div className="flex items-center justify-between">
                 <Button
                   size="icon"
@@ -148,9 +148,7 @@ function MapPage() {
               </label>
             </Card>
             <Card className="flex flex-col gap-2 p-4 text-sm">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                On this level
-              </div>
+              <div className="text-sm font-medium text-muted-foreground">On this level</div>
               <div className="flex flex-wrap gap-1">
                 <Badge
                   style={{ backgroundColor: UNIT_COLORS.citizen, color: '#000' }}
@@ -169,7 +167,7 @@ function MapPage() {
                 </Badge>
                 <Badge variant="outline">{data.buildings.length} buildings</Badge>
               </div>
-              <div className="min-h-[3rem] text-xs text-muted-foreground">
+              <div className="min-h-[3rem] text-sm leading-relaxed text-muted-foreground">
                 {hover ? (
                   <>
                     <span className="font-mono">
@@ -206,7 +204,7 @@ function Legend() {
     ['#0b0f14', 'open air'],
   ]
   return (
-    <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
       {swatches.map(([color, label]) => (
         <div key={label} className="flex items-center gap-1.5">
           <span

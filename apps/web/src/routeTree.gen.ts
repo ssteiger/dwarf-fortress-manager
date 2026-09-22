@@ -23,12 +23,16 @@ import { Route as AuthenticatedAppSettingsNotificationsIndexRouteImport } from '
 import { Route as AuthenticatedAppSettingsDisplayIndexRouteImport } from './routes/_authenticated/_app/settings/display/index'
 import { Route as AuthenticatedAppSettingsAppearanceIndexRouteImport } from './routes/_authenticated/_app/settings/appearance/index'
 import { Route as AuthenticatedAppSettingsAccountIndexRouteImport } from './routes/_authenticated/_app/settings/account/index'
+import { Route as AuthenticatedAppLegendsWorldIndexRouteImport } from './routes/_authenticated/_app/legends/world/index'
+import { Route as AuthenticatedAppLegendsHistoryIndexRouteImport } from './routes/_authenticated/_app/legends/history/index'
+import { Route as AuthenticatedAppLegendsArchiveIndexRouteImport } from './routes/_authenticated/_app/legends/archive/index'
 import { Route as AuthenticatedAppFortressWorkIndexRouteImport } from './routes/_authenticated/_app/fortress/work/index'
 import { Route as AuthenticatedAppFortressMapIndexRouteImport } from './routes/_authenticated/_app/fortress/map/index'
 import { Route as AuthenticatedAppFortressItemsIndexRouteImport } from './routes/_authenticated/_app/fortress/items/index'
 import { Route as AuthenticatedAppFortressDwarvesIndexRouteImport } from './routes/_authenticated/_app/fortress/dwarves/index'
 import { Route as AuthenticatedAppFortressChronicleIndexRouteImport } from './routes/_authenticated/_app/fortress/chronicle/index'
 import { Route as AuthenticatedAppLegendsKindIdRouteImport } from './routes/_authenticated/_app/legends/$kind/$id'
+import { Route as AuthenticatedAppFortressDwarvesIdRouteImport } from './routes/_authenticated/_app/fortress/dwarves/$id'
 
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
@@ -106,6 +110,24 @@ const AuthenticatedAppSettingsAccountIndexRoute =
     path: '/settings/account/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppLegendsWorldIndexRoute =
+  AuthenticatedAppLegendsWorldIndexRouteImport.update({
+    id: '/legends/world/',
+    path: '/legends/world/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLegendsHistoryIndexRoute =
+  AuthenticatedAppLegendsHistoryIndexRouteImport.update({
+    id: '/legends/history/',
+    path: '/legends/history/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLegendsArchiveIndexRoute =
+  AuthenticatedAppLegendsArchiveIndexRouteImport.update({
+    id: '/legends/archive/',
+    path: '/legends/archive/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFortressWorkIndexRoute =
   AuthenticatedAppFortressWorkIndexRouteImport.update({
     id: '/fortress/work/',
@@ -142,6 +164,12 @@ const AuthenticatedAppLegendsKindIdRoute =
     path: '/legends/$kind/$id',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppFortressDwarvesIdRoute =
+  AuthenticatedAppFortressDwarvesIdRouteImport.update({
+    id: '/fortress/dwarves/$id',
+    path: '/fortress/dwarves/$id',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedAppIndexRoute
@@ -152,12 +180,16 @@ export interface FileRoutesByFullPath {
   '/fortress/': typeof AuthenticatedAppFortressIndexRoute
   '/legends/': typeof AuthenticatedAppLegendsIndexRoute
   '/settings/': typeof AuthenticatedAppSettingsIndexRoute
+  '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/fortress/items/': typeof AuthenticatedAppFortressItemsIndexRoute
   '/fortress/map/': typeof AuthenticatedAppFortressMapIndexRoute
   '/fortress/work/': typeof AuthenticatedAppFortressWorkIndexRoute
+  '/legends/archive/': typeof AuthenticatedAppLegendsArchiveIndexRoute
+  '/legends/history/': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/legends/world/': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/settings/account/': typeof AuthenticatedAppSettingsAccountIndexRoute
   '/settings/appearance/': typeof AuthenticatedAppSettingsAppearanceIndexRoute
   '/settings/display/': typeof AuthenticatedAppSettingsDisplayIndexRoute
@@ -172,12 +204,16 @@ export interface FileRoutesByTo {
   '/fortress': typeof AuthenticatedAppFortressIndexRoute
   '/legends': typeof AuthenticatedAppLegendsIndexRoute
   '/settings': typeof AuthenticatedAppSettingsIndexRoute
+  '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/fortress/chronicle': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/fortress/dwarves': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/fortress/items': typeof AuthenticatedAppFortressItemsIndexRoute
   '/fortress/map': typeof AuthenticatedAppFortressMapIndexRoute
   '/fortress/work': typeof AuthenticatedAppFortressWorkIndexRoute
+  '/legends/archive': typeof AuthenticatedAppLegendsArchiveIndexRoute
+  '/legends/history': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/legends/world': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/settings/account': typeof AuthenticatedAppSettingsAccountIndexRoute
   '/settings/appearance': typeof AuthenticatedAppSettingsAppearanceIndexRoute
   '/settings/display': typeof AuthenticatedAppSettingsDisplayIndexRoute
@@ -195,12 +231,16 @@ export interface FileRoutesById {
   '/_authenticated/_app/fortress/': typeof AuthenticatedAppFortressIndexRoute
   '/_authenticated/_app/legends/': typeof AuthenticatedAppLegendsIndexRoute
   '/_authenticated/_app/settings/': typeof AuthenticatedAppSettingsIndexRoute
+  '/_authenticated/_app/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/_authenticated/_app/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/_authenticated/_app/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/_authenticated/_app/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/_authenticated/_app/fortress/items/': typeof AuthenticatedAppFortressItemsIndexRoute
   '/_authenticated/_app/fortress/map/': typeof AuthenticatedAppFortressMapIndexRoute
   '/_authenticated/_app/fortress/work/': typeof AuthenticatedAppFortressWorkIndexRoute
+  '/_authenticated/_app/legends/archive/': typeof AuthenticatedAppLegendsArchiveIndexRoute
+  '/_authenticated/_app/legends/history/': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/_authenticated/_app/legends/world/': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/_authenticated/_app/settings/account/': typeof AuthenticatedAppSettingsAccountIndexRoute
   '/_authenticated/_app/settings/appearance/': typeof AuthenticatedAppSettingsAppearanceIndexRoute
   '/_authenticated/_app/settings/display/': typeof AuthenticatedAppSettingsDisplayIndexRoute
@@ -217,12 +257,16 @@ export interface FileRouteTypes {
     | '/fortress/'
     | '/legends/'
     | '/settings/'
+    | '/fortress/dwarves/$id'
     | '/legends/$kind/$id'
     | '/fortress/chronicle/'
     | '/fortress/dwarves/'
     | '/fortress/items/'
     | '/fortress/map/'
     | '/fortress/work/'
+    | '/legends/archive/'
+    | '/legends/history/'
+    | '/legends/world/'
     | '/settings/account/'
     | '/settings/appearance/'
     | '/settings/display/'
@@ -237,12 +281,16 @@ export interface FileRouteTypes {
     | '/fortress'
     | '/legends'
     | '/settings'
+    | '/fortress/dwarves/$id'
     | '/legends/$kind/$id'
     | '/fortress/chronicle'
     | '/fortress/dwarves'
     | '/fortress/items'
     | '/fortress/map'
     | '/fortress/work'
+    | '/legends/archive'
+    | '/legends/history'
+    | '/legends/world'
     | '/settings/account'
     | '/settings/appearance'
     | '/settings/display'
@@ -259,12 +307,16 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/fortress/'
     | '/_authenticated/_app/legends/'
     | '/_authenticated/_app/settings/'
+    | '/_authenticated/_app/fortress/dwarves/$id'
     | '/_authenticated/_app/legends/$kind/$id'
     | '/_authenticated/_app/fortress/chronicle/'
     | '/_authenticated/_app/fortress/dwarves/'
     | '/_authenticated/_app/fortress/items/'
     | '/_authenticated/_app/fortress/map/'
     | '/_authenticated/_app/fortress/work/'
+    | '/_authenticated/_app/legends/archive/'
+    | '/_authenticated/_app/legends/history/'
+    | '/_authenticated/_app/legends/world/'
     | '/_authenticated/_app/settings/account/'
     | '/_authenticated/_app/settings/appearance/'
     | '/_authenticated/_app/settings/display/'
@@ -378,6 +430,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppSettingsAccountIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/_app/legends/world/': {
+      id: '/_authenticated/_app/legends/world/'
+      path: '/legends/world'
+      fullPath: '/legends/world/'
+      preLoaderRoute: typeof AuthenticatedAppLegendsWorldIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/legends/history/': {
+      id: '/_authenticated/_app/legends/history/'
+      path: '/legends/history'
+      fullPath: '/legends/history/'
+      preLoaderRoute: typeof AuthenticatedAppLegendsHistoryIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/legends/archive/': {
+      id: '/_authenticated/_app/legends/archive/'
+      path: '/legends/archive'
+      fullPath: '/legends/archive/'
+      preLoaderRoute: typeof AuthenticatedAppLegendsArchiveIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/_app/fortress/work/': {
       id: '/_authenticated/_app/fortress/work/'
       path: '/fortress/work'
@@ -420,6 +493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppLegendsKindIdRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/_app/fortress/dwarves/$id': {
+      id: '/_authenticated/_app/fortress/dwarves/$id'
+      path: '/fortress/dwarves/$id'
+      fullPath: '/fortress/dwarves/$id'
+      preLoaderRoute: typeof AuthenticatedAppFortressDwarvesIdRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
   }
 }
 
@@ -429,12 +509,16 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFortressIndexRoute: typeof AuthenticatedAppFortressIndexRoute
   AuthenticatedAppLegendsIndexRoute: typeof AuthenticatedAppLegendsIndexRoute
   AuthenticatedAppSettingsIndexRoute: typeof AuthenticatedAppSettingsIndexRoute
+  AuthenticatedAppFortressDwarvesIdRoute: typeof AuthenticatedAppFortressDwarvesIdRoute
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
   AuthenticatedAppFortressChronicleIndexRoute: typeof AuthenticatedAppFortressChronicleIndexRoute
   AuthenticatedAppFortressDwarvesIndexRoute: typeof AuthenticatedAppFortressDwarvesIndexRoute
   AuthenticatedAppFortressItemsIndexRoute: typeof AuthenticatedAppFortressItemsIndexRoute
   AuthenticatedAppFortressMapIndexRoute: typeof AuthenticatedAppFortressMapIndexRoute
   AuthenticatedAppFortressWorkIndexRoute: typeof AuthenticatedAppFortressWorkIndexRoute
+  AuthenticatedAppLegendsArchiveIndexRoute: typeof AuthenticatedAppLegendsArchiveIndexRoute
+  AuthenticatedAppLegendsHistoryIndexRoute: typeof AuthenticatedAppLegendsHistoryIndexRoute
+  AuthenticatedAppLegendsWorldIndexRoute: typeof AuthenticatedAppLegendsWorldIndexRoute
   AuthenticatedAppSettingsAccountIndexRoute: typeof AuthenticatedAppSettingsAccountIndexRoute
   AuthenticatedAppSettingsAppearanceIndexRoute: typeof AuthenticatedAppSettingsAppearanceIndexRoute
   AuthenticatedAppSettingsDisplayIndexRoute: typeof AuthenticatedAppSettingsDisplayIndexRoute
@@ -448,6 +532,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppFortressIndexRoute: AuthenticatedAppFortressIndexRoute,
   AuthenticatedAppLegendsIndexRoute: AuthenticatedAppLegendsIndexRoute,
   AuthenticatedAppSettingsIndexRoute: AuthenticatedAppSettingsIndexRoute,
+  AuthenticatedAppFortressDwarvesIdRoute:
+    AuthenticatedAppFortressDwarvesIdRoute,
   AuthenticatedAppLegendsKindIdRoute: AuthenticatedAppLegendsKindIdRoute,
   AuthenticatedAppFortressChronicleIndexRoute:
     AuthenticatedAppFortressChronicleIndexRoute,
@@ -458,6 +544,12 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppFortressMapIndexRoute: AuthenticatedAppFortressMapIndexRoute,
   AuthenticatedAppFortressWorkIndexRoute:
     AuthenticatedAppFortressWorkIndexRoute,
+  AuthenticatedAppLegendsArchiveIndexRoute:
+    AuthenticatedAppLegendsArchiveIndexRoute,
+  AuthenticatedAppLegendsHistoryIndexRoute:
+    AuthenticatedAppLegendsHistoryIndexRoute,
+  AuthenticatedAppLegendsWorldIndexRoute:
+    AuthenticatedAppLegendsWorldIndexRoute,
   AuthenticatedAppSettingsAccountIndexRoute:
     AuthenticatedAppSettingsAccountIndexRoute,
   AuthenticatedAppSettingsAppearanceIndexRoute:

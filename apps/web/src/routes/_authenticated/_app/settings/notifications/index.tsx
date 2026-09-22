@@ -1,6 +1,6 @@
 import { Separator } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
-import { NotificationsForm } from './-components/notifications-form'
+import { NotificationsForm } from './-components/NotificationsForm'
 
 const SettingsNotificationsPage = () => {
   return (

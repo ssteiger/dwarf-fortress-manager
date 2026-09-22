@@ -1,6 +1,6 @@
 import { Separator } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
-import { AppearanceForm } from './-components/appearance-form'
+import { AppearanceForm } from './-components/AppearanceForm'
 
 const SettingsAppearancePage = () => {
   return (

@@ -5,29 +5,36 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Input,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  DataTable,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-  cn,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import type { ColumnDef } from '@tanstack/react-table'
 import * as React from 'react'
 
-import { formatNumber, humanize, splitPascal } from '~/lib/fortress/format'
+import { formatNumber, splitPascal } from '~/lib/fortress/format'
 import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortWork } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatCard, StatusBanner } from '../-components/fort-chrome'
+import { EmptyState, PageHeader, StatCard, StatusBanner } from '../-components/FortChrome'
 
 const WORKSHOP_TYPES = new Set(['Workshop', 'Furnace', 'TradeDepot'])
+
+interface BuildingGroup {
+  label: string
+  buildings: FortBuilding[]
+}
+
+function jobLabel(job: FortJob): string {
+  return job.name || splitPascal(job.type)
+}
+
+function jobFlagScore(job: FortJob): number {
+  return (job.suspended ? 4 : 0) + (job.repeat ? 2 : 0) + (job.order_id >= 0 ? 1 : 0)
+}
 
 function buildingLabel(b: FortBuilding): string {
   if (b.custom) return b.custom
@@ -44,9 +51,6 @@ function WorkPage() {
     queryFn: () => getFortWork(),
     refetchInterval: FORT_REFRESH_MS * 2,
   })
-  const [search, setSearch] = React.useState('')
-  const q = search.trim().toLowerCase()
-
   const buildings = data?.buildings ?? []
   const jobs = data?.jobs ?? []
   const unitNames = React.useMemo(
@@ -65,7 +69,6 @@ function WorkPage() {
     const furniture: FortBuilding[] = []
     const unfinished: FortBuilding[] = []
     for (const b of buildings) {
-      if (q && !`${b.name} ${buildingLabel(b)} ${b.room ?? ''}`.toLowerCase().includes(q)) continue
       if (b.max_stage > 0 && b.stage < b.max_stage) unfinished.push(b)
       if (WORKSHOP_TYPES.has(b.type)) workshops.push(b)
       else if (b.type === 'Stockpile') stockpiles.push(b)
@@ -73,17 +76,71 @@ function WorkPage() {
       else furniture.push(b)
     }
     return { workshops, stockpiles, zones, furniture, unfinished }
-  }, [buildings, q])
+  }, [buildings])
 
-  const jobRows = React.useMemo(() => {
-    return jobs
-      .filter((j) => !q || `${j.name} ${j.type}`.toLowerCase().includes(q))
-      .sort(
-        (a, b) =>
-          Number(b.worker_id !== null) - Number(a.worker_id !== null) ||
-          a.name.localeCompare(b.name),
-      )
-  }, [jobs, q])
+  const jobColumns = React.useMemo<ColumnDef<FortJob>[]>(
+    () => [
+      {
+        id: 'job',
+        header: 'Job',
+        accessorFn: (job) => jobLabel(job),
+        meta: { cellClassName: 'font-medium' },
+      },
+      {
+        id: 'worker',
+        header: 'Worker',
+        accessorFn: (job) =>
+          job.worker_id !== null ? (unitNames.get(job.worker_id) ?? null) : null,
+        sortUndefined: 'last',
+        meta: {
+          cellClassName: 'text-sm',
+          searchText: (job) =>
+            job.worker_id !== null ? (unitNames.get(job.worker_id) ?? 'unassigned') : 'unassigned',
+        },
+        cell: ({ getValue }) =>
+          getValue<string | null>() ?? <span className="text-muted-foreground">unassigned</span>,
+      },
+      {
+        id: 'building',
+        header: 'Building',
+        accessorFn: (job) =>
+          job.building_id !== null ? (buildingNames.get(job.building_id) ?? null) : null,
+        sortUndefined: 'last',
+        meta: { cellClassName: 'text-sm text-muted-foreground' },
+        cell: ({ getValue }) => getValue<string | null>() ?? '—',
+      },
+      {
+        id: 'flags',
+        header: 'Flags',
+        accessorFn: (job) => jobFlagScore(job),
+        meta: {
+          searchText: (job) =>
+            [
+              job.suspended ? 'suspended' : '',
+              job.repeat ? 'repeat' : '',
+              job.order_id >= 0 ? 'manager order' : '',
+            ]
+              .filter(Boolean)
+              .join(' '),
+        },
+        cell: ({ row }) => (
+          <div className="flex gap-1">
+            {row.original.suspended ? <Badge variant="destructive">Suspended</Badge> : null}
+            {row.original.repeat ? <Badge variant="outline">Repeat</Badge> : null}
+            {row.original.order_id >= 0 ? <Badge variant="secondary">Manager order</Badge> : null}
+          </div>
+        ),
+      },
+      {
+        id: 'where',
+        header: 'Where',
+        accessorFn: (job) => `${job.z} ${job.y} ${job.x}`,
+        meta: { align: 'right', cellClassName: 'font-mono text-sm text-muted-foreground' },
+        cell: ({ row }) => `${row.original.x},${row.original.y} z${row.original.z}`,
+      },
+    ],
+    [buildingNames, unitNames],
+  )
 
   const activeJobs = jobs.filter((j) => j.worker_id !== null).length
   const suspended = jobs.filter((j) => j.suspended).length
@@ -102,14 +159,6 @@ function WorkPage() {
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
-        actions={
-          <Input
-            placeholder="Filter jobs and buildings…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 w-56"
-          />
-        }
       />
       <StatusBanner state={overview.data?.state} />
 
@@ -154,7 +203,7 @@ function WorkPage() {
 
       <Tabs defaultValue="jobs">
         <TabsList>
-          <TabsTrigger value="jobs">Jobs ({jobRows.length})</TabsTrigger>
+          <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>
           <TabsTrigger value="workshops">Workshops ({groups.workshops.length})</TabsTrigger>
           <TabsTrigger value="stockpiles">Stockpiles ({groups.stockpiles.length})</TabsTrigger>
           <TabsTrigger value="zones">Zones ({groups.zones.length})</TabsTrigger>
@@ -165,7 +214,7 @@ function WorkPage() {
 
         <TabsContent value="jobs">
           <Card className="overflow-hidden p-0">
-            {jobRows.length === 0 ? (
+            {jobs.length === 0 ? (
               <div className="p-6">
                 <EmptyState title="No jobs">
                   {jobs.length
@@ -174,29 +223,17 @@ function WorkPage() {
                 </EmptyState>
               </div>
             ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job</TableHead>
-                    <TableHead>Worker</TableHead>
-                    <TableHead>Building</TableHead>
-                    <TableHead>Flags</TableHead>
-                    <TableHead className="text-right">Where</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {jobRows.map((job) => (
-                    <JobRow
-                      key={job.id}
-                      job={job}
-                      worker={job.worker_id !== null ? unitNames.get(job.worker_id) : undefined}
-                      building={
-                        job.building_id !== null ? buildingNames.get(job.building_id) : undefined
-                      }
-                    />
-                  ))}
-                </TableBody>
-              </Table>
+              <DataTable
+                data={jobs}
+                columns={jobColumns}
+                showSelectColumn={false}
+                showActionsColumn={false}
+                showToolbar={false}
+                enableSortingRemoval={false}
+                defaultSort={[{ id: 'worker', desc: false }]}
+                getRowId={(job) => String(job.id)}
+                rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
+              />
             )}
           </Card>
         </TabsContent>
@@ -216,28 +253,6 @@ function WorkPage() {
   )
 }
 
-function JobRow({ job, worker, building }: { job: FortJob; worker?: string; building?: string }) {
-  return (
-    <TableRow className={cn(job.suspended && 'opacity-60')}>
-      <TableCell className="font-medium">{job.name || splitPascal(job.type)}</TableCell>
-      <TableCell className="text-sm">
-        {worker ?? <span className="text-muted-foreground">unassigned</span>}
-      </TableCell>
-      <TableCell className="text-sm text-muted-foreground">{building ?? '—'}</TableCell>
-      <TableCell>
-        <div className="flex gap-1">
-          {job.suspended ? <Badge variant="destructive">Suspended</Badge> : null}
-          {job.repeat ? <Badge variant="outline">Repeat</Badge> : null}
-          {job.order_id >= 0 ? <Badge variant="secondary">Manager order</Badge> : null}
-        </div>
-      </TableCell>
-      <TableCell className="text-right font-mono text-xs text-muted-foreground">
-        {job.x},{job.y} z{job.z}
-      </TableCell>
-    </TableRow>
-  )
-}
-
 function BuildingTable({
   buildings,
   showJobs,
@@ -249,7 +264,7 @@ function BuildingTable({
   showItems: boolean
   unitNames: Map<number, string>
 }) {
-  const grouped = React.useMemo(() => {
+  const grouped = React.useMemo<BuildingGroup[]>(() => {
     const m = new Map<string, FortBuilding[]>()
     for (const b of buildings) {
       const label = buildingLabel(b)
@@ -257,8 +272,68 @@ function BuildingTable({
       list.push(b)
       m.set(label, list)
     }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length)
+    return [...m.entries()].map(([label, list]) => ({ label, buildings: list }))
   }, [buildings])
+  const columns = React.useMemo<ColumnDef<BuildingGroup>[]>(
+    () => [
+      {
+        id: 'building',
+        header: 'Building',
+        accessorKey: 'label',
+        meta: { cellClassName: 'font-medium' },
+      },
+      {
+        id: 'count',
+        header: 'Count',
+        accessorFn: (group) => group.buildings.length,
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+      },
+      {
+        id: 'details',
+        header: 'Details',
+        accessorFn: (group) =>
+          group.buildings
+            .map((b) =>
+              [b.name, b.room ?? '', `${b.z} ${b.cy} ${b.cx}`, String(b.jobs.length)]
+                .filter(Boolean)
+                .join(' '),
+            )
+            .join(' | '),
+        meta: { cellClassName: 'text-sm text-muted-foreground' },
+        cell: ({ row }) => (
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {row.original.buildings.slice(0, 12).map((b) => (
+              <span key={b.id} className="inline-flex items-center gap-1">
+                <span className="font-mono text-sm">
+                  {b.cx},{b.cy} z{b.z}
+                </span>
+                {b.name ? <span className="text-foreground">“{b.name}”</span> : null}
+                {b.room ? <span>{b.room}</span> : null}
+                {showJobs && b.jobs.length ? (
+                  <Badge variant="secondary">{b.jobs.length} jobs</Badge>
+                ) : null}
+                {showItems && b.stockpile_items !== null ? (
+                  <Badge variant="outline">{b.stockpile_items} items</Badge>
+                ) : null}
+                {b.assigned_units.length ? (
+                  <span>
+                    · {b.assigned_units.map((id) => unitNames.get(id) ?? `#${id}`).join(', ')}
+                  </span>
+                ) : null}
+                {b.max_stage > 0 && b.stage < b.max_stage ? (
+                  <Badge variant="outline">building</Badge>
+                ) : null}
+              </span>
+            ))}
+            {row.original.buildings.length > 12 ? (
+              <span>+{row.original.buildings.length - 12} more</span>
+            ) : null}
+          </div>
+        ),
+      },
+    ],
+    [showItems, showJobs, unitNames],
+  )
 
   if (buildings.length === 0) {
     return (
@@ -269,51 +344,16 @@ function BuildingTable({
   }
   return (
     <Card className="overflow-hidden p-0">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Building</TableHead>
-            <TableHead className="text-right">Count</TableHead>
-            <TableHead>Details</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {grouped.map(([label, list]) => (
-            <TableRow key={label}>
-              <TableCell className="font-medium">{label}</TableCell>
-              <TableCell className="text-right tabular-nums">{list.length}</TableCell>
-              <TableCell className="text-sm text-muted-foreground">
-                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                  {list.slice(0, 12).map((b) => (
-                    <span key={b.id} className="inline-flex items-center gap-1">
-                      <span className="font-mono text-xs">
-                        {b.cx},{b.cy} z{b.z}
-                      </span>
-                      {b.name ? <span className="text-foreground">“{b.name}”</span> : null}
-                      {b.room ? <span>{b.room}</span> : null}
-                      {showJobs && b.jobs.length ? (
-                        <Badge variant="secondary">{b.jobs.length} jobs</Badge>
-                      ) : null}
-                      {showItems && b.stockpile_items !== null ? (
-                        <Badge variant="outline">{b.stockpile_items} items</Badge>
-                      ) : null}
-                      {b.assigned_units.length ? (
-                        <span>
-                          · {b.assigned_units.map((id) => unitNames.get(id) ?? `#${id}`).join(', ')}
-                        </span>
-                      ) : null}
-                      {b.max_stage > 0 && b.stage < b.max_stage ? (
-                        <Badge variant="outline">building</Badge>
-                      ) : null}
-                    </span>
-                  ))}
-                  {list.length > 12 ? <span>+{list.length - 12} more</span> : null}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <DataTable
+        data={grouped}
+        columns={columns}
+        showSelectColumn={false}
+        showActionsColumn={false}
+        showToolbar={false}
+        enableSortingRemoval={false}
+        defaultSort={[{ id: 'count', desc: true }]}
+        getRowId={(group) => group.label}
+      />
     </Card>
   )
 }
