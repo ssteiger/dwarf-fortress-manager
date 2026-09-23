@@ -179,6 +179,22 @@ export function regionColor(type: string | null | undefined): string {
 }
 
 /** How settled a site is, for icons and map markers. */
+/** The imported legends world whose name matches the fortress, in either language. */
+export function matchLegendsWorld<T extends { name: string | null; alt_name: string | null }>(
+  worlds: T[],
+  names: Array<string | null | undefined>,
+): T | null {
+  const needles = new Set(
+    names.map((name) => name?.trim().toLowerCase()).filter((name): name is string => !!name),
+  )
+  if (!needles.size) return null
+  return (
+    worlds.find((world) =>
+      [world.name, world.alt_name].some((name) => name && needles.has(name.trim().toLowerCase())),
+    ) ?? null
+  )
+}
+
 export function siteGroup(type: string | null | undefined): 'settlement' | 'ruin' | 'wild' {
   const t = words(type)
   if (['lair', 'cave', 'mysterious lair', 'shrine', 'camp', 'labyrinth'].includes(t)) return 'wild'

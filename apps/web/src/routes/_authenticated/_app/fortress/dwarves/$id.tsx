@@ -1,14 +1,17 @@
-import { Badge, Button } from '@fortress/ui'
-import { useQuery } from '@tanstack/react-query'
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { BookOpenIcon } from 'lucide-react'
+import { Badge } from '@fortress/ui'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { UnitPortrait } from '~/lib/df-assets/components'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
 import { useFortOverview, useFortUnit } from '~/lib/fortress/queries'
-import { getKnownFigures, getLegendsOverview } from '~/lib/legends/server'
 import { FortBreadcrumbs, MoodBadge, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { DwarfDetails } from './-components/DwarfDetails'
+import {
+  UnitLinks,
+  legendsRefFor,
+  useFortLegendsWorldId,
+  useKnownHistFigures,
+} from './-components/UnitLinks'
 
 const GROUP_EYEBROW = {
   citizen: 'Citizen',
@@ -28,23 +31,9 @@ function DwarfPage() {
   const unit = data?.unit ?? null
   const title = unit ? unitDisplayName(unit) : `Unit #${id}`
 
-  const legends = useQuery({
-    queryKey: ['legends', 'overview'],
-    queryFn: () => getLegendsOverview(),
-    staleTime: 60_000,
-  })
-  const liveWorld = overview.data?.state?.world_name ?? null
-  const matchingWorld =
-    legends.data?.worlds.find((w) => w.name && liveWorld && w.name === liveWorld) ?? null
-  const hfId = unit?.hist_figure_id ?? -1
-  const matchingWorldId = matchingWorld?.id ?? null
-  const known = useQuery({
-    queryKey: ['legends', 'known-figures', matchingWorldId, hfId],
-    queryFn: () => getKnownFigures({ data: { worldId: matchingWorldId ?? -1, ids: [hfId] } }),
-    enabled: matchingWorldId !== null && hfId >= 0,
-    staleTime: 5 * 60_000,
-  })
-  const legendsWorldId = matchingWorld && known.data?.includes(hfId) ? matchingWorld.id : null
+  const legendsWorldId = useFortLegendsWorldId()
+  const knownFigures = useKnownHistFigures(legendsWorldId, [unit?.hist_figure_id ?? -1])
+  const legends = unit ? legendsRefFor(unit, legendsWorldId, knownFigures) : null
 
   const living = unit ? isLiving(unit) : false
   const group = unit ? unitGroup(unit) : 'other'
@@ -99,23 +88,10 @@ function DwarfPage() {
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
-        actions={
-          legendsWorldId ? (
-            <Button asChild size="sm" variant="outline" className="gap-2">
-              <Link
-                to="/legends/$kind/$id"
-                params={{ kind: 'historical_figure', id: String(hfId) }}
-                search={{ world: legendsWorldId }}
-              >
-                <BookOpenIcon className="size-3.5" />
-                Legends
-              </Link>
-            </Button>
-          ) : null
-        }
+        actions={unit ? <UnitLinks unit={unit} legends={legends} variant="button" /> : null}
       />
       <StatusBanner state={overview.data?.state} />
-      <DwarfDetails unitId={numericId} />
+      <DwarfDetails unitId={numericId} legends={legends} />
     </div>
   )
 }

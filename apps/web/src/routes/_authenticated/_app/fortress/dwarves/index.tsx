@@ -18,7 +18,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import { BookOpenIcon, Maximize2Icon, XIcon } from 'lucide-react'
+import { Maximize2Icon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { CreatureSprite, UnitPortrait } from '~/lib/df-assets/components'
@@ -33,7 +33,6 @@ import {
 } from '~/lib/fortress/format'
 import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortUnits } from '~/lib/fortress/server'
-import { getKnownFigures, getLegendsOverview } from '~/lib/legends/server'
 import {
   EmptyState,
   MoodBadge,
@@ -42,6 +41,14 @@ import {
   UnitConditionBadges,
 } from '../-components/FortChrome'
 import { DwarfDetails } from './-components/DwarfDetails'
+import {
+  UnitLinks,
+  legendsRefFor,
+  useChronicleMentionCounts,
+  useFigureEventCounts,
+  useFortLegendsWorldId,
+  useKnownHistFigures,
+} from './-components/UnitLinks'
 
 type Group = ReturnType<typeof unitGroup> | 'all'
 
@@ -102,27 +109,11 @@ function DwarvesPage() {
     [units, group, showDead],
   )
 
-  // Legends cross-link: only when the imported world is the one being played.
-  const legends = useQuery({
-    queryKey: ['legends', 'overview'],
-    queryFn: () => getLegendsOverview(),
-    staleTime: 60_000,
-  })
-  const liveWorld = overview.data?.state?.world_name ?? null
-  const matchingWorld =
-    legends.data?.worlds.find((w) => w.name && liveWorld && w.name === liveWorld) ?? null
-  const hfIds = React.useMemo(
-    () => rows.map((u) => u.hist_figure_id).filter((id) => id >= 0),
-    [rows],
-  )
-  const matchingWorldId = matchingWorld?.id ?? null
-  const known = useQuery({
-    queryKey: ['legends', 'known-figures', matchingWorldId, hfIds.join(',')],
-    queryFn: () => getKnownFigures({ data: { worldId: matchingWorldId ?? -1, ids: hfIds } }),
-    enabled: matchingWorldId !== null && hfIds.length > 0,
-    staleTime: 5 * 60_000,
-  })
-  const knownSet = React.useMemo(() => new Set(known.data ?? []), [known.data])
+  const legendsWorldId = useFortLegendsWorldId()
+  const figureIds = rows.map((unit) => unit.hist_figure_id)
+  const knownFigures = useKnownHistFigures(legendsWorldId, figureIds)
+  const legendCounts = useFigureEventCounts(legendsWorldId, figureIds)
+  const chronicleCounts = useChronicleMentionCounts(rows.map((unit) => unit.name))
 
   const columns = React.useMemo<ColumnDef<FortUnit>[]>(
     () => [
@@ -133,27 +124,11 @@ function DwarvesPage() {
         meta: { cellClassName: 'max-w-[280px]' },
         cell: ({ row }) => {
           const unit = row.original
-          const legendsWorldId =
-            matchingWorld && knownSet.has(unit.hist_figure_id) ? matchingWorld.id : null
           return (
             <div className="flex items-center gap-3">
               <CreatureSprite unit={unit} size={32} className="-my-1" />
               <div className="min-w-0">
-                <div className="flex items-center gap-2 font-medium">
-                  <span className="truncate">{unitDisplayName(unit)}</span>
-                  {legendsWorldId ? (
-                    <Link
-                      to="/legends/$kind/$id"
-                      params={{ kind: 'historical_figure', id: String(unit.hist_figure_id) }}
-                      search={{ world: legendsWorldId }}
-                      className="text-muted-foreground hover:text-foreground"
-                      title="Open in legends"
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      <BookOpenIcon className="size-3.5" />
-                    </Link>
-                  ) : null}
-                </div>
+                <div className="truncate font-medium">{unitDisplayName(unit)}</div>
                 <div className="truncate text-sm text-muted-foreground">
                   {unit.name_english && unit.name_english !== unit.name
                     ? `${unit.name_english} · `
@@ -163,6 +138,59 @@ function DwarvesPage() {
                 </div>
               </div>
             </div>
+          )
+        },
+      },
+      {
+        id: 'legends',
+        header: 'Legends',
+        accessorFn: (unit) => {
+          const legends = legendsRefFor(unit, legendsWorldId, knownFigures)
+          return legends ? (legendCounts.get(legends.figureId) ?? 0) : null
+        },
+        sortUndefined: 'last',
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+        cell: ({ row }) => {
+          const legends = legendsRefFor(row.original, legendsWorldId, knownFigures)
+          if (!legends) return '—'
+          const count = legendCounts.get(legends.figureId) ?? 0
+          return (
+            <Link
+              to="/legends/$kind/$id"
+              params={{ kind: 'historical_figure', id: String(legends.figureId) }}
+              search={{ world: legends.worldId }}
+              className="hover:underline"
+              title="Their legends"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {count.toLocaleString()}
+            </Link>
+          )
+        },
+      },
+      {
+        id: 'chronicle',
+        header: 'Chronicle',
+        accessorFn: (unit) => {
+          const name = unit.name.trim()
+          return name ? (chronicleCounts.get(name) ?? 0) : null
+        },
+        sortUndefined: 'last',
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+        cell: ({ row }) => {
+          const name = row.original.name.trim()
+          if (!name) return '—'
+          const count = chronicleCounts.get(name) ?? 0
+          return (
+            <Link
+              to="/fortress/chronicle"
+              search={{ q: name, filter: 'all' }}
+              className="hover:underline"
+              title="Announcements that name them"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {count.toLocaleString()}
+            </Link>
           )
         },
       },
@@ -261,7 +289,7 @@ function DwarvesPage() {
         },
       },
     ],
-    [knownSet, matchingWorld],
+    [legendsWorldId, knownFigures, legendCounts, chronicleCounts],
   )
 
   return (
@@ -343,6 +371,10 @@ function DwarvesPage() {
                     <div className="min-w-0">
                       <DrawerTitle className="flex flex-wrap items-center gap-2">
                         {unitDisplayName(selected)}
+                        <UnitLinks
+                          unit={selected}
+                          legends={legendsRefFor(selected, legendsWorldId, knownFigures)}
+                        />
                         {unitGroup(selected) === 'citizen' || unitGroup(selected) === 'resident' ? (
                           <MoodBadge
                             category={selected.stress_category}
@@ -379,7 +411,11 @@ function DwarvesPage() {
                 </div>
               </DrawerHeader>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <DwarfDetails unitId={selected.id} compact />
+                <DwarfDetails
+                  unitId={selected.id}
+                  compact
+                  legends={legendsRefFor(selected, legendsWorldId, knownFigures)}
+                />
               </div>
               <DrawerFooter className="border-t">
                 <Button asChild>

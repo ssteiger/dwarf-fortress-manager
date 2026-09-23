@@ -145,7 +145,13 @@ export interface UnitWornItem {
  * night creature), from which its sprite is assembled out of the beast kit.
  */
 export interface GeneratedLook {
-	kind: "FEATURE_BEAST" | "TITAN" | "DEMON" | "NIGHT_CREATURE" | "MEGABEAST" | "OTHER";
+	kind:
+		| "FEATURE_BEAST"
+		| "TITAN"
+		| "DEMON"
+		| "NIGHT_CREATURE"
+		| "MEGABEAST"
+		| "OTHER";
 	/** The generator's description, e.g. "An enormous hairy tarantula. It has a long, swinging trunk ...". */
 	description: string;
 	/** Body part category -> count (LEG_REAR: 6, WING: 2, SHELL: 1, EYE: 2, ...). */
@@ -185,6 +191,8 @@ export interface FortUnit {
 	name: string;
 	name_english: string;
 	readable: string;
+	/** Player-assigned nickname; null when the unit has none. */
+	nickname: string | null;
 	race: string;
 	caste: string;
 	sex: number;

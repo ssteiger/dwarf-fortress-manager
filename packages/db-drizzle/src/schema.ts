@@ -91,6 +91,28 @@ export const fort_events = pgTable(
 	],
 );
 
+/** Commands queued by the web app and executed by the sole DFHack worker. */
+export const fort_commands = pgTable(
+	"fort_commands",
+	{
+		id: serial().primaryKey().notNull(),
+		kind: text().$type<"set_nickname">().notNull(),
+		unit_id: integer().notNull(),
+		nickname: text().notNull(),
+		status: text()
+			.$type<"pending" | "processing" | "done" | "failed">()
+			.notNull()
+			.default("pending"),
+		error: text(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+		started_at: timestamp({ withTimezone: true, mode: "string" }),
+		completed_at: timestamp({ withTimezone: true, mode: "string" }),
+	},
+	(t) => [index("fort_commands_pending_idx").on(t.status, t.created_at)],
+);
+
 /** One row per exported world (grouped by the legends file prefix). */
 export const legends_worlds = pgTable("legends_worlds", {
 	id: serial().primaryKey().notNull(),

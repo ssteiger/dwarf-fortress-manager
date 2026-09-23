@@ -16,6 +16,7 @@ import { Route as AuthRegisterIndexRouteImport } from './routes/auth/register/in
 import { Route as AuthLoginIndexRouteImport } from './routes/auth/login/index'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/_app/index'
 import { Route as AuthenticatedAppSettingsIndexRouteImport } from './routes/_authenticated/_app/settings/index'
+import { Route as AuthenticatedAppNicknameDwarvesIndexRouteImport } from './routes/_authenticated/_app/nickname-dwarves/index'
 import { Route as AuthenticatedAppLegendsIndexRouteImport } from './routes/_authenticated/_app/legends/index'
 import { Route as AuthenticatedAppFortressIndexRouteImport } from './routes/_authenticated/_app/fortress/index'
 import { Route as AuthenticatedAppActivityLogsIndexRouteImport } from './routes/_authenticated/_app/activity-logs/index'
@@ -66,6 +67,12 @@ const AuthenticatedAppSettingsIndexRoute =
   AuthenticatedAppSettingsIndexRouteImport.update({
     id: '/settings/',
     path: '/settings/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppNicknameDwarvesIndexRoute =
+  AuthenticatedAppNicknameDwarvesIndexRouteImport.update({
+    id: '/nickname-dwarves/',
+    path: '/nickname-dwarves/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppLegendsIndexRoute =
@@ -179,6 +186,7 @@ export interface FileRoutesByFullPath {
   '/activity-logs/': typeof AuthenticatedAppActivityLogsIndexRoute
   '/fortress/': typeof AuthenticatedAppFortressIndexRoute
   '/legends/': typeof AuthenticatedAppLegendsIndexRoute
+  '/nickname-dwarves/': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/settings/': typeof AuthenticatedAppSettingsIndexRoute
   '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -203,6 +211,7 @@ export interface FileRoutesByTo {
   '/activity-logs': typeof AuthenticatedAppActivityLogsIndexRoute
   '/fortress': typeof AuthenticatedAppFortressIndexRoute
   '/legends': typeof AuthenticatedAppLegendsIndexRoute
+  '/nickname-dwarves': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/settings': typeof AuthenticatedAppSettingsIndexRoute
   '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -230,6 +239,7 @@ export interface FileRoutesById {
   '/_authenticated/_app/activity-logs/': typeof AuthenticatedAppActivityLogsIndexRoute
   '/_authenticated/_app/fortress/': typeof AuthenticatedAppFortressIndexRoute
   '/_authenticated/_app/legends/': typeof AuthenticatedAppLegendsIndexRoute
+  '/_authenticated/_app/nickname-dwarves/': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/_authenticated/_app/settings/': typeof AuthenticatedAppSettingsIndexRoute
   '/_authenticated/_app/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/_authenticated/_app/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -256,6 +266,7 @@ export interface FileRouteTypes {
     | '/activity-logs/'
     | '/fortress/'
     | '/legends/'
+    | '/nickname-dwarves/'
     | '/settings/'
     | '/fortress/dwarves/$id'
     | '/legends/$kind/$id'
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/activity-logs'
     | '/fortress'
     | '/legends'
+    | '/nickname-dwarves'
     | '/settings'
     | '/fortress/dwarves/$id'
     | '/legends/$kind/$id'
@@ -306,6 +318,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/activity-logs/'
     | '/_authenticated/_app/fortress/'
     | '/_authenticated/_app/legends/'
+    | '/_authenticated/_app/nickname-dwarves/'
     | '/_authenticated/_app/settings/'
     | '/_authenticated/_app/fortress/dwarves/$id'
     | '/_authenticated/_app/legends/$kind/$id'
@@ -379,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthenticatedAppSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/nickname-dwarves/': {
+      id: '/_authenticated/_app/nickname-dwarves/'
+      path: '/nickname-dwarves'
+      fullPath: '/nickname-dwarves/'
+      preLoaderRoute: typeof AuthenticatedAppNicknameDwarvesIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/_app/legends/': {
@@ -508,6 +528,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppActivityLogsIndexRoute: typeof AuthenticatedAppActivityLogsIndexRoute
   AuthenticatedAppFortressIndexRoute: typeof AuthenticatedAppFortressIndexRoute
   AuthenticatedAppLegendsIndexRoute: typeof AuthenticatedAppLegendsIndexRoute
+  AuthenticatedAppNicknameDwarvesIndexRoute: typeof AuthenticatedAppNicknameDwarvesIndexRoute
   AuthenticatedAppSettingsIndexRoute: typeof AuthenticatedAppSettingsIndexRoute
   AuthenticatedAppFortressDwarvesIdRoute: typeof AuthenticatedAppFortressDwarvesIdRoute
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
@@ -531,6 +552,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppActivityLogsIndexRoute,
   AuthenticatedAppFortressIndexRoute: AuthenticatedAppFortressIndexRoute,
   AuthenticatedAppLegendsIndexRoute: AuthenticatedAppLegendsIndexRoute,
+  AuthenticatedAppNicknameDwarvesIndexRoute:
+    AuthenticatedAppNicknameDwarvesIndexRoute,
   AuthenticatedAppSettingsIndexRoute: AuthenticatedAppSettingsIndexRoute,
   AuthenticatedAppFortressDwarvesIdRoute:
     AuthenticatedAppFortressDwarvesIdRoute,

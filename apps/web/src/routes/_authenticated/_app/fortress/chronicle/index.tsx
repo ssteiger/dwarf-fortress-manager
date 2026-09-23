@@ -69,9 +69,14 @@ const EVENT_COLUMNS: ColumnDef<FortEvent>[] = [
 
 function ChroniclePage() {
   const overview = useFortOverview()
-  const [search, setSearch] = React.useState('')
-  const [filter, setFilter] = React.useState<Filter>('notable')
-  const [q, setQ] = React.useState('')
+  const params = Route.useSearch()
+  const [search, setSearch] = React.useState(params.q ?? '')
+  const [filter, setFilter] = React.useState<Filter>(params.filter ?? 'notable')
+  const [q, setQ] = React.useState((params.q ?? '').trim())
+  React.useEffect(() => {
+    setSearch(params.q ?? '')
+    setFilter(params.filter ?? 'notable')
+  }, [params.q, params.filter])
   React.useEffect(() => {
     const id = setTimeout(() => setQ(search.trim()), 250)
     return () => clearTimeout(id)
@@ -148,6 +153,23 @@ function ChroniclePage() {
   )
 }
 
+interface ChronicleSearch {
+  q?: string
+  filter?: Filter
+}
+
 export const Route = createFileRoute('/_authenticated/_app/fortress/chronicle/')({
+  validateSearch: (raw: Record<string, unknown>): ChronicleSearch => {
+    const out: ChronicleSearch = {}
+    if (typeof raw.q === 'string' && raw.q) out.q = raw.q
+    if (
+      raw.filter === 'all' ||
+      raw.filter === 'notable' ||
+      raw.filter === 'cancellations' ||
+      raw.filter === 'combat'
+    )
+      out.filter = raw.filter
+    return out
+  },
   component: ChroniclePage,
 })

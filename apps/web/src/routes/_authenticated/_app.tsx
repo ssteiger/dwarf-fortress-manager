@@ -6,6 +6,7 @@ import {
   ClipboardListIcon,
   DatabaseIcon,
   HammerIcon,
+  LibraryIcon,
   MapIcon,
   MountainIcon,
   PackageIcon,
@@ -25,6 +26,7 @@ const NAV = [
   { title: 'Map', url: '/fortress/map', icon: MapIcon },
   { title: 'Chronicle', url: '/fortress/chronicle', icon: ScrollTextIcon },
   { title: 'Legends', url: '/legends', icon: BookOpenIcon, matchPrefix: true },
+  { title: 'Nickname Dwarves', url: '/nickname-dwarves', icon: LibraryIcon },
 ]
 
 function headerTitle(pathname: string): string {

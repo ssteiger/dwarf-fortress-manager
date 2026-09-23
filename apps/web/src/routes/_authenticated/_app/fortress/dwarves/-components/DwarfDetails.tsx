@@ -9,6 +9,7 @@ import {
   Skeleton,
   cn,
 } from '@fortress/ui'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { MapIcon } from 'lucide-react'
@@ -16,6 +17,7 @@ import type { ReactNode } from 'react'
 
 import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
 import {
+  formatGameTick,
   formatValue,
   humanize,
   hungerState,
@@ -27,8 +29,9 @@ import {
   thirstState,
 } from '~/lib/fortress/format'
 import { useFortUnit } from '~/lib/fortress/queries'
-import type { CarriedItem } from '~/lib/fortress/server'
+import { type CarriedItem, getFortEvents } from '~/lib/fortress/server'
 import { EmptyState, StatCard, UnitConditionBadges } from '../../-components/FortChrome'
+import type { UnitLegendsRef } from './UnitLinks'
 
 const HUNGER_DANGER = 75_000
 const THIRST_DANGER = 50_000
@@ -105,9 +108,24 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
   },
 ]
 
-export function DwarfDetails({ unitId, compact }: { unitId: number; compact?: boolean }) {
+export function DwarfDetails({
+  unitId,
+  compact,
+  legends = null,
+}: {
+  unitId: number
+  compact?: boolean
+  legends?: UnitLegendsRef | null
+}) {
   const { data, isLoading } = useFortUnit(unitId)
   const unit = data?.unit ?? null
+  const mentionedName = unit?.name.trim() ?? ''
+  const mentions = useQuery({
+    queryKey: ['fort', 'events', 'unit', mentionedName],
+    queryFn: () => getFortEvents({ data: { q: mentionedName, limit: 8 } }),
+    enabled: mentionedName.length > 0,
+    staleTime: 30_000,
+  })
 
   if (isLoading) {
     return (
@@ -306,6 +324,63 @@ export function DwarfDetails({ unitId, compact }: { unitId: number; compact?: bo
                 </span>
               </Badge>
             ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {mentionedName || legends ? (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
+              Records
+              <span className="flex items-center gap-3 text-sm font-normal">
+                {legends ? (
+                  <Link
+                    to="/legends/$kind/$id"
+                    params={{ kind: 'historical_figure', id: String(legends.figureId) }}
+                    search={{ world: legends.worldId }}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Their legends
+                  </Link>
+                ) : null}
+                {mentionedName ? (
+                  <Link
+                    to="/fortress/chronicle"
+                    search={{ q: mentionedName, filter: 'all' }}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    All events
+                  </Link>
+                ) : null}
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {mentionedName ? (
+              mentions.data?.length ? (
+                <ul className="flex flex-col gap-2 text-sm">
+                  {mentions.data.slice(0, compact ? 4 : 8).map((event) => (
+                    <li key={event.id} className="flex gap-3">
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {formatGameTick(event.game_year, event.game_tick) || '—'}
+                      </span>
+                      <span>{event.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {mentions.isLoading
+                    ? 'Looking through the chronicle…'
+                    : 'The chronicle has not mentioned them yet.'}
+                </p>
+              )
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No name for the chronicle to quote. Their legends are linked above.
+              </p>
+            )}
           </CardContent>
         </Card>
       ) : null}

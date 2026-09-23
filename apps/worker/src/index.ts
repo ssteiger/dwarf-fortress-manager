@@ -1,5 +1,7 @@
 import { config } from './config'
 import { installSnapshotScript, takeDump } from './dfhack/dump'
+import { installNicknameScript } from './dfhack/nickname'
+import { processPendingCommands, recoverInterruptedCommands } from './fortress/commands'
 import { readStatus, storeLiveDump, storeMap, storeStatus } from './fortress/store'
 import { scanAndImportLegends } from './legends/import'
 import { logger } from './utils/logger'
@@ -26,6 +28,17 @@ async function pollOnce(): Promise<void> {
   if (polling) return
   polling = true
   try {
+    const processedCommands = await processPendingCommands(config).catch(async (err) => {
+      console.error('Could not process fortress commands:', err)
+      await logger
+        .error(`Fortress worker: command processing failed (${describeError(err)})`)
+        .catch(() => {})
+      return 0
+    })
+    if (processedCommands > 0) {
+      console.log(`Processed ${processedCommands} fortress command(s).`)
+    }
+
     const due = Date.now() - lastMapAt >= config.mapPollMs
     const outcome = await takeDump(config, { withMap: due })
 
@@ -89,20 +102,27 @@ async function startWorker() {
   )
 
   try {
-    const refreshed = await installSnapshotScript(config)
+    const [snapshotRefreshed, nicknameRefreshed] = await Promise.all([
+      installSnapshotScript(config),
+      installNicknameScript(config),
+    ])
     console.log(
-      refreshed
+      snapshotRefreshed
         ? 'Installed fortress-snapshot.lua into dfhack-config/'
         : 'fortress-snapshot.lua is up to date',
     )
-  } catch (err) {
-    console.error('Could not install the DFHack script:', describeError(err))
-    await logger.error(
-      `Fortress worker: could not install the DFHack script (${describeError(err)})`,
+    console.log(
+      nicknameRefreshed
+        ? 'Installed set-nickname.lua into dfhack-config/'
+        : 'set-nickname.lua is up to date',
     )
+  } catch (err) {
+    console.error('Could not install DFHack scripts:', describeError(err))
+    await logger.error(`Fortress worker: could not install DFHack scripts (${describeError(err)})`)
     process.exit(1)
   }
 
+  await recoverInterruptedCommands()
   lastStatus = await readStatus().catch(() => null)
 
   await pollOnce()

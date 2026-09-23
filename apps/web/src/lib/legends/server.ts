@@ -1951,3 +1951,25 @@ export const getKnownFigures = createServerFn({ method: 'GET' })
       .where(and(eq(R.world_id, data.worldId), eq(R.kind, 'historical_figure'), inArray(R.id, ids)))
     return rows.map((r) => r.id)
   })
+
+/** How many historical events mention each figure. Figures with none are omitted. */
+export const getFigureEventCounts = createServerFn({ method: 'GET' })
+  .inputValidator((input: LegendsFigureLookup) => input)
+  .handler(async ({ data }): Promise<{ id: number; count: number }[]> => {
+    const ids = data.ids.filter((v) => Number.isInteger(v) && v >= 0).slice(0, 2000)
+    if (ids.length === 0) return []
+    const list = sql`array[${sql.join(
+      ids.map((id) => sql`${id}`),
+      sql`, `,
+    )}]::int[]`
+    const result = await postgres_db.execute<{ id: number; c: number }>(sql`
+      select u.id, count(distinct e.id)::int as c
+      from ${R} e, unnest(e.hfids) as u(id)
+      where e.world_id = ${data.worldId}
+        and e.kind = 'historical_event'
+        and e.hfids && ${list}
+        and u.id = any(${list})
+      group by u.id
+    `)
+    return [...result].map((row) => ({ id: Number(row.id), count: Number(row.c) }))
+  })

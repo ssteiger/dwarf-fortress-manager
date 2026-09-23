@@ -186,7 +186,7 @@ end
 -- ---------------------------------------------------------------------------
 
 local UNIT_COLUMNS = arr{
-    'id', 'name', 'name_english', 'readable', 'race', 'caste', 'sex', 'age',
+    'id', 'name', 'name_english', 'readable', 'nickname', 'race', 'caste', 'sex', 'age',
     'profession', 'x', 'y', 'z', 'stress', 'stress_category', 'job_id', 'job',
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
@@ -711,6 +711,7 @@ local function unit_row(u)
         translate(visible_name, false),
         translate(visible_name, true),
         dfhack.units.getReadableName(u),
+        try(function() return visible_name.nickname end),
         race,
         caste,
         u.sex,

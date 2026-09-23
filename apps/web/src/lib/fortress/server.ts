@@ -367,6 +367,24 @@ export const getFortEvents = createServerFn({ method: 'GET' })
       .limit(limit)
   })
 
+/** How many chronicle announcements quote each name. Matching is case-insensitive. */
+export const getChronicleMentionCounts = createServerFn({ method: 'GET' })
+  .inputValidator((input: { names: string[] }) => input)
+  .handler(async ({ data }): Promise<{ name: string; count: number }[]> => {
+    const names = [
+      ...new Set(data.names.map((name) => name.trim()).filter((name) => name.length > 0)),
+    ].slice(0, 500)
+    if (names.length === 0) return []
+    const rows = await postgres_db
+      .select({ text: schema.fort_events.text })
+      .from(schema.fort_events)
+    const texts = rows.map((row) => row.text.toLowerCase())
+    return names.map((name) => {
+      const needle = name.toLowerCase()
+      return { name, count: texts.reduce((sum, text) => sum + (text.includes(needle) ? 1 : 0), 0) }
+    })
+  })
+
 export interface MapLevelQuery {
   z?: number
 }
