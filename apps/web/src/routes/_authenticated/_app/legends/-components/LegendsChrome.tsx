@@ -305,6 +305,7 @@ export function Section({
   action,
   children,
   className,
+  collapsed = false,
 }: {
   title: React.ReactNode
   count?: number | null
@@ -312,24 +313,47 @@ export function Section({
   action?: React.ReactNode
   children: React.ReactNode
   className?: string
+  /** Start closed. The title is the disclosure control; the body uses the same card. */
+  collapsed?: boolean
 }) {
+  const heading = (
+    <div>
+      <CardTitle className="flex items-center gap-2 text-base">
+        {collapsed ? (
+          <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
+        ) : null}
+        {title}
+        {typeof count === 'number' ? (
+          <Badge variant="secondary" className="tabular-nums">
+            {count.toLocaleString()}
+          </Badge>
+        ) : null}
+      </CardTitle>
+      {description ? (
+        <p className="mt-1 text-sm font-normal text-muted-foreground">{description}</p>
+      ) : null}
+    </div>
+  )
+  if (collapsed) {
+    return (
+      <Card className={cn('gap-0 py-0', className)}>
+        <details className="group">
+          <summary className="cursor-pointer select-none list-none px-5 py-4 font-normal [&::-webkit-details-marker]:hidden">
+            <div className="flex items-start justify-between gap-3">
+              {heading}
+              {action}
+            </div>
+          </summary>
+          <CardContent className="border-t px-5 py-4">{children}</CardContent>
+        </details>
+      </Card>
+    )
+  }
   return (
     <Card className={cn('gap-4 py-5', className)}>
       <CardHeader className="px-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              {title}
-              {typeof count === 'number' ? (
-                <Badge variant="secondary" className="tabular-nums">
-                  {count.toLocaleString()}
-                </Badge>
-              ) : null}
-            </CardTitle>
-            {description ? (
-              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-            ) : null}
-          </div>
+          {heading}
           {action}
         </div>
       </CardHeader>

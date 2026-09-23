@@ -1,8 +1,16 @@
 import type { FortItem } from '@fortress/db-drizzle'
 import {
   Badge,
+  Button,
   Card,
   DataTable,
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
   Select,
   SelectContent,
   SelectItem,
@@ -11,8 +19,9 @@ import {
   cn,
 } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
+import { Maximize2Icon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
@@ -20,6 +29,7 @@ import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
 import { FORT_SLOW_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { type ItemSortKey, getFortItems } from '~/lib/fortress/server'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
 
 const ALL_TYPES = '__all__'
 
@@ -164,6 +174,7 @@ function ItemsPage() {
   const sortKey = (sortColumn?.id ?? 'value') as ItemSortKey
   const sortDir = sortColumn?.desc === false ? 'asc' : 'desc'
   const q = useDebounced(search, 250)
+  const [selected, setSelected] = React.useState<FortItem | null>(null)
 
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'items', q, type, onlyForbidden, page, pageSize, sortKey, sortDir],
@@ -199,7 +210,7 @@ function ItemsPage() {
         title="Items"
         description={
           data
-            ? `${formatNumber(data.total)} items on the map and in the stores, most valuable first.`
+            ? `${formatNumber(data.total)} items on the map and in the stores, most valuable first. Click a row to inspect one.`
             : 'Everything the fortress owns, once a dump has been taken.'
         }
         updatedAt={data?.capturedAt}
@@ -286,6 +297,7 @@ function ItemsPage() {
             }}
             rowCount={data.filtered}
             getRowId={(item) => String(item.id)}
+            onRowClick={setSelected}
             emptyState={{
               title: 'No items',
               subtitle: 'Nothing matches this search.',
@@ -293,6 +305,58 @@ function ItemsPage() {
           />
         )}
       </Card>
+
+      <Drawer
+        direction="right"
+        open={selected !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelected(null)
+        }}
+      >
+        <DrawerContent className="data-[vaul-drawer-direction=right]:h-full data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:sm:max-w-xl">
+          {selected ? (
+            <>
+              <DrawerHeader className="border-b">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <ItemSprite
+                      item={selected}
+                      size={72}
+                      className="shrink-0 rounded-md border bg-muted/40"
+                      title={`${selected.description} as drawn in the game`}
+                    />
+                    <div className="min-w-0">
+                      <DrawerTitle className="flex flex-wrap items-center gap-2">
+                        {selected.description}
+                        <ItemStatusBadges flags={selected.flags} className="text-sm font-normal" />
+                      </DrawerTitle>
+                      <DrawerDescription className="mt-1">
+                        {itemSubtitle(selected)}
+                      </DrawerDescription>
+                    </div>
+                  </div>
+                  <DrawerClose asChild>
+                    <Button size="icon" variant="ghost" aria-label="Close">
+                      <XIcon className="size-4" />
+                    </Button>
+                  </DrawerClose>
+                </div>
+              </DrawerHeader>
+              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+                <ItemDetails itemId={selected.id} compact />
+              </div>
+              <DrawerFooter className="border-t">
+                <Button asChild>
+                  <Link to="/fortress/items/$id" params={{ id: String(selected.id) }}>
+                    <Maximize2Icon className="size-4" />
+                    Show full page
+                  </Link>
+                </Button>
+              </DrawerFooter>
+            </>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 }

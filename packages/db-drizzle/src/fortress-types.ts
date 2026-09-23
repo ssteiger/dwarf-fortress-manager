@@ -226,6 +226,12 @@ export interface FortUnit {
 	caste_id: string | null;
 	/** Appearance and wardrobe for exact sprite rendering; null in older dumps. */
 	look: UnitLook | null;
+	/** [facet token, 0–100] for traits the game would remark on. Absent in older dumps. */
+	traits?: [string, number][] | null;
+	/** [value token, strength] for beliefs, strongest first. Absent in older dumps. */
+	values?: [string, number][] | null;
+	/** [thought, emotion, strength, year, year tick], newest first. Absent in older dumps. */
+	thoughts?: [string, string, number, number, number][] | null;
 }
 
 export interface FortItem {

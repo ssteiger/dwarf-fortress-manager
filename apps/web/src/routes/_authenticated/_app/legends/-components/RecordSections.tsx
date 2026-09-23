@@ -39,6 +39,8 @@ export interface SectionProps {
   positions: HeldPosition[]
   worldId: number
   map: LegendsMapData | undefined
+  /** Chronicle for this record. Map kinds render it under the map; others render it first. */
+  timeline?: React.ReactNode
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +199,49 @@ function RefList({
   )
 }
 
+function LinkGroup({
+  label,
+  entries,
+  kind,
+  names,
+  worldId,
+  max = 30,
+}: {
+  label: string
+  entries: { id: number; note?: string }[]
+  kind: string
+  names: NameIndex
+  worldId: number
+  max?: number
+}) {
+  const [all, setAll] = React.useState(false)
+  const shown = all ? entries : entries.slice(0, max)
+  return (
+    <div>
+      <div className="mb-1.5 text-sm capitalize text-muted-foreground">{label}</div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 leading-relaxed">
+        {shown.map((entry, i) => (
+          <span key={`${entry.id}-${i}`}>
+            <NamedRef kind={kind} id={entry.id} names={names} worldId={worldId} />
+            {entry.note ? (
+              <span className="text-sm text-muted-foreground"> {entry.note}</span>
+            ) : null}
+          </span>
+        ))}
+        {entries.length > shown.length ? (
+          <button
+            type="button"
+            className="text-sm text-primary hover:underline"
+            onClick={() => setAll(true)}
+          >
+            and {entries.length - shown.length} more
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 function LinkGroups({
   groups,
   kind,
@@ -209,24 +254,33 @@ function LinkGroups({
   worldId: number
 }) {
   return (
-    <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-4 gap-y-2 text-base">
+    <div className="flex flex-col gap-4">
       {[...groups.entries()].map(([label, entries]) => (
-        <div key={label} className="contents">
-          <dt className="capitalize text-muted-foreground">{label}</dt>
-          <dd className="min-w-0 leading-relaxed">
-            {entries.map((entry, i) => (
-              <span key={`${entry.id}-${i}`}>
-                {i > 0 ? ', ' : ''}
-                <NamedRef kind={kind} id={entry.id} names={names} worldId={worldId} />
-                {entry.note ? (
-                  <span className="text-sm text-muted-foreground"> {entry.note}</span>
-                ) : null}
-              </span>
-            ))}
-          </dd>
-        </div>
+        <LinkGroup
+          key={label}
+          label={label}
+          entries={entries}
+          kind={kind}
+          names={names}
+          worldId={worldId}
+        />
       ))}
-    </dl>
+    </div>
+  )
+}
+
+function TimelineRow({ timeline }: { timeline?: React.ReactNode }) {
+  if (!timeline) return null
+  return <div className="lg:col-span-3">{timeline}</div>
+}
+
+function MapAndFacts({ map, facts }: { map?: React.ReactNode; facts: React.ReactNode }) {
+  if (!map) return facts
+  return (
+    <div className="grid items-start gap-6 lg:grid-cols-2">
+      <div className="min-w-0">{map}</div>
+      <div className="min-w-0">{facts}</div>
+    </div>
   )
 }
 
@@ -319,11 +373,11 @@ export function FigureSections({
   related,
   positions,
   worldId,
+  timeline,
 }: SectionProps) {
   const [allSkills, setAllSkills] = React.useState(false)
   const birth = num(p.birth_year)
   const death = num(p.death_year)
-  const alive = death !== null && death < 0
   const hfLinks = objList(p.hf_link)
   const family = groupLinks(
     hfLinks.filter((l) => FAMILY_LINKS.includes(str(l.link_type) ?? '')),
@@ -356,9 +410,6 @@ export function FigureSections({
   const spheres = Array.isArray(p.sphere) ? p.sphere.map(String) : []
   const goals = Array.isArray(p.goal) ? p.goal.map(String) : []
   const pets = Array.isArray(p.journey_pet) ? p.journey_pet.map((x) => words(String(x))) : []
-  const curses = Array.isArray(p.active_interaction)
-    ? p.active_interaction.map((x) => humanizeToken(String(x)))
-    : []
   const knowledge = Array.isArray(p.interaction_knowledge)
     ? p.interaction_knowledge.map((x) => humanizeToken(String(x)))
     : []
@@ -367,80 +418,67 @@ export function FigureSections({
   const profiles = objList(p.relationship_profile_hf_historical)
   const race = str(plus.race) ?? words(str(p.race))
 
-  const status: string[] = []
-  if (p.deity === true) status.push('deity')
-  if (p.force === true) status.push('force of nature')
-  if (alive && p.deity !== true && p.force !== true) status.push('alive at export')
-  if (death !== null && death >= 0) status.push(`died ${death}`)
-  if (p.animated === true) status.push('undead')
-  if (p.ghost === true) status.push('ghost')
-  if (str(p.associated_type) && str(p.associated_type) !== 'STANDARD')
-    status.push(words(str(p.associated_type)))
-  for (const curse of curses) status.push(curse)
-
   return (
     <>
+      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="Who they are">
-          <div className="flex flex-col gap-3">
-            <Chips items={status} />
-            <Facts
-              items={[
-                {
-                  label: 'Race',
-                  value: race ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="inline-block size-2.5 rounded-full"
-                        style={{ backgroundColor: raceColor(race) }}
-                      />
-                      {titleCase(words(race))}
-                    </span>
-                  ) : null,
-                },
-                {
-                  label: 'Caste',
-                  value:
-                    str(p.caste) && !['MALE', 'FEMALE', 'DEFAULT'].includes(str(p.caste) ?? '')
-                      ? words(str(p.caste))
-                      : null,
-                },
-                {
-                  label: 'Sex',
-                  value: num(plus.sex) === 0 ? 'female' : num(plus.sex) === 1 ? 'male' : null,
-                },
-                {
-                  label: 'Born',
-                  value:
-                    birth !== null && p.deity !== true && p.force !== true
-                      ? birth < 0
-                        ? 'before recorded history'
-                        : legendsDate(birth, num(p.birth_seconds72))
-                      : null,
-                },
-                {
-                  label: 'Died',
-                  value:
-                    death !== null && death >= 0
-                      ? `${legendsDate(death, num(p.death_seconds72))}${birth !== null && birth >= 0 ? `, aged ${death - birth}` : ''}`
-                      : null,
-                },
-                {
-                  label: 'First appeared',
-                  value:
-                    num(p.appeared) !== null &&
-                    (num(p.appeared) ?? -1) >= 0 &&
-                    num(p.appeared) !== birth
-                      ? `year ${num(p.appeared)}`
-                      : null,
-                },
-                { label: 'Spheres', value: spheres.length ? spheres.join(', ') : null },
-                { label: 'Goals', value: goals.length ? goals.join(', ') : null },
-                { label: 'Secrets known', value: knowledge.length ? knowledge.join(', ') : null },
-                { label: 'Undead form', value: str(p.animated_string) },
-              ]}
-            />
-          </div>
+          <Facts
+            items={[
+              {
+                label: 'Race',
+                value: race ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="inline-block size-2.5 rounded-full"
+                      style={{ backgroundColor: raceColor(race) }}
+                    />
+                    {titleCase(words(race))}
+                  </span>
+                ) : null,
+              },
+              {
+                label: 'Caste',
+                value:
+                  str(p.caste) && !['MALE', 'FEMALE', 'DEFAULT'].includes(str(p.caste) ?? '')
+                    ? words(str(p.caste))
+                    : null,
+              },
+              {
+                label: 'Sex',
+                value: num(plus.sex) === 0 ? 'female' : num(plus.sex) === 1 ? 'male' : null,
+              },
+              {
+                label: 'Born',
+                value:
+                  birth !== null && p.deity !== true && p.force !== true
+                    ? birth < 0
+                      ? 'before recorded history'
+                      : legendsDate(birth, num(p.birth_seconds72))
+                    : null,
+              },
+              {
+                label: 'Died',
+                value:
+                  death !== null && death >= 0
+                    ? `${legendsDate(death, num(p.death_seconds72))}${birth !== null && birth >= 0 ? `, aged ${death - birth}` : ''}`
+                    : null,
+              },
+              {
+                label: 'First appeared',
+                value:
+                  num(p.appeared) !== null &&
+                  (num(p.appeared) ?? -1) >= 0 &&
+                  num(p.appeared) !== birth
+                    ? `year ${num(p.appeared)}`
+                    : null,
+              },
+              { label: 'Spheres', value: spheres.length ? spheres.join(', ') : null },
+              { label: 'Goals', value: goals.length ? goals.join(', ') : null },
+              { label: 'Secrets known', value: knowledge.length ? knowledge.join(', ') : null },
+              { label: 'Undead form', value: str(p.animated_string) },
+            ]}
+          />
         </Section>
 
         {positions.length ? (
@@ -735,7 +773,15 @@ function mergeStructures(p: LegendsPayload, plus: JsonObject): Structure[] {
   return out
 }
 
-export function SiteSections({ payload: p, plus, names, related, worldId, map }: SectionProps) {
+export function SiteSections({
+  payload: p,
+  plus,
+  names,
+  related,
+  worldId,
+  map,
+  timeline,
+}: SectionProps) {
   const at = parseCoord(p.coords)
   const region = regionAt(map, at)
   const structures = mergeStructures(p, plus)
@@ -751,80 +797,78 @@ export function SiteSections({ payload: p, plus, names, related, worldId, map }:
     (a, b) => b[1] - a[1],
   )
 
+  const chapterChips = collectionTypes.map(
+    ([type, n]) => `${n} ${words(type)}${n === 1 ? '' : type.endsWith('s') ? '' : 's'}`,
+  )
+
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-3">
         <Section title="Where it stands">
-          <div className="flex flex-col gap-3">
-            <MiniMap map={map} focus={at} />
-            <Facts
-              items={[
-                { label: 'Kind of place', value: words(str(p.type)) },
-                {
-                  label: 'Held by',
-                  value:
-                    num(plus.civ_id) !== null && (num(plus.civ_id) ?? -1) >= 0 ? (
-                      <NamedRef
-                        kind="entity"
-                        id={num(plus.civ_id)}
-                        names={names}
+          <MapAndFacts
+            map={<MiniMap map={map} focus={at} />}
+            facts={
+              <Facts
+                items={[
+                  { label: 'Kind of place', value: words(str(p.type)) },
+                  {
+                    label: 'Held by',
+                    value:
+                      num(plus.civ_id) !== null && (num(plus.civ_id) ?? -1) >= 0 ? (
+                        <NamedRef
+                          kind="entity"
+                          id={num(plus.civ_id)}
+                          names={names}
+                          worldId={worldId}
+                        />
+                      ) : (
+                        'no one'
+                      ),
+                  },
+                  {
+                    label: 'Governed by',
+                    value:
+                      num(plus.cur_owner_id) !== null &&
+                      (num(plus.cur_owner_id) ?? -1) >= 0 &&
+                      num(plus.cur_owner_id) !== num(plus.civ_id) ? (
+                        <NamedRef
+                          kind="entity"
+                          id={num(plus.cur_owner_id)}
+                          names={names}
+                          worldId={worldId}
+                        />
+                      ) : null,
+                  },
+                  {
+                    label: 'Region',
+                    value: region ? (
+                      <RecordLink
+                        kind="region"
+                        id={region.id}
+                        name={region.name}
                         worldId={worldId}
-                      />
-                    ) : (
-                      'no one'
-                    ),
-                },
-                {
-                  label: 'Governed by',
-                  value:
-                    num(plus.cur_owner_id) !== null &&
-                    (num(plus.cur_owner_id) ?? -1) >= 0 &&
-                    num(plus.cur_owner_id) !== num(plus.civ_id) ? (
-                      <NamedRef
-                        kind="entity"
-                        id={num(plus.cur_owner_id)}
-                        names={names}
-                        worldId={worldId}
-                      />
+                      >{`${region.name ? titleCase(region.name) : 'Unnamed region'} (${words(region.type)})`}</RecordLink>
                     ) : null,
-                },
-                {
-                  label: 'Region',
-                  value: region ? (
-                    <RecordLink
-                      kind="region"
-                      id={region.id}
-                      name={region.name}
-                      worldId={worldId}
-                    >{`${region.name ? titleCase(region.name) : 'Unnamed region'} (${words(region.type)})`}</RecordLink>
-                  ) : null,
-                },
-                { label: 'Coordinates', value: at ? `${at.x}, ${at.y}` : null },
-                {
-                  label: 'First recorded',
-                  value: firstYear !== null && firstYear >= 0 ? `year ${firstYear}` : null,
-                },
-                {
-                  label: 'Events on record',
-                  value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
-                },
-              ]}
-            />
-          </div>
+                  },
+                  { label: 'Coordinates', value: at ? `${at.x}, ${at.y}` : null },
+                  {
+                    label: 'First recorded',
+                    value: firstYear !== null && firstYear >= 0 ? `year ${firstYear}` : null,
+                  },
+                  {
+                    label: 'Events on record',
+                    value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
+                  },
+                ]}
+              />
+            }
+          />
         </Section>
-
-        {collectionTypes.length ? (
-          <Section title="What happened here" description="Chapters of history set at this site.">
-            <Chips
-              items={collectionTypes.map(
-                ([type, n]) => `${n} ${words(type)}${n === 1 ? '' : type.endsWith('s') ? '' : 's'}`,
-              )}
-            />
-          </Section>
-        ) : null}
       </div>
 
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <TimelineRow timeline={timeline} />
+
+      <div className="flex flex-col gap-4 lg:col-span-3">
         {structures.length ? (
           <Section title="Structures" count={structures.length}>
             <div className="flex flex-col gap-4">
@@ -908,18 +952,25 @@ export function SiteSections({ payload: p, plus, names, related, worldId, map }:
           </Section>
         ) : null}
 
-        {related.collections?.rows.length ? (
+        {related.collections?.rows.length || chapterChips.length ? (
           <Section
             title="Chapters"
-            count={related.collections.total}
+            count={related.collections?.total || null}
             description="Battles, attacks, festivals, and other episodes set here."
           >
-            <HitRows
-              hits={related.collections.rows}
-              worldId={worldId}
-              total={related.collections.total}
-              years
-            />
+            {chapterChips.length ? (
+              <div className={related.collections?.rows.length ? 'mb-4' : undefined}>
+                <Chips items={chapterChips} />
+              </div>
+            ) : null}
+            {related.collections?.rows.length ? (
+              <HitRows
+                hits={related.collections.rows}
+                worldId={worldId}
+                total={related.collections.total}
+                years
+              />
+            ) : null}
           </Section>
         ) : null}
 
@@ -944,6 +995,7 @@ export function EntitySections({
   related,
   worldId,
   map,
+  timeline,
 }: SectionProps) {
   const positions = objList(plus.entity_position)
   const assignments = objList(plus.entity_position_assignment)
@@ -980,73 +1032,78 @@ export function EntitySections({
     (a, b) => b[1] - a[1],
   )
 
+  const involvedChips = collectionTypes.map(([t, n]) => `${n} ${words(t)}${n === 1 ? '' : 's'}`)
+
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-3">
         <Section title="What it is">
-          <div className="flex flex-col gap-3">
-            {siteIds?.size ? <MiniMap map={map} highlightSites={siteIds} /> : null}
-            <Facts
-              items={[
-                { label: 'Kind', value: words(type) || 'group' },
-                {
-                  label: 'People',
-                  value: race ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span
-                        className="inline-block size-2.5 rounded-full"
-                        style={{ backgroundColor: raceColor(race) }}
-                      />
-                      {titleCase(words(race))}s
-                    </span>
-                  ) : null,
-                },
-                {
-                  label: 'Part of',
-                  value:
-                    parentId !== null && parentId >= 0 ? (
-                      <NamedRef kind="entity" id={parentId} names={names} worldId={worldId} />
+          <MapAndFacts
+            map={siteIds?.size ? <MiniMap map={map} highlightSites={siteIds} /> : null}
+            facts={
+              <Facts
+                items={[
+                  { label: 'Kind', value: words(type) || 'group' },
+                  {
+                    label: 'People',
+                    value: race ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span
+                          className="inline-block size-2.5 rounded-full"
+                          style={{ backgroundColor: raceColor(race) }}
+                        />
+                        {titleCase(words(race))}s
+                      </span>
                     ) : null,
-                },
-                {
-                  label: 'Sites',
-                  value: related.sites ? related.sites.total.toLocaleString() : null,
-                },
-                {
-                  label: 'Members of note',
-                  value: related.members
-                    ? related.members.total.toLocaleString()
-                    : memberIds.length
-                      ? memberIds.length.toLocaleString()
-                      : null,
-                },
-                {
-                  label: 'Events on record',
-                  value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
-                },
-                { label: 'Weapons', value: weapons.length ? weapons.join(', ') : null },
-                { label: 'Professions', value: professions.length ? professions.join(', ') : null },
-              ]}
-            />
-          </div>
+                  },
+                  {
+                    label: 'Part of',
+                    value:
+                      parentId !== null && parentId >= 0 ? (
+                        <NamedRef kind="entity" id={parentId} names={names} worldId={worldId} />
+                      ) : null,
+                  },
+                  {
+                    label: 'Sites',
+                    value: related.sites ? related.sites.total.toLocaleString() : null,
+                  },
+                  {
+                    label: 'Members of note',
+                    value: related.members
+                      ? related.members.total.toLocaleString()
+                      : memberIds.length
+                        ? memberIds.length.toLocaleString()
+                        : null,
+                  },
+                  {
+                    label: 'Events on record',
+                    value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
+                  },
+                  { label: 'Weapons', value: weapons.length ? weapons.join(', ') : null },
+                  {
+                    label: 'Professions',
+                    value: professions.length ? professions.join(', ') : null,
+                  },
+                ]}
+              />
+            }
+          />
         </Section>
+      </div>
 
-        {worship.length ? (
+      <TimelineRow timeline={timeline} />
+
+      {worship.length ? (
+        <div>
           <Section title="Gods" count={worship.length}>
             <RefList kind="historical_figure" ids={worship} names={names} worldId={worldId} />
           </Section>
-        ) : null}
+        </div>
+      ) : null}
 
-        {collectionTypes.length ? (
-          <Section title="Involved in">
-            <Chips
-              items={collectionTypes.map(([t, n]) => `${n} ${words(t)}${n === 1 ? '' : 's'}`)}
-            />
-          </Section>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <div
+        className={cn('flex flex-col gap-4', worship.length ? 'lg:col-span-2' : 'lg:col-span-3')}
+      >
         {positions.length ? (
           <Section
             title="Offices"
@@ -1103,9 +1160,16 @@ export function EntitySections({
           </Section>
         ) : null}
 
-        {related.collections?.rows.length ? (
-          <Section title="Wars & conflicts" count={related.collections.rows.length}>
-            <HitRows hits={related.collections.rows} worldId={worldId} years />
+        {related.collections?.rows.length || involvedChips.length ? (
+          <Section title="Wars & conflicts" count={related.collections?.rows.length || null}>
+            {involvedChips.length ? (
+              <div className={related.collections?.rows.length ? 'mb-4' : undefined}>
+                <Chips items={involvedChips} />
+              </div>
+            ) : null}
+            {related.collections?.rows.length ? (
+              <HitRows hits={related.collections.rows} worldId={worldId} years />
+            ) : null}
           </Section>
         ) : null}
 
@@ -1166,7 +1230,14 @@ export function EntitySections({
 // ---------------------------------------------------------------------------
 // Artifact
 
-export function ArtifactSections({ payload: p, plus, names, related, worldId }: SectionProps) {
+export function ArtifactSections({
+  payload: p,
+  plus,
+  names,
+  related,
+  worldId,
+  timeline,
+}: SectionProps) {
   const item = (p.item as JsonObject | undefined) ?? {}
   const writing = num(plus.writing) ?? num(item.writing_written_content_id)
   const first = related.firstEvent
@@ -1174,6 +1245,7 @@ export function ArtifactSections({ payload: p, plus, names, related, worldId }: 
   const creator = num(firstPayload.hist_figure_id) ?? num(plusOf(firstPayload).creator_hfid)
   return (
     <>
+      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="The object">
           <Facts
@@ -1251,7 +1323,14 @@ export function ArtifactSections({ payload: p, plus, names, related, worldId }: 
 // ---------------------------------------------------------------------------
 // Written content
 
-export function WrittenSections({ payload: p, plus, names, related, worldId }: SectionProps) {
+export function WrittenSections({
+  payload: p,
+  plus,
+  names,
+  related,
+  worldId,
+  timeline,
+}: SectionProps) {
   const author = num(p.author_hfid) ?? num(plus.author)
   const styles = Array.isArray(plus.style)
     ? plus.style.map((s) => words(String(s)))
@@ -1275,6 +1354,7 @@ export function WrittenSections({ payload: p, plus, names, related, worldId }: S
   }
   return (
     <>
+      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="The work">
           <Facts
@@ -1446,7 +1526,14 @@ function SquadTable({
   )
 }
 
-export function CollectionSections({ payload: p, names, related, worldId, map }: SectionProps) {
+export function CollectionSections({
+  payload: p,
+  names,
+  related,
+  worldId,
+  map,
+  timeline,
+}: SectionProps) {
   const type = str(p.type) ?? 'chapter'
   const at = parseCoord(p.coords)
   const attackers = squads(p, 'attacking')
@@ -1462,109 +1549,118 @@ export function CollectionSections({ payload: p, names, related, worldId, map }:
 
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-3">
         <Section title="The chapter">
-          <div className="flex flex-col gap-3">
-            {at ? <MiniMap map={map} focus={at} /> : null}
-            <Facts
-              items={[
-                {
-                  label: 'Kind',
-                  value: `${words(type)}${str(p.adjective) ? ` (${str(p.adjective)})` : ''}`,
-                },
-                {
-                  label: 'When',
-                  value: `${legendsDate(num(p.start_year), num(p.start_seconds72))}${num(p.end_year) !== null && (num(p.end_year) !== num(p.start_year) || num(p.end_seconds72) !== num(p.start_seconds72)) ? ` to ${legendsDate(num(p.end_year), num(p.end_seconds72))}` : ''}`,
-                },
-                { label: 'Outcome', value: str(p.outcome) },
-                {
-                  label: 'Aggressor',
-                  value: (
-                    <NamedRef
-                      kind="entity"
-                      id={num(p.aggressor_ent_id) ?? num(p.attacking_enid)}
-                      names={names}
-                      worldId={worldId}
-                      fallback=""
-                    />
-                  ),
-                },
-                {
-                  label: 'Defender',
-                  value: (
-                    <NamedRef
-                      kind="entity"
-                      id={num(p.defender_ent_id) ?? num(p.defending_enid)}
-                      names={names}
-                      worldId={worldId}
-                      fallback=""
-                    />
-                  ),
-                },
-                {
-                  label: 'Target',
-                  value:
-                    num(p.target_entity_id) !== null ? (
+          <MapAndFacts
+            map={at ? <MiniMap map={map} focus={at} /> : null}
+            facts={
+              <Facts
+                items={[
+                  {
+                    label: 'Kind',
+                    value: `${words(type)}${str(p.adjective) ? ` (${str(p.adjective)})` : ''}`,
+                  },
+                  {
+                    label: 'When',
+                    value: `${legendsDate(num(p.start_year), num(p.start_seconds72))}${num(p.end_year) !== null && (num(p.end_year) !== num(p.start_year) || num(p.end_seconds72) !== num(p.start_seconds72)) ? ` to ${legendsDate(num(p.end_year), num(p.end_seconds72))}` : ''}`,
+                  },
+                  { label: 'Outcome', value: str(p.outcome) },
+                  {
+                    label: 'Aggressor',
+                    value: (
                       <NamedRef
                         kind="entity"
-                        id={num(p.target_entity_id)}
+                        id={num(p.aggressor_ent_id) ?? num(p.attacking_enid)}
                         names={names}
                         worldId={worldId}
+                        fallback=""
                       />
-                    ) : null,
-                },
-                {
-                  label: 'Held by',
-                  value:
-                    num(p.civ_id) !== null && (num(p.civ_id) ?? -1) >= 0 ? (
-                      <NamedRef kind="entity" id={num(p.civ_id)} names={names} worldId={worldId} />
-                    ) : null,
-                },
-                {
-                  label: 'Where',
-                  value:
-                    num(p.site_id) !== null && (num(p.site_id) ?? -1) >= 0 ? (
-                      <NamedRef kind="site" id={num(p.site_id)} names={names} worldId={worldId} />
-                    ) : num(p.subregion_id) !== null && (num(p.subregion_id) ?? -1) >= 0 ? (
+                    ),
+                  },
+                  {
+                    label: 'Defender',
+                    value: (
                       <NamedRef
-                        kind="region"
-                        id={num(p.subregion_id)}
+                        kind="entity"
+                        id={num(p.defender_ent_id) ?? num(p.defending_enid)}
                         names={names}
                         worldId={worldId}
+                        fallback=""
                       />
+                    ),
+                  },
+                  {
+                    label: 'Target',
+                    value:
+                      num(p.target_entity_id) !== null ? (
+                        <NamedRef
+                          kind="entity"
+                          id={num(p.target_entity_id)}
+                          names={names}
+                          worldId={worldId}
+                        />
+                      ) : null,
+                  },
+                  {
+                    label: 'Held by',
+                    value:
+                      num(p.civ_id) !== null && (num(p.civ_id) ?? -1) >= 0 ? (
+                        <NamedRef
+                          kind="entity"
+                          id={num(p.civ_id)}
+                          names={names}
+                          worldId={worldId}
+                        />
+                      ) : null,
+                  },
+                  {
+                    label: 'Where',
+                    value:
+                      num(p.site_id) !== null && (num(p.site_id) ?? -1) >= 0 ? (
+                        <NamedRef kind="site" id={num(p.site_id)} names={names} worldId={worldId} />
+                      ) : num(p.subregion_id) !== null && (num(p.subregion_id) ?? -1) >= 0 ? (
+                        <NamedRef
+                          kind="region"
+                          id={num(p.subregion_id)}
+                          names={names}
+                          worldId={worldId}
+                        />
+                      ) : null,
+                  },
+                  {
+                    label: 'Part of',
+                    value: related.parent ? (
+                      <RecordLink
+                        kind="historical_event_collection"
+                        id={related.parent.id}
+                        name={related.parent.name}
+                        type={related.parent.type}
+                        worldId={worldId}
+                      >
+                        {related.parent.name
+                          ? titleCase(related.parent.name)
+                          : `${words(related.parent.type)} #${related.parent.id}`}
+                      </RecordLink>
                     ) : null,
-                },
-                {
-                  label: 'Part of',
-                  value: related.parent ? (
-                    <RecordLink
-                      kind="historical_event_collection"
-                      id={related.parent.id}
-                      name={related.parent.name}
-                      type={related.parent.type}
-                      worldId={worldId}
-                    >
-                      {related.parent.name
-                        ? titleCase(related.parent.name)
-                        : `${words(related.parent.type)} #${related.parent.id}`}
-                    </RecordLink>
-                  ) : null,
-                },
-                {
-                  label: 'Ordinal',
-                  value:
-                    num(p.ordinal) !== null
-                      ? `${num(p.ordinal)}${['st', 'nd', 'rd'][(num(p.ordinal) ?? 0) - 1] ?? 'th'} of its kind`
-                      : null,
-                },
-                { label: 'Events', value: numList(p.event).length || null },
-              ]}
-            />
-          </div>
+                  },
+                  {
+                    label: 'Ordinal',
+                    value:
+                      num(p.ordinal) !== null
+                        ? `${num(p.ordinal)}${['st', 'nd', 'rd'][(num(p.ordinal) ?? 0) - 1] ?? 'th'} of its kind`
+                        : null,
+                  },
+                  { label: 'Events', value: numList(p.event).length || null },
+                ]}
+              />
+            }
+          />
         </Section>
       </div>
 
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <TimelineRow timeline={timeline} />
+
+      <div className="flex flex-col gap-4 lg:col-span-3">
         {isBattle ? (
           <Section
             title="The forces"
@@ -1618,7 +1714,15 @@ export function CollectionSections({ payload: p, names, related, worldId, map }:
 // ---------------------------------------------------------------------------
 // Region and other geography
 
-export function RegionSections({ record, payload: p, plus, related, worldId, map }: SectionProps) {
+export function RegionSections({
+  record,
+  payload: p,
+  plus,
+  related,
+  worldId,
+  map,
+  timeline,
+}: SectionProps) {
   const sitesInRegion = React.useMemo(() => {
     if (!map) return []
     const index = map.regions.findIndex((r) => r.id === record.id)
@@ -1641,36 +1745,39 @@ export function RegionSections({ record, payload: p, plus, related, worldId, map
   })
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-3">
         <Section title="The land">
-          <div className="flex flex-col gap-3">
-            <MiniMap map={map} highlightRegion={record.id} />
-            <Facts
-              items={[
-                { label: 'Terrain', value: words(str(p.type)) },
-                {
-                  label: 'Alignment',
-                  value:
-                    str(plus.evilness) && str(plus.evilness) !== 'neutral'
-                      ? str(plus.evilness)
-                      : 'neutral',
-                },
-                { label: 'Size', value: tiles ? `${tiles} tiles` : null },
-                {
-                  label: 'Depth',
-                  value: num(p.depth) !== null ? `cavern layer ${num(p.depth)}` : null,
-                },
-                { label: 'Sites', value: sitesInRegion.length || null },
-                {
-                  label: 'Events on record',
-                  value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
-                },
-              ]}
-            />
-          </div>
+          <MapAndFacts
+            map={<MiniMap map={map} highlightRegion={record.id} />}
+            facts={
+              <Facts
+                items={[
+                  { label: 'Terrain', value: words(str(p.type)) },
+                  {
+                    label: 'Alignment',
+                    value:
+                      str(plus.evilness) && str(plus.evilness) !== 'neutral'
+                        ? str(plus.evilness)
+                        : 'neutral',
+                  },
+                  { label: 'Size', value: tiles ? `${tiles} tiles` : null },
+                  {
+                    label: 'Depth',
+                    value: num(p.depth) !== null ? `cavern layer ${num(p.depth)}` : null,
+                  },
+                  { label: 'Sites', value: sitesInRegion.length || null },
+                  {
+                    label: 'Events on record',
+                    value: related.eventsTotal ? related.eventsTotal.toLocaleString() : null,
+                  },
+                ]}
+              />
+            }
+          />
         </Section>
       </div>
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <TimelineRow timeline={timeline} />
+      <div className="flex flex-col gap-4 lg:col-span-3">
         {hits.length ? (
           <Section title="Sites in this region" count={hits.length}>
             <HitRows hits={hits} worldId={worldId} />
@@ -1681,40 +1788,42 @@ export function RegionSections({ record, payload: p, plus, related, worldId, map
   )
 }
 
-export function PlaceSections({ payload: p, plus, map }: SectionProps) {
+export function PlaceSections({ payload: p, plus, map, timeline }: SectionProps) {
   const at = parseCoord(plus.coords)
   const end = parseCoord(plus.end_pos)
   const pathTiles = str(plus.path)?.split('|').filter(Boolean).length ?? 0
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="lg:col-span-3">
         <Section title="The place">
-          <div className="flex flex-col gap-3">
-            {at ? <MiniMap map={map} focus={at} /> : null}
-            <Facts
-              items={[
-                {
-                  label: 'Height',
-                  value: num(plus.height) !== null ? `${num(plus.height)}` : null,
-                },
-                { label: 'Volcano', value: plus.is_volcano === true ? 'yes' : null },
-                { label: 'Length', value: pathTiles ? `${pathTiles} tiles` : null },
-                { label: 'Flows to', value: end ? `${end.x}, ${end.y}` : null },
-                {
-                  label: 'Coordinates',
-                  value: at
-                    ? `${at.x}, ${at.y}`
-                    : str(plus.coord_1) && str(plus.coord_2)
-                      ? `${plus.coord_1} to ${plus.coord_2}`
-                      : null,
-                },
-                { label: 'Depth', value: num(p.depth) !== null ? `layer ${num(p.depth)}` : null },
-              ]}
-            />
-          </div>
+          <MapAndFacts
+            map={at ? <MiniMap map={map} focus={at} /> : null}
+            facts={
+              <Facts
+                items={[
+                  {
+                    label: 'Height',
+                    value: num(plus.height) !== null ? `${num(plus.height)}` : null,
+                  },
+                  { label: 'Volcano', value: plus.is_volcano === true ? 'yes' : null },
+                  { label: 'Length', value: pathTiles ? `${pathTiles} tiles` : null },
+                  { label: 'Flows to', value: end ? `${end.x}, ${end.y}` : null },
+                  {
+                    label: 'Coordinates',
+                    value: at
+                      ? `${at.x}, ${at.y}`
+                      : str(plus.coord_1) && str(plus.coord_2)
+                        ? `${plus.coord_1} to ${plus.coord_2}`
+                        : null,
+                  },
+                  { label: 'Depth', value: num(p.depth) !== null ? `layer ${num(p.depth)}` : null },
+                ]}
+              />
+            }
+          />
         </Section>
       </div>
-      <div className="lg:col-span-2" />
+      <TimelineRow timeline={timeline} />
     </>
   )
 }
@@ -1722,7 +1831,14 @@ export function PlaceSections({ payload: p, plus, map }: SectionProps) {
 // ---------------------------------------------------------------------------
 // Art forms, creatures, identities, and anything else with prose
 
-export function ProseSections({ record, payload: p, plus, names, worldId }: SectionProps) {
+export function ProseSections({
+  record,
+  payload: p,
+  plus,
+  names,
+  worldId,
+  timeline,
+}: SectionProps) {
   const description = str(p.description)
   const paragraphs = description
     ? description
@@ -1738,6 +1854,7 @@ export function ProseSections({ record, payload: p, plus, names, worldId }: Sect
     .map((k) => words(k.replace('biome_pool_', '')))
   return (
     <>
+      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="Details">
           <Facts

@@ -149,6 +149,73 @@ export const getFortUnit = createServerFn({ method: 'GET' })
     }
   })
 
+export interface FortItemQuery {
+  id: number
+}
+
+export interface FortItemDetail {
+  capturedAt: string | null
+  item: FortItem | null
+  holder: Pick<FortUnit, 'id' | 'name' | 'readable'> | null
+  building: FortBuilding | null
+  container: Pick<FortItem, 'id' | 'description'> | null
+  contents: FortItem[]
+}
+
+export const getFortItem = createServerFn({ method: 'GET' })
+  .inputValidator((input: FortItemQuery) => input)
+  .handler(async ({ data }): Promise<FortItemDetail> => {
+    const rows = await postgres_db
+      .select({
+        captured_at: schema.fort_dump.captured_at,
+        units: schema.fort_dump.units,
+        items: schema.fort_dump.items,
+        buildings: schema.fort_dump.buildings,
+      })
+      .from(schema.fort_dump)
+      .where(eq(schema.fort_dump.id, SINGLETON_ID))
+      .limit(1)
+    const row = rows[0]
+    const empty: FortItemDetail = {
+      capturedAt: row?.captured_at ?? null,
+      item: null,
+      holder: null,
+      building: null,
+      container: null,
+      contents: [],
+    }
+    if (!row) return empty
+    const items = decodeTable<FortItem>(row.items)
+    const item = items.find((entry) => entry.id === data.id) ?? null
+    if (!item) return empty
+
+    const holderUnit =
+      item.holder_unit_id !== null
+        ? (decodeTable<FortUnit>(row.units).find((unit) => unit.id === item.holder_unit_id) ?? null)
+        : null
+    const building =
+      item.holder_building_id !== null
+        ? (decodeTable<FortBuilding>(row.buildings).find(
+            (entry) => entry.id === item.holder_building_id,
+          ) ?? null)
+        : null
+    const container =
+      item.container_id !== null
+        ? (items.find((entry) => entry.id === item.container_id) ?? null)
+        : null
+
+    return {
+      capturedAt: row.captured_at ?? null,
+      item,
+      holder: holderUnit
+        ? { id: holderUnit.id, name: holderUnit.name, readable: holderUnit.readable }
+        : null,
+      building,
+      container: container ? { id: container.id, description: container.description } : null,
+      contents: items.filter((entry) => entry.container_id === item.id),
+    }
+  })
+
 export type ItemSortKey =
   | 'item'
   | 'type'

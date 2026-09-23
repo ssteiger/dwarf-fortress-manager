@@ -59,36 +59,42 @@ function HistoryBody({
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Section
-          title="Gods and forces"
-          count={summary.deitiesTotal}
-          description="Deities worshipped by the civilizations, and the spheres they hold."
-          action={
-            <button
-              type="button"
-              className="text-sm text-primary underline-offset-4 hover:underline"
-              onClick={() => onSearch('deity')}
-            >
-              Browse all
-            </button>
-          }
+          title="Names that fill the chronicles"
+          description="The figures mentioned in the most recorded events."
         >
           <ul className="divide-y">
-            {summary.deities.map((deity) => (
-              <li key={deity.id} className="flex flex-wrap items-center gap-x-3 py-2">
+            {summary.notable.map((figure, i) => (
+              <li key={figure.id} className="flex items-center gap-3 py-2">
+                <span className="w-5 text-right text-sm text-muted-foreground tabular-nums">
+                  {i + 1}
+                </span>
                 <LegendsSprite
-                  subject={{ kind: 'historical_figure', id: deity.id, race: deity.raceToken }}
-                  size={24}
+                  subject={{ kind: 'historical_figure', id: figure.id, race: figure.raceToken }}
+                  size={32}
                   className="-my-1"
                 />
-                <RecordLink
-                  kind="historical_figure"
-                  id={deity.id}
-                  name={deity.name}
-                  worldId={worldId}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {deity.race ? `${words(deity.race)} god` : 'god'}
-                  {deity.spheres.length ? ` of ${deity.spheres.join(', ')}` : ''}
+                <div className="min-w-0 flex-1">
+                  <RecordLink
+                    kind="historical_figure"
+                    id={figure.id}
+                    name={figure.name}
+                    type={figure.race}
+                    worldId={worldId}
+                  />
+                  <div className="text-sm text-muted-foreground">
+                    {figure.race ? words(figure.race) : 'unknown'}
+                    {figure.birthYear !== null && figure.birthYear >= 0
+                      ? ` · born ${figure.birthYear}`
+                      : ''}
+                    {figure.deathYear !== null && figure.deathYear >= 0
+                      ? `, died ${figure.deathYear}`
+                      : figure.birthYear !== null
+                        ? ', still alive'
+                        : ''}
+                  </div>
+                </div>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {figure.events.toLocaleString()} events
                 </span>
               </li>
             ))}
@@ -187,42 +193,36 @@ function HistoryBody({
         </Section>
 
         <Section
-          title="Names that fill the chronicles"
-          description="The figures mentioned in the most recorded events."
+          title="Gods and forces"
+          count={summary.deitiesTotal}
+          description="Deities worshipped by the civilizations, and the spheres they hold."
+          action={
+            <button
+              type="button"
+              className="text-sm text-primary underline-offset-4 hover:underline"
+              onClick={() => onSearch('deity')}
+            >
+              Browse all
+            </button>
+          }
         >
           <ul className="divide-y">
-            {summary.notable.map((figure, i) => (
-              <li key={figure.id} className="flex items-center gap-3 py-2">
-                <span className="w-5 text-right text-sm text-muted-foreground tabular-nums">
-                  {i + 1}
-                </span>
+            {summary.deities.map((deity) => (
+              <li key={deity.id} className="flex flex-wrap items-center gap-x-3 py-2">
                 <LegendsSprite
-                  subject={{ kind: 'historical_figure', id: figure.id, race: figure.raceToken }}
-                  size={32}
+                  subject={{ kind: 'historical_figure', id: deity.id, race: deity.raceToken }}
+                  size={24}
                   className="-my-1"
                 />
-                <div className="min-w-0 flex-1">
-                  <RecordLink
-                    kind="historical_figure"
-                    id={figure.id}
-                    name={figure.name}
-                    type={figure.race}
-                    worldId={worldId}
-                  />
-                  <div className="text-sm text-muted-foreground">
-                    {figure.race ? words(figure.race) : 'unknown'}
-                    {figure.birthYear !== null && figure.birthYear >= 0
-                      ? ` · born ${figure.birthYear}`
-                      : ''}
-                    {figure.deathYear !== null && figure.deathYear >= 0
-                      ? `, died ${figure.deathYear}`
-                      : figure.birthYear !== null
-                        ? ', still alive'
-                        : ''}
-                  </div>
-                </div>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {figure.events.toLocaleString()} events
+                <RecordLink
+                  kind="historical_figure"
+                  id={deity.id}
+                  name={deity.name}
+                  worldId={worldId}
+                />
+                <span className="text-sm text-muted-foreground">
+                  {deity.race ? `${words(deity.race)} god` : 'god'}
+                  {deity.spheres.length ? ` of ${deity.spheres.join(', ')}` : ''}
                 </span>
               </li>
             ))}

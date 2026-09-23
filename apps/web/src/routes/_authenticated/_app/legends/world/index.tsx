@@ -79,6 +79,59 @@ function WorldBody({
       </Section>
 
       <div className="flex flex-col gap-4">
+        <Section title="The land">
+          <div className="flex flex-col gap-4 text-sm">
+            <div>
+              <div className="mb-1.5 font-medium">Regions</div>
+              <ul className="flex flex-col gap-1">
+                {Object.entries(summary?.regionTypes ?? {})
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, n]) => (
+                    <li key={type} className="flex items-center gap-2">
+                      {assets ? (
+                        <TerrainChip index={assets} type={type} />
+                      ) : (
+                        <span
+                          className="inline-block size-3 rounded-sm border border-black/20"
+                          style={{ backgroundColor: regionColor(type) }}
+                        />
+                      )}
+                      <span className="flex-1">{type}</span>
+                      <span className="tabular-nums text-muted-foreground">{n}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            <div>
+              <div className="mb-1.5 font-medium">Sites</div>
+              <ul className="flex flex-col gap-1">
+                {Object.entries(summary?.siteTypes ?? {})
+                  .sort((a, b) => b[1] - a[1])
+                  .map(([type, n]) => (
+                    <li key={type} className="flex items-center gap-2">
+                      {assets ? (
+                        <span className="inline-flex w-4 justify-center">
+                          {siteSpriteNameFor(type, 0, false) ? (
+                            <TileChip
+                              index={assets}
+                              name={siteSpriteNameFor(type, 0, false) ?? ''}
+                            />
+                          ) : null}
+                        </span>
+                      ) : null}
+                      <span className="flex-1">{titleCase(type)}s</span>
+                      <span className="tabular-nums text-muted-foreground">{n}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+            <div className="text-muted-foreground">
+              {formatNumber(counts.mountain_peak)} mountain peaks, {formatNumber(counts.river)}{' '}
+              rivers, {formatNumber(counts.underground_region)} cavern layers below.
+            </div>
+          </div>
+        </Section>
+
         <Section
           title="Civilizations"
           count={civs.length || null}
@@ -156,59 +209,6 @@ function WorldBody({
           ) : (
             <p className="text-sm text-muted-foreground">Counting banners…</p>
           )}
-        </Section>
-
-        <Section title="The land">
-          <div className="flex flex-col gap-4 text-sm">
-            <div>
-              <div className="mb-1.5 font-medium">Regions</div>
-              <ul className="flex flex-col gap-1">
-                {Object.entries(summary?.regionTypes ?? {})
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([type, n]) => (
-                    <li key={type} className="flex items-center gap-2">
-                      {assets ? (
-                        <TerrainChip index={assets} type={type} />
-                      ) : (
-                        <span
-                          className="inline-block size-3 rounded-sm border border-black/20"
-                          style={{ backgroundColor: regionColor(type) }}
-                        />
-                      )}
-                      <span className="flex-1">{type}</span>
-                      <span className="tabular-nums text-muted-foreground">{n}</span>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-            <div>
-              <div className="mb-1.5 font-medium">Sites</div>
-              <ul className="flex flex-col gap-1">
-                {Object.entries(summary?.siteTypes ?? {})
-                  .sort((a, b) => b[1] - a[1])
-                  .map(([type, n]) => (
-                    <li key={type} className="flex items-center gap-2">
-                      {assets ? (
-                        <span className="inline-flex w-4 justify-center">
-                          {siteSpriteNameFor(type, 0, false) ? (
-                            <TileChip
-                              index={assets}
-                              name={siteSpriteNameFor(type, 0, false) ?? ''}
-                            />
-                          ) : null}
-                        </span>
-                      ) : null}
-                      <span className="flex-1">{titleCase(type)}s</span>
-                      <span className="tabular-nums text-muted-foreground">{n}</span>
-                    </li>
-                  ))}
-              </ul>
-            </div>
-            <div className="text-muted-foreground">
-              {formatNumber(counts.mountain_peak)} mountain peaks, {formatNumber(counts.river)}{' '}
-              rivers, {formatNumber(counts.underground_region)} cavern layers below.
-            </div>
-          </div>
         </Section>
       </div>
     </div>

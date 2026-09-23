@@ -310,6 +310,69 @@ export function DwarfDetails({
         </Card>
       </div>
 
+      {unit.traits == null && unit.values == null && unit.thoughts == null ? (
+        <p className="text-sm text-muted-foreground">
+          Personality and thoughts arrive with the next fortress dump.
+        </p>
+      ) : unit.traits?.length || unit.values?.length || unit.thoughts?.length ? (
+        <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+          {unit.traits?.length || unit.values?.length ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">Personality</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {unit.traits?.length ? (
+                  <ul className="flex flex-col gap-1.5">
+                    {unit.traits.map(([facet, value]) => (
+                      <FacetRow key={facet} name={facet} value={value} />
+                    ))}
+                  </ul>
+                ) : null}
+                {unit.values?.length ? (
+                  <div>
+                    <div className="mb-1.5 text-sm font-medium text-muted-foreground">Beliefs</div>
+                    <ul className="flex flex-col gap-1 text-sm">
+                      {unit.values.map(([value, strength]) => (
+                        <li key={value} className="flex items-baseline justify-between gap-3">
+                          <span>{tokenLabel(value)}</span>
+                          <span className="text-muted-foreground">
+                            {strength < 0 ? 'rejects it' : 'holds it'}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ) : null}
+
+          {unit.thoughts?.length ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  Thoughts
+                  <Badge variant="secondary" className="tabular-nums">
+                    {unit.thoughts.length}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="flex flex-col gap-2">
+                  {unit.thoughts.slice(0, compact ? 8 : unit.thoughts.length).map((thought) => (
+                    <ThoughtRow
+                      key={`${thought[0]}-${thought[1]}-${thought[3]}-${thought[4]}`}
+                      thought={thought}
+                    />
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          ) : null}
+        </div>
+      ) : null}
+
       {data?.buildings.length ? (
         <Card>
           <CardHeader className="pb-2">
@@ -409,6 +472,73 @@ export function DwarfDetails({
         ) : null}
       </Card>
     </div>
+  )
+}
+
+function tokenLabel(token: string): string {
+  if (token.includes('_')) return humanize(token)
+  return splitPascal(token)
+}
+
+function facetLevel(value: number): string {
+  if (value <= 24) return 'very low'
+  if (value <= 40) return 'low'
+  if (value >= 76) return 'very high'
+  return 'high'
+}
+
+function emotionTone(emotion: string): 'bad' | 'good' | 'neutral' {
+  const name = emotion.toLowerCase()
+  if (/anything|interest|empathy|sympathy/.test(name)) return 'neutral'
+  if (
+    /anger|anguish|anxi|apath|bitter|contempt|despair|disgust|fear|fright|frustrat|grief|grouch|hate|horror|irritat|loath|lonely|loneli|miser|mortif|nervous|panic|pessim|restless|sad|shame|shock|terror|uneas|worry|agitat|empti|outrage/.test(
+      name,
+    )
+  )
+    return 'bad'
+  return 'good'
+}
+
+function FacetRow({ name, value }: { name: string; value: number }) {
+  const towardHigh = value >= 61
+  const pct = Math.min(100, Math.round((Math.abs(value - 50) / 50) * 100))
+  return (
+    <li className="flex items-center gap-3 text-sm">
+      <span className="min-w-0 flex-1 truncate">{tokenLabel(name)}</span>
+      <span className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
+        <span
+          className={cn('block h-full', towardHigh ? 'bg-primary' : 'bg-amber-500')}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+      <span className="w-16 text-right text-muted-foreground">{facetLevel(value)}</span>
+    </li>
+  )
+}
+
+function ThoughtRow({
+  thought,
+}: {
+  thought: [string, string, number, number, number]
+}) {
+  const [name, emotion, , year, tick] = thought
+  const tone = emotionTone(emotion)
+  return (
+    <li className="flex flex-wrap items-baseline gap-x-3 text-sm">
+      <span className="min-w-0 flex-1">{tokenLabel(name)}</span>
+      {emotion ? (
+        <span
+          className={cn(
+            tone === 'bad' && 'text-red-600 dark:text-red-400',
+            tone === 'good' && 'text-emerald-700 dark:text-emerald-400',
+            tone === 'neutral' && 'text-muted-foreground',
+          )}
+        >
+          {tokenLabel(emotion)}
+        </span>
+      ) : null}
+      <span className="tabular-nums text-muted-foreground">{formatGameTick(year, tick)}</span>
+    </li>
   )
 }
 

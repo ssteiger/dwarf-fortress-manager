@@ -13,7 +13,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 6
+local DUMP_VERSION = 7
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -191,6 +191,7 @@ local UNIT_COLUMNS = arr{
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
     'hist_figure_id', 'civ_id', 'race_id', 'caste_id', 'look',
+    'traits', 'values', 'thoughts',
 }
 
 local UNIT_FLAG_CHECKS = {
@@ -229,6 +230,75 @@ local function unit_flags(u)
         if ok and res then flags[#flags + 1] = check[1] end
     end
     return flags
+end
+
+-- Facets the game would remark on (outside the unremarkable 41–60 band),
+-- strongest first. Values are beliefs; thoughts are the current emotions.
+local function unit_traits(pers)
+    local traits = arr{}
+    local list = {}
+    local i = 0
+    while i < 80 do
+        local name = df.personality_facet_type[i]
+        if type(name) ~= 'string' then break end
+        local val = tonumber(pers.traits[i])
+        if val and (val <= 40 or val >= 61) then
+            list[#list + 1] = {name, val}
+        end
+        i = i + 1
+    end
+    table.sort(list, function(a, b) return math.abs(a[2] - 50) > math.abs(b[2] - 50) end)
+    for n = 1, #list do traits[n] = arr(list[n]) end
+    return traits
+end
+
+local function unit_values(pers)
+    local values = arr{}
+    local list = {}
+    for _, v in ipairs(pers.values) do
+        local name = enum_name(df.value_type, v.type)
+        local strength = tonumber(v.strength) or 0
+        if name and name ~= 'NONE' and strength ~= 0 then
+            list[#list + 1] = {name, strength}
+        end
+    end
+    table.sort(list, function(a, b) return math.abs(a[2]) > math.abs(b[2]) end)
+    for n = 1, math.min(#list, 12) do values[n] = arr(list[n]) end
+    return values
+end
+
+local function unit_thoughts(pers)
+    local thoughts = arr{}
+    local list = {}
+    for _, e in ipairs(pers.emotions) do
+        local thought = enum_name(df.unit_thought_type, e.thought)
+        if thought and thought ~= 'None' then
+            list[#list + 1] = {
+                thought,
+                enum_name(df.emotion_type, e.type) or '',
+                tonumber(e.strength) or 0,
+                tonumber(e.year) or 0,
+                tonumber(e.year_tick) or 0,
+            }
+        end
+    end
+    table.sort(list, function(a, b)
+        if a[4] ~= b[4] then return a[4] > b[4] end
+        return a[5] > b[5]
+    end)
+    for n = 1, math.min(#list, 16) do thoughts[n] = arr(list[n]) end
+    return thoughts
+end
+
+local function unit_mind(u)
+    local empty = arr{}
+    local soul = try(function() return u.status.current_soul end)
+    local pers = soul and try(function() return soul.personality end)
+    if not pers then return empty, empty, empty end
+    local traits = try(unit_traits, pers) or empty
+    local values = try(unit_values, pers) or empty
+    local thoughts = try(unit_thoughts, pers) or empty
+    return traits, values, thoughts
 end
 
 local function unit_skills(u)
@@ -739,7 +809,8 @@ local function unit_row(u)
         u.civ_id,
         race_id,
         caste_id,
-        unit_look(u, craw)
+        unit_look(u, craw),
+        unit_mind(u)
     )
 end
 

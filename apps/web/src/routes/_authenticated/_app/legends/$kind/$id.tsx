@@ -7,6 +7,7 @@ import { LegendsSprite } from '~/lib/df-assets/legends'
 import { plusOf, str } from '~/lib/legends/events'
 import {
   browseTabForKind,
+  humanizeToken,
   kindLabel,
   kindPlural,
   raceToken,
@@ -16,6 +17,7 @@ import {
 import { getLegendsMap, getLegendsRecord } from '~/lib/legends/server'
 import {
   Breadcrumbs,
+  Section,
   parseWorldSearch,
   recordName,
   useLegendsWorlds,
@@ -35,7 +37,7 @@ import {
   describeRecord,
 } from '../-components/RecordSections'
 import { Timeline } from '../-components/Timeline'
-import { EmptyState, PageHeader } from '../../fortress/-components/FortChrome'
+import { EmptyState } from '../../fortress/-components/FortChrome'
 
 /** Kinds whose page shows the world map. */
 const MAP_KINDS = new Set([
@@ -112,10 +114,23 @@ function RecordPage() {
 
   const chips: string[] = []
   if (record?.type && kind !== 'historical_figure') chips.push(words(record.type))
-  if (kind === 'historical_figure' && payload.deity === true) chips.push('deity')
-  if (kind === 'historical_figure' && payload.force === true) chips.push('force of nature')
+  if (kind === 'historical_figure') {
+    if (payload.deity === true) chips.push('deity')
+    if (payload.force === true) chips.push('force of nature')
+    if (payload.animated === true) chips.push('undead')
+    if (payload.ghost === true) chips.push('ghost')
+    const associated = str(payload.associated_type)
+    if (associated && associated !== 'STANDARD') chips.push(words(associated))
+    if (Array.isArray(payload.active_interaction)) {
+      for (const curse of payload.active_interaction) {
+        const label = humanizeToken(String(curse))
+        if (label) chips.push(label)
+      }
+    }
+  }
   if (kind === 'region' && typeof plus.evilness === 'string' && plus.evilness !== 'neutral')
     chips.push(plus.evilness)
+  const statusChips = [...new Set(chips)]
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
@@ -140,27 +155,34 @@ function RecordPage() {
         ]}
       />
 
-      <PageHeader
-        eyebrow={kindLabel(kind)}
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            {spriteSubject ? (
-              <LegendsSprite
-                subject={spriteSubject}
-                size={48}
-                title={`${title} as drawn in the game`}
-              />
-            ) : null}
-            {title}
-            {chips.map((chip) => (
-              <Badge key={chip} variant="outline" className="text-sm font-normal">
-                {chip}
-              </Badge>
-            ))}
-          </span>
-        }
-        description={subtitle}
-      />
+      <header className="flex items-start gap-4">
+        {spriteSubject ? (
+          <LegendsSprite
+            subject={spriteSubject}
+            size={72}
+            className="mt-1 shrink-0"
+            title={`${title} as drawn in the game`}
+          />
+        ) : null}
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{kindLabel(kind)}</p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{title}</h1>
+          {subtitle ? (
+            <p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">
+              {subtitle}
+            </p>
+          ) : null}
+          {statusChips.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {statusChips.map((chip) => (
+                <Badge key={chip} variant="outline" className="text-sm font-normal">
+                  {chip}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </header>
 
       {detail.isLoading || (worldId === null && legends.isLoading) ? (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -183,44 +205,41 @@ function RecordPage() {
               positions={detail.data?.positions ?? []}
               worldId={worldId}
               map={map.data}
+              timeline={
+                TIMELINE_KINDS.has(kind) ? (
+                  <Timeline
+                    worldId={worldId}
+                    kind={kind}
+                    id={numericId}
+                    title={kind === 'historical_event_collection' ? 'What happened' : 'History'}
+                    description={
+                      kind === 'historical_figure'
+                        ? 'Everything the chronicles record about this figure, in order.'
+                        : kind === 'historical_event_collection'
+                          ? 'The events of this chapter, in order.'
+                          : 'Everything that happened here or involved this, in order.'
+                    }
+                  />
+                ) : null
+              }
             />
           </div>
 
-          {TIMELINE_KINDS.has(kind) ? (
-            <Timeline
-              worldId={worldId}
-              kind={kind}
-              id={numericId}
-              title={kind === 'historical_event_collection' ? 'What happened' : 'History'}
-              description={
-                kind === 'historical_figure'
-                  ? 'Everything the chronicles record about this figure, in order.'
-                  : kind === 'historical_event_collection'
-                    ? 'The events of this chapter, in order.'
-                    : 'Everything that happened here or involved this, in order.'
-              }
-            />
-          ) : null}
-
-          <details className="rounded-xl border bg-card text-card-foreground shadow-sm">
-            <summary className="cursor-pointer select-none px-5 py-4 text-base font-medium">
-              Every recorded field
-              <span className="ml-2 text-sm font-normal text-muted-foreground">
-                The raw export, with ids turned into links.
-              </span>
-            </summary>
-            <div className="border-t px-5 py-4">
-              <RawFacts payload={payload} names={names} worldId={worldId} />
-              {Object.keys(plus).length ? (
-                <>
-                  <div className="mb-3 mt-6 text-sm font-medium text-muted-foreground">
-                    From legends_plus
-                  </div>
-                  <RawFacts payload={plus} names={names} worldId={worldId} />
-                </>
-              ) : null}
-            </div>
-          </details>
+          <Section
+            collapsed
+            title="Every recorded field"
+            description="The raw export, with ids turned into links."
+          >
+            <RawFacts payload={payload} names={names} worldId={worldId} />
+            {Object.keys(plus).length ? (
+              <>
+                <div className="mb-3 mt-6 text-sm font-medium text-muted-foreground">
+                  From legends_plus
+                </div>
+                <RawFacts payload={plus} names={names} worldId={worldId} />
+              </>
+            ) : null}
+          </Section>
         </>
       )}
     </div>
