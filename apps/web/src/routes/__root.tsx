@@ -1,5 +1,4 @@
 import type { QueryClient } from '@tanstack/react-query'
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import {
   HeadContent,
   Outlet,
@@ -7,7 +6,6 @@ import {
   Scripts,
   createRootRouteWithContext,
 } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import { type CurrentUser, getCurrentUser } from '~/lib/auth/server'
 import { BOOT_SCRIPT } from '~/lib/preferences'
@@ -65,13 +63,6 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
         <ScriptOnce>{BOOT_SCRIPT}</ScriptOnce>
 
         {children}
-
-        {process.env.NODE_ENV === 'development' && (
-          <>
-            <ReactQueryDevtools buttonPosition="bottom-left" />
-            <TanStackRouterDevtools position="bottom-right" />
-          </>
-        )}
 
         <Scripts />
       </body>
