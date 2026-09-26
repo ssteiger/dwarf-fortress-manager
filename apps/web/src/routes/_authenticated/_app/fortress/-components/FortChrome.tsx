@@ -196,7 +196,7 @@ export function StatCard({
   children?: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 text-card-foreground shadow-sm">
+    <div className="rounded-xl border bg-card p-4 text-card-foreground">
       <div className="text-sm font-medium text-muted-foreground">{title}</div>
       <div className="mt-1.5 flex items-center gap-2 text-2xl font-semibold tabular-nums">
         {Icon ? <Icon className={cn('size-5', accentClassName)} /> : null}
