@@ -5,7 +5,7 @@ import {
   postgres_db,
   schema,
 } from '@fortress/db-drizzle'
-import { type SQL, and, eq, inArray, sql } from 'drizzle-orm'
+import { type SQL, and, asc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm'
 
 import { num, numList, objList, plusOf, str } from './events'
 import { entityTypeLabel, racePlural, raceToken, words } from './model'
@@ -371,6 +371,62 @@ export async function describeRows(
     }
     return hit
   })
+}
+
+/** Kinds worth showing first when someone searches by name. */
+const NAME_KIND_ORDER = [
+  'historical_figure',
+  'site',
+  'entity',
+  'artifact',
+  'historical_event_collection',
+  'region',
+  'written_content',
+]
+
+/**
+ * Named records matching `q`, best match first: an exact name, then one that
+ * starts with it, then the rest, each within the kind order above. Events are
+ * left out; they are found by their text, not by a name.
+ */
+export async function searchRecordsByName(
+  worldId: number,
+  query: string,
+  kinds: string[] | undefined,
+  limit: number,
+): Promise<LegendsHit[]> {
+  const q = query.trim()
+  if (q.length < 2) return []
+  const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`
+  const conditions: SQL[] = [
+    eq(R.world_id, worldId),
+    sql`${R.kind} <> 'historical_event'`,
+    isNotNull(R.name),
+    ilike(R.name, like),
+  ]
+  if (kinds?.length) conditions.push(inArray(R.kind, kinds))
+  const kindOrder = sql`case ${R.kind} ${sql.join(
+    NAME_KIND_ORDER.map((k, i) => sql`when ${k} then ${i}`),
+    sql` `,
+  )} else 9 end`
+  const rows = await postgres_db
+    .select({
+      kind: R.kind,
+      id: R.id,
+      name: R.name,
+      type: R.type,
+      year: R.year,
+      payload: R.payload,
+    })
+    .from(R)
+    .where(and(...conditions))
+    .orderBy(
+      sql`case when lower(${R.name}) = lower(${q}) then 0 when lower(${R.name}) like lower(${`${q}%`}) then 1 else 2 end`,
+      kindOrder,
+      asc(R.name),
+    )
+    .limit(Math.min(limit, 50))
+  return describeRows(worldId, rows)
 }
 
 export function eventsWhere(

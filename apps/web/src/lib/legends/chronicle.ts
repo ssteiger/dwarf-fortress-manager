@@ -5,7 +5,14 @@ import { type SQL, and, asc, desc, eq, ilike, inArray, isNotNull, sql } from 'dr
 import { EVENT_CATEGORIES, eventCategory, num, numList, plusOf, str } from './events'
 import { racePlural, raceToken, titleCase, words } from './model'
 import { list, sentence } from './prose'
-import { type RefSet, addRef, addRefs, describeRows, lookupNames } from './records'
+import {
+  type RefSet,
+  addRef,
+  addRefs,
+  describeRows,
+  lookupNames,
+  searchRecordsByName,
+} from './records'
 import type { LegendsHit, NameIndex } from './server'
 
 /*
@@ -1326,51 +1333,11 @@ export const searchEvents = createServerFn({ method: 'GET' })
 // ---------------------------------------------------------------------------
 // Jumping to a record by name
 
-const QUICK_KIND_ORDER = [
-  'historical_figure',
-  'site',
-  'entity',
-  'artifact',
-  'historical_event_collection',
-  'region',
-  'written_content',
-]
-
 export const quickSearch = createServerFn({ method: 'GET' })
   .inputValidator(
     (input: { worldId: number; q: string; kinds?: string[]; limit?: number }) => input,
   )
-  .handler(async ({ data }): Promise<LegendsHit[]> => {
-    const q = data.q.trim()
-    if (q.length < 2) return []
-    const like = `%${q.replace(/[%_\\]/g, (m) => `\\${m}`)}%`
-    const conditions: SQL[] = [
-      eq(R.world_id, data.worldId),
-      sql`${R.kind} <> 'historical_event'`,
-      isNotNull(R.name),
-      ilike(R.name, like),
-    ]
-    if (data.kinds?.length) conditions.push(inArray(R.kind, data.kinds))
-    const kindOrder = sql`case ${R.kind} ${sql.join(
-      QUICK_KIND_ORDER.map((k, i) => sql`when ${k} then ${i}`),
-      sql` `,
-    )} else 9 end`
-    const rows = await postgres_db
-      .select({
-        kind: R.kind,
-        id: R.id,
-        name: R.name,
-        type: R.type,
-        year: R.year,
-        payload: R.payload,
-      })
-      .from(R)
-      .where(and(...conditions))
-      .orderBy(
-        sql`case when lower(${R.name}) = lower(${q}) then 0 when lower(${R.name}) like lower(${`${q}%`}) then 1 else 2 end`,
-        kindOrder,
-        asc(R.name),
-      )
-      .limit(Math.min(data.limit ?? 12, 50))
-    return describeRows(data.worldId, rows)
-  })
+  .handler(
+    async ({ data }): Promise<LegendsHit[]> =>
+      searchRecordsByName(data.worldId, data.q, data.kinds, data.limit ?? 12),
+  )

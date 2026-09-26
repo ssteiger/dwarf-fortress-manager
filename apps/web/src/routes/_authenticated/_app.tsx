@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 
 import { logoutFn } from '~/lib/auth/server'
 import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
+import { GlobalSearch } from '~/lib/components/GlobalSearch'
 import { FortWatcher } from '~/lib/fortress/FortWatcher'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { getFortUnits } from '~/lib/fortress/server'
@@ -100,7 +101,7 @@ const Layout = () => {
 
   return (
     <AppLayout
-      headerProps={{ title: headerTitle(location.pathname) }}
+      headerProps={{ title: headerTitle(location.pathname), center: <GlobalSearch /> }}
       sidebarProps={{
         brand: '☺ Dwarf Fortress Manager',
         brandHref: '/fortress',
