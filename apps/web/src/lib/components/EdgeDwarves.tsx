@@ -43,8 +43,11 @@ interface Body {
   drop: number
   mode: Mode
   dir: 1 | -1
+  /** Eases from -1 to 1 so a turn reads as the dwarf swinging round, not snapping. */
+  facing: number
   speed: number
   until: number
+  /** Drives the walk bob; advances with distance walked, so it keeps step with the legs. */
   phase: number
   hitAt: number
   riseFrom: number
@@ -64,6 +67,7 @@ function normalize(angle: number): number {
 }
 
 function spawn(width: number, ground: number, now: number): Body {
+  const dir: 1 | -1 = Math.random() < 0.5 ? -1 : 1
   return {
     x: 40 + Math.random() * Math.max(0, width - 80),
     y: ground,
@@ -74,7 +78,8 @@ function spawn(width: number, ground: number, now: number): Body {
     lie: 0,
     drop: 0,
     mode: 'walk',
-    dir: Math.random() < 0.5 ? -1 : 1,
+    dir,
+    facing: dir,
     speed: 16 + Math.random() * 18,
     until: now + 2000 + Math.random() * 6000,
     phase: Math.random() * 10,
@@ -193,6 +198,7 @@ function step(b: Body, dt: number, now: number, width: number, ground: number, s
   }
   const lying = b.mode === 'air' ? 0 : Math.abs(Math.sin(b.angle)) * size * 0.28
   b.drop += (lying - b.drop) * Math.min(1, dt * 18)
+  b.facing += (b.dir - b.facing) * Math.min(1, dt * 14)
 }
 
 function topple(b: Body, pushX: number, now: number) {
@@ -303,9 +309,11 @@ export function EdgeDwarves({
         step(b, dt, now, width, ground, size)
         const el = els.current.get(key)
         if (!el?.outer || !el.inner) continue
-        const bob = b.mode === 'walk' ? -Math.abs(Math.sin(b.phase * Math.PI)) * size * 0.06 : 0
+        const bob = b.mode === 'walk' ? -Math.abs(Math.sin(b.phase * Math.PI)) * size * 0.03 : 0
         el.outer.style.transform = `translate3d(${b.x - size / 2}px, ${b.y - size + b.drop + bob}px, 0)`
-        el.inner.style.transform = `rotate(${b.angle}rad)`
+        // The sprites are drawn facing left, so walking right is the mirrored one. Mirror before
+        // the rotation, so a toppled dwarf falls the way it was pushed either way round.
+        el.inner.style.transform = `rotate(${b.angle}rad) scaleX(${-b.facing})`
         if (el.label) el.label.style.opacity = b.mode === 'walk' || b.mode === 'idle' ? '1' : '0'
       }
       frame = requestAnimationFrame(render)
