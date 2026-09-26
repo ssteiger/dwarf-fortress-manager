@@ -1,4 +1,11 @@
-import { type FortStatus, WORKER_HEARTBEAT_MS, postgres_db, schema } from '@fortress/db-drizzle'
+import {
+  type DumpProgress,
+  type FortStatus,
+  WORKER_HEARTBEAT_MS,
+  parseDumpProgress,
+  postgres_db,
+  schema,
+} from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
 import { eq, sql } from 'drizzle-orm'
 
@@ -35,6 +42,8 @@ export interface DumpState {
   status: FortStatus | null
   /** How long the game was paused for the last read. */
   elapsedMs: number | null
+  /** Where the latest read is, or how it ended; null once a new request clears it. */
+  progress: DumpProgress | null
 }
 
 async function requireUser() {
@@ -56,6 +65,7 @@ export const getDumpState = createServerFn({ method: 'GET' }).handler(
           pending: sql<boolean>`${W.dump_requested_at} is not null and (${W.dump_answered_at} is null or ${W.dump_answered_at} < ${W.dump_requested_at})`,
           workerRunning: sql<boolean>`coalesce(${W.seen_at} > now() - make_interval(secs => ${WORKER_GONE_AFTER_S}), false)`,
           workerSeenAt: W.seen_at,
+          progress: W.dump_progress,
         })
         .from(W)
         .where(eq(W.id, SINGLETON_ID))
@@ -81,6 +91,7 @@ export const getDumpState = createServerFn({ method: 'GET' }).handler(
       lastDumpAt: s?.capturedAt ?? null,
       status: s?.status ?? null,
       elapsedMs: s?.elapsedMs ?? null,
+      progress: parseDumpProgress(w?.progress ?? null),
     }
   },
 )
@@ -110,7 +121,8 @@ export const setDumpSchedule = createServerFn({ method: 'POST' })
 /**
  * Ask the worker to read the game now. Asking again before it has answered
  * does not cost a second read: one dump answers every request made before it
- * finished.
+ * finished. A read already under way keeps its progress, since it is the one
+ * that answers; an ended one is cleared so it is not mistaken for the answer.
  */
 export const requestDump = createServerFn({ method: 'POST' }).handler(
   async (): Promise<{ workerRunning: boolean }> => {
@@ -118,7 +130,13 @@ export const requestDump = createServerFn({ method: 'POST' }).handler(
     const [row] = await postgres_db
       .insert(W)
       .values({ id: SINGLETON_ID, dump_requested_at: sql`now()` })
-      .onConflictDoUpdate({ target: W.id, set: { dump_requested_at: sql`now()` } })
+      .onConflictDoUpdate({
+        target: W.id,
+        set: {
+          dump_requested_at: sql`now()`,
+          dump_progress: sql`case when ${W.dump_progress}->>'state' = 'running' then ${W.dump_progress} end`,
+        },
+      })
       .returning({
         workerRunning: sql<boolean>`coalesce(${W.seen_at} > now() - make_interval(secs => ${WORKER_GONE_AFTER_S}), false)`,
       })

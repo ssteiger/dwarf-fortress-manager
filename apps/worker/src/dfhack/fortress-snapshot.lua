@@ -11,6 +11,11 @@
 --   MENU                        no fortress loaded (nothing written)
 --   ERR <message>               something failed (nothing written)
 --
+-- While it runs, <out_path>.progress holds the step it is on (world, units,
+-- items, buildings, jobs, announcements, writing, map). Console text only
+-- reaches the worker once the script has finished; the file can be read while
+-- the game is still paused.
+--
 -- Nothing in here writes to game state.
 
 local DUMP_VERSION = 8
@@ -146,6 +151,15 @@ if not dfhack.isMapLoaded() or not dfhack.world.isFortressMode() then
 end
 
 local t_start = dfhack.getTickCount()
+local progress_path = out_path .. '.progress'
+
+local function progress(step)
+    local f = io.open(progress_path, 'wb')
+    if f then
+        f:write(step)
+        f:close()
+    end
+end
 
 -- ---------------------------------------------------------------------------
 -- World / calendar
@@ -1778,13 +1792,16 @@ local function write_table(f, columns, rows)
 end
 
 local function run()
+    progress('world')
     local world = collect_world()
 
+    progress('units')
     local unit_rows = {}
     for _, u in ipairs(df.global.world.units.active) do
         unit_rows[#unit_rows + 1] = unit_row(u)
     end
 
+    progress('items')
     local item_rows = {}
     for _, it in ipairs(df.global.world.items.all) do
         if not it.flags.garbage_collect then
@@ -1792,19 +1809,23 @@ local function run()
         end
     end
 
+    progress('buildings')
     local building_rows = {}
     for _, b in ipairs(df.global.world.buildings.all) do
         building_rows[#building_rows + 1] = building_row(b)
     end
 
+    progress('jobs')
     local job_rows = {}
     for _, job in utils.listpairs(df.global.world.jobs.list) do
         job_rows[#job_rows + 1] = job_row(job)
     end
 
+    progress('announcements')
     local announcement_rows = collect_announcements(400)
     local summary = collect_summary(unit_rows, #item_rows, #building_rows, announcement_rows)
 
+    progress('writing')
     local tmp_path = out_path .. '.tmp'
     local f = assert(io.open(tmp_path, 'wb'))
     f:write('{"status":"live","dump_version":' .. DUMP_VERSION)
@@ -1816,6 +1837,7 @@ local function run()
     f:write(',"jobs":'); write_table(f, JOB_COLUMNS, job_rows)
     f:write(',"announcements":'); write_table(f, ANNOUNCEMENT_COLUMNS, announcement_rows)
     if with_map then
+        progress('map')
         f:write(',"map":'); write_map(f)
     else
         f:write(',"map":null')

@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/pg-core";
 import type {
 	DfhackAction,
+	DumpProgress,
 	FortMapPayload,
 	FortStatus,
 	FortSummary,
@@ -74,7 +75,8 @@ export const fort_map = pgTable("fort_map", {
 /**
  * Single row (id = 1): how often the worker reads the game, chosen in
  * Settings, and requests from the app to read it now. The worker answers the
- * requests and leaves a heartbeat while it runs.
+ * requests, leaves a heartbeat while it runs and reports how far each read
+ * has got.
  */
 export const fort_worker = pgTable("fort_worker", {
 	id: integer().primaryKey().notNull(),
@@ -88,6 +90,8 @@ export const fort_worker = pgTable("fort_worker", {
 	dump_answered_at: timestamp({ withTimezone: true, mode: "string" }),
 	/** The worker's heartbeat, every WORKER_HEARTBEAT_MS while it runs. */
 	seen_at: timestamp({ withTimezone: true, mode: "string" }),
+	/** Set by the worker: where the latest read is. A request clears an ended one. */
+	dump_progress: jsonb().$type<DumpProgress>(),
 });
 
 /** Append-only chronicle of in-game announcements. */

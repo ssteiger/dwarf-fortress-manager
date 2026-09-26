@@ -1,5 +1,5 @@
-import { postgres_db, schema } from '@fortress/db-drizzle'
-import { eq, sql } from 'drizzle-orm'
+import { type DumpProgress, postgres_db, schema } from '@fortress/db-drizzle'
+import { and, eq, sql } from 'drizzle-orm'
 import type { Config } from '../config'
 
 const W = schema.fort_worker
@@ -45,4 +45,17 @@ export async function answerDumpRequests(): Promise<void> {
 
 export async function markAlive(): Promise<void> {
   await postgres_db.update(W).set({ seen_at: sql`now()` }).where(eq(W.id, SINGLETON_ID))
+}
+
+/** Where the read in progress has got to, or how it ended. */
+export async function setDumpProgress(progress: DumpProgress): Promise<void> {
+  await postgres_db.update(W).set({ dump_progress: progress }).where(eq(W.id, SINGLETON_ID))
+}
+
+/** A read the worker was stopped in the middle of will never end; forget it. */
+export async function clearInterruptedDumpProgress(): Promise<void> {
+  await postgres_db
+    .update(W)
+    .set({ dump_progress: null })
+    .where(and(eq(W.id, SINGLETON_ID), sql`${W.dump_progress}->>'state' = 'running'`))
 }

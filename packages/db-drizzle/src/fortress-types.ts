@@ -11,6 +11,67 @@ export type FortStatus = "live" | "menu" | "offline";
 /** How often the worker marks `fort_worker.seen_at` while it runs. */
 export const WORKER_HEARTBEAT_MS = 10_000;
 
+/**
+ * The steps of one game read, in order. `worker` is the web app's own step
+ * until the worker picks a request up; fortress-snapshot.lua reports `world`
+ * through `map`; `map` only comes along when the map is due.
+ */
+export const DUMP_STEPS = [
+	"worker",
+	"game",
+	"world",
+	"units",
+	"items",
+	"buildings",
+	"jobs",
+	"announcements",
+	"writing",
+	"map",
+	"store",
+] as const;
+
+export type DumpStep = (typeof DUMP_STEPS)[number];
+
+export function isDumpStep(value: string): value is DumpStep {
+	return (DUMP_STEPS as readonly string[]).includes(value);
+}
+
+export function dumpSteps(withMap: boolean): DumpStep[] {
+	return DUMP_STEPS.filter((step) => withMap || step !== "map");
+}
+
+const DUMP_PROGRESS_STATES = ["running", "done", "menu", "offline", "error"] as const;
+
+/** `running` until the read ends; the rest say how it ended. */
+export type DumpProgressState = (typeof DUMP_PROGRESS_STATES)[number];
+
+/** Where the latest read is, kept by the worker in `fort_worker.dump_progress`. */
+export interface DumpProgress {
+	/** The step the read is on, or the one it ended on. */
+	step: DumpStep;
+	state: DumpProgressState;
+	withMap: boolean;
+	/** When the worker started the read. */
+	startedAt: string;
+	/** What the read found, or why it stopped. */
+	detail: string | null;
+}
+
+export function parseDumpProgress(value: unknown): DumpProgress | null {
+	if (!value || typeof value !== "object") return null;
+	const v = value as Record<string, unknown>;
+	if (typeof v.step !== "string" || !isDumpStep(v.step)) return null;
+	const state = DUMP_PROGRESS_STATES.find((s) => s === v.state);
+	if (!state || typeof v.startedAt !== "string") return null;
+	return {
+		step: v.step,
+		state,
+		withMap: v.withMap === true,
+		startedAt: v.startedAt,
+		detail: typeof v.detail === "string" ? v.detail : null,
+	};
+}
+
 export interface RowTable {
 	columns: string[];
 	rows: unknown[][];

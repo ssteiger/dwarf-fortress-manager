@@ -64,7 +64,7 @@ Import a world's exports and `/legends` becomes a reader for its history: a worl
 - **Ask how to…** next to the search (⌘J / Ctrl+J) opens a sidebar where a language model answers questions about playing, with a summary of your fortress attached: population, stocks, workshops, the job queue and what the app itself flags. DFHack commands it suggests (`workorder ConstructBed 10`, `orders import library/basic`, ...) show up as cards you can copy, or run after reading and confirming them. Needs the model settings below.
 - **Alerts**: while the app is open in a tab it watches the fortress and speaks up about deaths, threats, strange moods, births, arrivals and more. Choose which in Settings.
 - **Walking dwarves**: your citizens potter along the bottom of the window. Knock them over with the cursor, or turn them off in Settings.
-- **Refresh** at the top right reads the game now. Useful with automatic reads turned off.
+- **Refresh** at the top right reads the game now and opens a window that follows the read step by step: waiting for the worker, dwarves, items, buildings and the rest, then what it found or why it stopped. Useful with automatic reads turned off.
 - **Settings** `/settings`: look, text size and motion; alerts; how often the game is read, or only on refresh; whether guides run DFHack commands in one click or show them to copy; the worker's connection status and recent commands; legends worlds and the narrator.
 - **Worker logs** `/activity-logs`: the worker's own log lines.
 
@@ -74,7 +74,7 @@ Import a world's exports and `/legends` becomes a reader for its history: a worl
 
 On start the worker copies [fortress-snapshot.lua](apps/worker/src/dfhack/fortress-snapshot.lua) into the game's `dfhack-config/` folder. It then runs the script over DFHack's remote console on the schedule chosen in **Settings → Game connection** (every 30 s by default, or only when asked); the script walks units, items, buildings, jobs and announcements and writes one JSON file, which the worker reads back into Postgres. The map is included at most every `DF_MAP_POLL_MS`. Each dump pauses the game while it runs: a couple of seconds for a young fort, longer as units and items pile up. The worker logs how long each one took, and Settings shows the last one.
 
-The refresh button at the top right of every page asks for a dump now, whatever the schedule. The schedule and the requests live in the single-row `fort_worker` table, which the worker checks every `DF_COMMAND_POLL_MS`, so changes apply without a restart.
+The refresh button at the top right of every page asks for a dump now, whatever the schedule. The schedule and the requests live in the single-row `fort_worker` table, which the worker checks every `DF_COMMAND_POLL_MS`, so changes apply without a restart. While the script runs it writes the part it is on to `<dump>.progress` next to the dump; the worker follows that file and keeps the step in `fort_worker.dump_progress`, which the refresh window shows while the game is paused.
 
 Units carry more than the columns suggest: `look` holds everything the game's layered graphics read (tissues, appearance modifiers, body parts, worn items), so the web app can draw each dwarf the way the game does, and `sheet` holds what the game's unit screens show (attributes, every skill with experience, needs, preferences, dreams, memories, relationships, gods, groups, wounds, work details).
 
@@ -173,7 +173,7 @@ fortress/
 | `fort_map` | worker | One row: the last map dump, run-length encoded per 16×16 block. |
 | `fort_events` | worker | Every announcement ever seen, append-only, keyed per save and site. |
 | `fort_commands` | web, then worker | The command queue described above. |
-| `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers and a heartbeat (worker). |
+| `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers, the progress of the latest read and a heartbeat (worker). |
 | `fort_unit_notes` | web | Each player's role-play notes per fortress and unit. |
 | `legends_worlds`, `legends_imports`, `legends_records` | worker | Imported legends exports, one generic JSON record per element. |
 | `legends_notes` | web | Each player's legends journal. |

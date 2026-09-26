@@ -1,12 +1,13 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { FortDumpPayload } from '@fortress/db-drizzle'
+import { type DumpStep, type FortDumpPayload, dumpSteps } from '@fortress/db-drizzle'
 import type { Config } from '../config'
 import { DfhackError, runDfhackCommand } from './rpc'
 
 const SCRIPT_NAME = 'fortress-snapshot.lua'
 const FAST_DUMP_NAME = 'fortress-dump.json'
 const MAP_DUMP_NAME = 'fortress-dump-map.json'
+const PROGRESS_POLL_MS = 250
 
 /** The Lua source ships next to this file; the worker always runs from apps/worker. */
 const scriptSource =
@@ -34,15 +35,57 @@ export async function installSnapshotScript(config: Config): Promise<boolean> {
 }
 
 /**
+ * Follow the step the script writes next to its dump. Steps only move
+ * forward, so a slow read of the file never takes the progress back.
+ */
+function watchProgress(
+  filePath: string,
+  withMap: boolean,
+  onStep: (step: DumpStep) => Promise<void>,
+): { stop: () => Promise<void> } {
+  const order = dumpSteps(withMap)
+  let reached = order.indexOf('game')
+  let stopped = false
+  let reported = Promise.resolve()
+  const check = async (last: boolean) => {
+    const text = await fs.readFile(filePath, 'utf8').catch(() => '')
+    if (stopped && !last) return
+    const index = order.indexOf(text.trim() as DumpStep)
+    if (index <= reached) return
+    reached = index
+    const step = order[index]
+    reported = reported.then(() => onStep(step))
+  }
+  const timer = setInterval(() => void check(false), PROGRESS_POLL_MS)
+  return {
+    stop: async () => {
+      stopped = true
+      clearInterval(timer)
+      await check(true)
+      await reported
+      await fs.rm(filePath, { force: true }).catch(() => {})
+    },
+  }
+}
+
+/**
  * Ask the running game to write a dump file, then read it back.
  * The map is optional because it takes a few seconds of game time.
+ * `onStep` hears each part the script moves on to while the game is paused.
  */
 export async function takeDump(
   config: Config,
-  { withMap }: { withMap: boolean },
+  {
+    withMap,
+    onStep = async () => {},
+  }: { withMap: boolean; onStep?: (step: DumpStep) => Promise<void> },
 ): Promise<DumpOutcome> {
   const fileName = withMap ? MAP_DUMP_NAME : FAST_DUMP_NAME
   const relativeOut = `dfhack-config/${fileName}`
+  const progressPath = path.join(config.gameDir, `${relativeOut}.progress`)
+  await fs.rm(progressPath, { force: true }).catch(() => {})
+  const progress = watchProgress(progressPath, withMap, onStep)
+
   let lines: string[]
   try {
     lines = await runDfhackCommand(
@@ -55,6 +98,8 @@ export async function takeDump(
       return { kind: 'offline', error: err.message }
     }
     return { kind: 'error', error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    await progress.stop()
   }
 
   const status = lines

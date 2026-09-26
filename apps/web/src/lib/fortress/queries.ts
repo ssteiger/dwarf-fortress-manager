@@ -16,12 +16,17 @@ export const FORT_SLOW_REFRESH_MS = 20_000
 
 export const DUMP_STATE_KEY = ['fort', 'dump']
 
-/** When the worker reads the game; polled every second while a read is on its way. */
-export function useDumpState() {
+/**
+ * When the worker reads the game; polled every second while a read is on its
+ * way, twice as often with `watch` so each step shows. `paused` holds off
+ * while a request is being sent, so a poll from before it cannot answer it.
+ */
+export function useDumpState({ watch = false, paused = false } = {}) {
   return useQuery({
     queryKey: DUMP_STATE_KEY,
     queryFn: () => getDumpState(),
-    refetchInterval: (query) => (query.state.data?.pending ? 1_000 : FORT_SLOW_REFRESH_MS),
+    refetchInterval: (query) =>
+      paused ? false : query.state.data?.pending ? (watch ? 500 : 1_000) : FORT_SLOW_REFRESH_MS,
   })
 }
 

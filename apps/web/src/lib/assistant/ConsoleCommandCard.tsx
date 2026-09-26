@@ -1,3 +1,4 @@
+import { checkConsoleCommand, MAX_CONSOLE_COMMAND } from '@fortress/db-drizzle/fortress-types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -8,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
+  Textarea,
 } from '@fortress/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -43,6 +45,8 @@ export function ConsoleCommandCard({
   const client = useQueryClient()
   const [runId, setRunId] = React.useState<number | null>(null)
   const [confirming, setConfirming] = React.useState(false)
+  const [draft, setDraft] = React.useState(command)
+  const draftProblem = checkConsoleCommand(draft)
 
   const run = useQuery({
     queryKey: ['assistant', 'console-run', runId],
@@ -54,7 +58,7 @@ export function ConsoleCommandCard({
     },
   })
   const queue = useMutation({
-    mutationFn: () => queueConsoleCommand({ data: { command } }),
+    mutationFn: (next: string) => queueConsoleCommand({ data: { command: next } }),
     onSuccess: ({ id, reused }) => {
       if (reused) toast.message('That command is already on its way.')
       setRunId(id)
@@ -99,7 +103,10 @@ export function ConsoleCommandCard({
           <Button
             size="sm"
             className="h-7 gap-1.5"
-            onClick={() => setConfirming(true)}
+            onClick={() => {
+              setDraft(command)
+              setConfirming(true)
+            }}
             disabled={busy}
           >
             {busy ? (
@@ -140,16 +147,38 @@ export function ConsoleCommandCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Run this in DFHack?</AlertDialogTitle>
             <AlertDialogDescription>
-              The app runs exactly this line in DFHack's console. It cannot check what the command
-              does to your game, so read it first.
+              The app runs exactly this line in DFHack's console. Change it if you need to. It
+              cannot check what the command does to your game, so read it first.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <pre className="max-h-48 overflow-auto rounded-md bg-muted p-3 font-mono text-sm break-all whitespace-pre-wrap">
-            {command}
-          </pre>
+          <Textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.preventDefault()
+            }}
+            spellCheck={false}
+            maxLength={MAX_CONSOLE_COMMAND}
+            rows={3}
+            aria-label="DFHack command"
+            aria-invalid={draftProblem ? true : undefined}
+            className="max-h-48 font-mono text-sm"
+          />
+          {draftProblem ? <p className="text-sm text-destructive">{draftProblem}</p> : null}
           <AlertDialogFooter>
             <AlertDialogCancel>Not now</AlertDialogCancel>
-            <AlertDialogAction onClick={() => queue.mutate()}>Run it</AlertDialogAction>
+            <AlertDialogAction
+              disabled={!!draftProblem || queue.isPending}
+              onClick={(event) => {
+                if (checkConsoleCommand(draft)) {
+                  event.preventDefault()
+                  return
+                }
+                queue.mutate(draft.trim())
+              }}
+            >
+              Run it
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

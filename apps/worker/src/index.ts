@@ -1,10 +1,22 @@
-import { WORKER_HEARTBEAT_MS } from '@fortress/db-drizzle'
+import {
+  type DumpProgressState,
+  type DumpStep,
+  type FortDumpPayload,
+  WORKER_HEARTBEAT_MS,
+} from '@fortress/db-drizzle'
 import { config } from './config'
 import { installSnapshotScript, takeDump } from './dfhack/dump'
 import { installNicknameScript } from './dfhack/nickname'
 import { installUnitActionScript } from './dfhack/unit-action'
 import { processPendingCommands, recoverInterruptedCommands } from './fortress/commands'
-import { type DumpSchedule, answerDumpRequests, markAlive, readSchedule } from './fortress/schedule'
+import {
+  type DumpSchedule,
+  answerDumpRequests,
+  clearInterruptedDumpProgress,
+  markAlive,
+  readSchedule,
+  setDumpProgress,
+} from './fortress/schedule'
 import { readStatus, storeLiveDump, storeMap, storeStatus } from './fortress/store'
 import { scanAndImportLegends } from './legends/import'
 import { logger } from './utils/logger'
@@ -32,6 +44,7 @@ let lastMapAt = 0
 let lastStatus: string | null = null
 let lastSchedule: string | null = null
 let scheduleUnreadable = false
+let progressUnwritable = false
 
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -92,18 +105,52 @@ async function tick(): Promise<void> {
   }
 }
 
+/** What the app shows once a read has landed. */
+function describeLiveDump(payload: FortDumpPayload, elapsedMs: number, newEvents: number): string {
+  const counts = [
+    `${payload.units?.rows.length ?? 0} units`,
+    `${payload.items?.rows.length ?? 0} items`,
+    `${payload.buildings?.rows.length ?? 0} buildings`,
+  ].join(', ')
+  const name = payload.world?.site_name
+  let text = `${name ? `${name}: ${counts}` : counts}${payload.map ? ', and the map' : ''}.`
+  text += ` The game was paused for ${(elapsedMs / 1000).toFixed(1)} s.`
+  if (newEvents) text += ` ${newEvents} new ${newEvents === 1 ? 'announcement' : 'announcements'}.`
+  return text
+}
+
 async function pollOnce(): Promise<void> {
+  const mapDue = Date.now() - lastMapAt >= config.mapPollMs
+  const startedAt = new Date().toISOString()
+  let step: DumpStep = 'game'
+  const report = async (state: DumpProgressState, detail: string | null = null) => {
+    try {
+      await setDumpProgress({ step, state, withMap: mapDue, startedAt, detail })
+      progressUnwritable = false
+    } catch (err) {
+      if (!progressUnwritable)
+        console.error(`Could not record dump progress: ${describeError(err)}`)
+      progressUnwritable = true
+    }
+  }
+  const reach = (next: DumpStep) => {
+    step = next
+    return report('running')
+  }
+
   try {
-    const mapDue = Date.now() - lastMapAt >= config.mapPollMs
-    const outcome = await takeDump(config, { withMap: mapDue })
+    await reach('game')
+    const outcome = await takeDump(config, { withMap: mapDue, onStep: reach })
 
     if (outcome.kind === 'live') {
+      await reach('store')
       const { payload } = outcome
       const { newEvents } = await storeLiveDump(payload, outcome.elapsedMs)
       if (payload.map) {
         await storeMap(payload)
         lastMapAt = Date.now()
       }
+      await report('done', describeLiveDump(payload, outcome.elapsedMs, newEvents))
       const label = `${payload.world?.site_name ?? 'fortress'} · ${payload.units?.rows.length ?? 0} units, ${payload.items?.rows.length ?? 0} items${payload.map ? `, ${payload.map.blocks.length} map blocks` : ''}`
       console.log(
         `[${new Date().toLocaleTimeString()}] dump ok (${(outcome.bytes / 1024).toFixed(0)} KB, game paused ${outcome.elapsedMs} ms): ${label}${newEvents ? `, ${newEvents} new announcements` : ''}`,
@@ -115,6 +162,7 @@ async function pollOnce(): Promise<void> {
 
     if (outcome.kind === 'menu') {
       await storeStatus('menu', null)
+      await report('menu')
       if (lastStatus !== 'menu') {
         console.log('Game is running but no fortress is loaded.')
         await logger.info('Fortress worker: game is on a menu, waiting for a fortress to load')
@@ -125,6 +173,7 @@ async function pollOnce(): Promise<void> {
 
     if (outcome.kind === 'offline') {
       await storeStatus('offline', outcome.error)
+      await report('offline', outcome.error)
       if (lastStatus !== 'offline') {
         console.log(
           `Dwarf Fortress is not reachable on ${config.dfhackHost}:${config.dfhackPort} (${outcome.error})`,
@@ -136,12 +185,14 @@ async function pollOnce(): Promise<void> {
     }
 
     await storeStatus('offline', outcome.error)
+    await report('error', outcome.error)
     console.error(`Dump failed: ${outcome.error}`)
     if (lastStatus !== 'error')
       await logger.error(`Fortress worker: dump failed (${outcome.error})`)
     lastStatus = 'error'
   } catch (err) {
     console.error('Poll failed:', err)
+    await report('error', describeError(err))
     await logger.error(`Fortress worker: poll failed (${describeError(err)})`).catch(() => {})
   } finally {
     lastDumpAt = Date.now()
@@ -172,6 +223,9 @@ async function startWorker() {
   }
 
   await recoverInterruptedCommands()
+  await clearInterruptedDumpProgress().catch((err) => {
+    console.error('Could not clear an interrupted dump:', describeError(err))
+  })
   lastStatus = await readStatus().catch(() => null)
 
   await tick()
