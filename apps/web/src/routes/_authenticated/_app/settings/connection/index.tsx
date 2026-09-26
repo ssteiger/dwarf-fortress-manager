@@ -1,4 +1,10 @@
-import { DFHACK_ACTIONS, type DfhackActionSpec } from '@fortress/db-drizzle/fortress-types'
+import {
+  DFHACK_ACTIONS,
+  type DfhackActionSpec,
+  UNIT_ACTIONS,
+  isDfhackAction,
+  isUnitAction,
+} from '@fortress/db-drizzle/fortress-types'
 import {
   Alert,
   AlertDescription,
@@ -175,7 +181,9 @@ function StatusSection({ data }: { data: ConnectionStatus }) {
 
 function commandLabel(c: WorkerCommand, names: Map<number, string>): React.ReactNode {
   if (c.kind === 'dfhack') {
-    const spec: DfhackActionSpec | undefined = c.action ? DFHACK_ACTIONS[c.action] : undefined
+    const spec: DfhackActionSpec | undefined = isDfhackAction(c.action)
+      ? DFHACK_ACTIONS[c.action]
+      : undefined
     return spec ? spec.label : `DFHack: ${c.action ?? 'unknown'}`
   }
   const who =
@@ -190,6 +198,21 @@ function commandLabel(c: WorkerCommand, names: Map<number, string>): React.React
     ) : (
       'a dwarf'
     )
+  if (c.kind === 'unit_action') {
+    if (c.action === 'title')
+      return c.arg ? (
+        <>
+          Titled {who} “{c.arg}”
+        </>
+      ) : (
+        <>Cleared the title of {who}</>
+      )
+    return (
+      <>
+        {isUnitAction(c.action) ? UNIT_ACTIONS[c.action].label : c.action}: {who}
+      </>
+    )
+  }
   return c.nickname ? (
     <>
       Nicknamed {who} “{c.nickname}”

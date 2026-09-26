@@ -13,7 +13,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 7
+local DUMP_VERSION = 8
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -191,7 +191,7 @@ local UNIT_COLUMNS = arr{
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
     'hist_figure_id', 'civ_id', 'race_id', 'caste_id', 'look',
-    'traits', 'values', 'thoughts',
+    'traits', 'values', 'thoughts', 'sheet',
 }
 
 local UNIT_FLAG_CHECKS = {
@@ -334,6 +334,27 @@ local function unit_inventory(u)
         end
     end
     return inv
+end
+
+-- Syndromes such as inebriation register as painless wounds that damage
+-- nothing. They are not injuries.
+local function is_syndrome_effect(w)
+    if w.syndrome_id < 0 or w.pain > 0 or w.flags.whole ~= 0 then return false end
+    for _, p in ipairs(w.parts) do
+        if p.flags1.whole ~= 0 or p.flags2.whole ~= 0 or #p.effect_type > 0
+            or p.bleeding > 0 or p.pain > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+local function injury_count(u)
+    local n = 0
+    for _, w in ipairs(u.body.wounds) do
+        if not try(is_syndrome_effect, w) then n = n + 1 end
+    end
+    return n
 end
 
 local function unit_positions(u)
@@ -756,6 +777,453 @@ local function unit_look(u, craw)
     return {error = tostring(res)}
 end
 
+-- ---------------------------------------------------------------------------
+-- Unit sheet: what the game's unit screens show beyond the columns above
+-- (attributes, needs, preferences, dreams, memories, people, gods, groups,
+-- wounds, labors), for the web app's character pages. Each section is read
+-- on its own, so a failure empties that section and keeps the rest.
+-- ---------------------------------------------------------------------------
+
+local function nonempty(s)
+    if s == nil or s == '' then return nil end
+    return s
+end
+
+local function hf_find(hfid)
+    if hfid == nil or hfid < 0 then return nil end
+    return df.historical_figure.find(hfid)
+end
+
+local function race_label(race)
+    local craw = df.creature_raw.find(race)
+    return craw and craw.name[0] or nil
+end
+
+-- [token, 'P' or 'M', effective value, potential, the caste's 7 range cutoffs].
+local function sheet_attributes(u, caste)
+    local out = arr{}
+    local function add(kind, enum, value_of, attrs, ranges)
+        for i = enum._first_item, enum._last_item do
+            local r = ranges[i]
+            out[#out + 1] = arr{
+                enum[i], kind, value_of(u, i), attrs[i].max_value,
+                arr{r[0], r[1], r[2], r[3], r[4], r[5], r[6]},
+            }
+        end
+    end
+    add('P', df.physical_attribute_type, dfhack.units.getPhysicalAttrValue,
+        u.body.physical_attrs, caste.attributes.phys_att_range)
+    local soul = u.status.current_soul
+    if soul then
+        add('M', df.mental_attribute_type, dfhack.units.getMentalAttrValue,
+            soul.mental_attrs, caste.attributes.ment_att_range)
+    end
+    return out
+end
+
+-- Every skill with any rating or experience: [token, rating, experience
+-- toward the next level, rust, skill class, whether its labor is enabled
+-- (null for skills without one)].
+local function sheet_skills(u)
+    local out = arr{}
+    local soul = u.status.current_soul
+    if not soul then return out end
+    local list = {}
+    for _, sk in ipairs(soul.skills) do
+        if sk.rating > 0 or sk.experience > 0 then
+            local attrs = df.job_skill.attrs[sk.id]
+            local enabled = nil
+            if attrs.labor ~= nil and attrs.labor >= 0 then
+                enabled = u.status.labors[attrs.labor] == true
+            end
+            list[#list + 1] = {
+                enum_name(df.job_skill, sk.id),
+                sk.rating,
+                sk.experience,
+                sk.rusty,
+                enum_name(df.job_skill_class, attrs.type),
+                enabled,
+            }
+        end
+    end
+    table.sort(list, function(a, b)
+        if a[2] ~= b[2] then return a[2] > b[2] end
+        return a[3] > b[3]
+    end)
+    for i = 1, math.min(#list, 60) do out[i] = row(table.unpack(list[i], 1, 6)) end
+    return out
+end
+
+-- [need token, focus level, how fast it drains, deity name for prayer].
+local function sheet_needs(pers)
+    local out = arr{}
+    for _, need in ipairs(pers.needs) do
+        local deity = need.deity_id >= 0 and hf_find(need.deity_id) or nil
+        out[#out + 1] = row(
+            enum_name(df.need_type, need.id),
+            need.focus_level,
+            need.need_level,
+            deity and nonempty(translate(deity.name, false)) or nil
+        )
+    end
+    table.sort(out, function(a, b) return a[2] < b[2] end)
+    return out
+end
+
+-- "beet plant plant" -> "beet plant".
+local function mat_label(mattype, matindex)
+    local info = try(dfhack.matinfo.decode, mattype, matindex)
+    local name = info and try(function() return info:toString() end)
+    return name and (name:gsub('(%a+) %1$', '%1')) or nil
+end
+
+local function pluralize(noun)
+    if noun:match('s$') then return noun end
+    if noun:match('[xz]$') or noun:match('[cs]h$') then return noun .. 'es' end
+    if noun:match('[^aeiou]y$') then return noun:sub(1, -2) .. 'ies' end
+    return noun .. 's'
+end
+
+local function item_type_label(item_type, subtype, plural)
+    if subtype ~= nil and subtype >= 0 then
+        local def = try(dfhack.items.getSubtypeDef, item_type, subtype)
+        local name = def and try(function() return plural and def.name_plural or def.name end)
+        if name and name ~= '' then return name end
+    end
+    local caption = try(function() return df.item_type.attrs[item_type].caption end)
+        or (enum_name(df.item_type, item_type) or ''):lower():gsub('_', ' ')
+    if caption == '' then return nil end
+    return plural and pluralize(caption) or caption
+end
+
+local function art_form_label(list, id)
+    local form = try(function() return list[id] end)
+    return form and nonempty(translate(form.name, true)) or nil
+end
+
+-- [kind, what they like, in words].
+local function sheet_preferences(soul)
+    local out = arr{}
+    local raws = df.global.world.raws
+    for _, p in ipairs(soul.preferences) do
+        local kind = enum_name(df.unitpref_type, p.type)
+        local text
+        if kind == 'LikeMaterial' then
+            text = mat_label(p.mattype, p.matindex)
+        elseif kind == 'LikeFood' then
+            local mat = mat_label(p.mattype, p.matindex)
+            local what = item_type_label(p.item_type, p.item_subtype, false)
+            text = mat and ((what == 'meat' or what == 'fish') and (mat .. ' (' .. what .. ')') or mat) or what
+        elseif kind == 'LikeCreature' or kind == 'HateCreature' then
+            text = try(function() return raws.creatures.all[p.creature_id].name[1] end)
+        elseif kind == 'LikeItem' then
+            text = item_type_label(p.item_type, p.item_subtype, true)
+        elseif kind == 'LikePlant' or kind == 'LikeTree' then
+            text = try(function() return raws.plants.all[p.plant_id].name_plural end)
+        elseif kind == 'LikeColor' then
+            text = try(function() return raws.descriptors.colors[p.color_id].name end)
+        elseif kind == 'LikeShape' then
+            text = try(function() return raws.descriptors.shapes[p.shape_id].name_plural end)
+        elseif kind == 'LikePoeticForm' then
+            text = art_form_label(df.global.world.poetic_forms.all, p.poetic_form_id)
+        elseif kind == 'LikeMusicalForm' then
+            text = art_form_label(df.global.world.musical_forms.all, p.musical_form_id)
+        elseif kind == 'LikeDanceForm' then
+            text = art_form_label(df.global.world.dance_forms.all, p.dance_form_id)
+        end
+        if kind and text and text ~= '' then out[#out + 1] = arr{kind, text} end
+    end
+    return out
+end
+
+-- [goal token, realised, the game's short name].
+local function sheet_dreams(pers)
+    local out = arr{}
+    for _, d in ipairs(pers.dreams) do
+        out[#out + 1] = row(
+            enum_name(df.goal_type, d.type),
+            d.flags.accomplished == true,
+            try(function() return df.goal_type.attrs[d.type].short_name end)
+        )
+    end
+    return out
+end
+
+-- Short- and long-term memories: [thought, emotion, strength, year, tick,
+-- 'short' | 'long'], plus core memories that changed who they are:
+-- [thought, emotion, year, tick, facet, old, new, value, old, new].
+local function sheet_memories(pers)
+    local out, core = arr{}, arr{}
+    local mem = pers.memories
+    if not mem then return out, core end
+    local function add(slot, kind)
+        for i = 0, 7 do
+            local m = try(function() return slot[i] end)
+            local thought = m and enum_name(df.unit_thought_type, m.thought)
+            if thought and thought ~= 'None' and thought ~= '-1' then
+                out[#out + 1] = row(
+                    thought, enum_name(df.emotion_type, m.type) or '',
+                    m.strength, m.year, m.year_tick, kind
+                )
+            end
+        end
+    end
+    add(mem.shortterm, 'short')
+    add(mem.longterm, 'long')
+    for _, c in ipairs(mem.core_memories) do
+        local m = c.memory
+        local facet = c.changed_facet >= 0 and enum_name(df.personality_facet_type, c.changed_facet) or nil
+        local value = c.changed_value >= 0 and enum_name(df.value_type, c.changed_value) or nil
+        core[#core + 1] = row(
+            enum_name(df.unit_thought_type, m.thought), enum_name(df.emotion_type, m.type) or '',
+            m.year, m.year_tick,
+            facet, facet and c.facet_old or nil, facet and c.facet_new or nil,
+            value, value and c.value_old or nil, value and c.value_new or nil
+        )
+    end
+    return out, core
+end
+
+local function person(hfid, kind)
+    local hf = hf_find(hfid)
+    if not hf then return nil end
+    return {
+        hf = hfid,
+        kind = kind,
+        name = nonempty(translate(hf.name, false)),
+        name_english = nonempty(translate(hf.name, true)),
+        race = race_label(hf.race),
+        sex = hf.sex,
+        alive = hf.died_year == -1,
+        unit = hf.unit_id >= 0 and hf.unit_id or nil,
+    }
+end
+
+-- Family, lovers and masters from the historical figure's links, then
+-- everyone they have formed an opinion of. `kind` is a histfig_hf_link_type
+-- (MOTHER, SPOUSE, ...) or, for opinions, "known" with the game's feelings.
+local function sheet_people(hf)
+    local out = arr{}
+    local seen = {}
+    for _, link in ipairs(hf.histfig_links) do
+        local kind = enum_name(df.histfig_hf_link_type, link:getType())
+        if kind and kind ~= 'DEITY' then
+            local p = person(link.target_hf, kind)
+            if p then
+                seen[link.target_hf] = true
+                out[#out + 1] = p
+            end
+        end
+    end
+    local profiles = try(function() return hf.info.relationships.hf_visual end)
+    if not profiles then return out end
+    local known = {}
+    for _, rel in ipairs(profiles) do
+        local core = rel.core
+        local rank = enum_name(df.vague_relationship_type, rel.rank)
+        local attitude = arr{}
+        for _, a in ipairs(rel.attitude) do attitude[#attitude + 1] = enum_name(df.reputation_type, a) end
+        if core.love ~= 0 or core.trust ~= 0 or core.respect ~= 0 or (rank and rank ~= 'none')
+            or #attitude > 0 or rel.meet_count >= 10 then
+            known[#known + 1] = {rel = rel, rank = rank, attitude = attitude}
+        end
+    end
+    table.sort(known, function(a, b)
+        local la, lb = math.abs(a.rel.core.love), math.abs(b.rel.core.love)
+        if la ~= lb then return la > lb end
+        return a.rel.meet_count > b.rel.meet_count
+    end)
+    local shown = 0
+    for _, k in ipairs(known) do
+        if shown >= 40 then break end
+        local p = person(k.rel.histfig_id, 'known')
+        if p then
+            local core = k.rel.core
+            p.love, p.trust, p.respect, p.loyalty, p.fear = core.love, core.trust, core.respect, core.loyalty, core.fear
+            p.met = k.rel.meet_count
+            p.rank = k.rank ~= 'none' and k.rank or nil
+            p.attitude = k.attitude
+            p.family = seen[k.rel.histfig_id] or nil
+            out[#out + 1] = p
+            shown = shown + 1
+        end
+    end
+    return out
+end
+
+-- [name, worship strength, spheres].
+local function sheet_deities(hf)
+    local out = arr{}
+    for _, link in ipairs(hf.histfig_links) do
+        if link:getType() == df.histfig_hf_link_type.DEITY then
+            local god = hf_find(link.target_hf)
+            if god then
+                local spheres = arr{}
+                local list = try(function() return god.info.metaphysical.spheres end)
+                if list then
+                    for _, s in ipairs(list) do spheres[#spheres + 1] = enum_name(df.sphere_type, s) end
+                end
+                out[#out + 1] = row(nonempty(translate(god.name, false)) or '?', link.link_strength, spheres)
+            end
+        end
+    end
+    table.sort(out, function(a, b) return a[2] > b[2] end)
+    return out
+end
+
+-- Religions, guilds, troupes, companies and civilizations: [name, entity type, link type].
+local function sheet_groups(hf)
+    local out = arr{}
+    for _, link in ipairs(hf.entity_links) do
+        local ltype = enum_name(df.histfig_entity_link_type, link:getType())
+        local ent = df.historical_entity.find(link.entity_id)
+        if ent and ltype then
+            local etype = enum_name(df.historical_entity_type, ent.type)
+            local name = nonempty(translate(ent.name, true))
+            if name and etype ~= 'MigratingGroup' and etype ~= 'NomadicGroup' and etype ~= 'VesselCrew' then
+                out[#out + 1] = arr{name, etype, ltype}
+            end
+        end
+    end
+    return out
+end
+
+local WOUND_LAYER_WORDS = {
+    {'cut', 'cut open'}, {'smashed', 'smashed open'}, {'broken', 'broken'},
+    {'edged_shake1', 'torn'}, {'joint_bend1', 'bent out of shape'}, {'gouged', 'gouged'},
+    {'tendon_bruised', 'tendon bruised'}, {'tendon_strained', 'tendon strained'},
+    {'tendon_torn', 'tendon torn'}, {'ligament_bruised', 'ligament bruised'},
+    {'ligament_sprained', 'ligament sprained'}, {'ligament_torn', 'ligament torn'},
+    {'motor_nerve_severed', 'motor nerve severed'}, {'sensory_nerve_severed', 'sensory nerve severed'},
+    {'major_artery', 'major artery opened'}, {'artery', 'artery opened'},
+    {'guts_spilled', 'guts spilled'}, {'compound_fracture', 'compound fracture'},
+    {'overlapping_fracture', 'overlapping fracture'},
+}
+local WOUND_SCAR_FLAGS = {
+    'scar_cut', 'scar_smashed', 'scar_edged_shake1', 'scar_broken', 'scar_blunt_shake1', 'scar_joint_bend1',
+}
+local WOUND_FLAG_WORDS = {
+    {'severed_part', 'severed'}, {'infection', 'infected'}, {'stuck_weapon', 'something stuck in it'},
+    {'sutured', 'sutured'}, {'diagnosed', 'diagnosed'},
+}
+
+-- One entry per wound: {parts = body part names, damage = words, flags =
+-- words, pain, bleeding, syndrome = its name, effect = true when the
+-- syndrome is all there is to it}.
+local function sheet_wounds(u)
+    local out = arr{}
+    local bps = try(function() return u.body.body_plan.body_parts end)
+    for _, w in ipairs(u.body.wounds) do
+        local parts, damage, flags = arr{}, arr{}, arr{}
+        local seen = {}
+        local function add(list, word)
+            if word and not seen[word] then
+                seen[word] = true
+                list[#list + 1] = word
+            end
+        end
+        local bleeding = 0
+        for _, part in ipairs(w.parts) do
+            add(parts, try(function() return bps[part.body_part_id].name_singular[0].value end))
+            for _, pair in ipairs(WOUND_LAYER_WORDS) do
+                if try(function() return part.flags1[pair[1]] end) then add(damage, pair[2]) end
+            end
+            for _, e in ipairs(part.effect_type) do
+                local name = enum_name(df.wound_effect_type, e)
+                if name and name ~= 'NONE' then add(damage, name:lower()) end
+            end
+            if try(function() return part.flags2.needs_setting end) then add(damage, 'needs setting') end
+            for _, s in ipairs(WOUND_SCAR_FLAGS) do
+                if try(function() return part.flags1[s] end) then add(damage, 'scarred') end
+            end
+            bleeding = bleeding + (part.bleeding or 0)
+        end
+        for _, pair in ipairs(WOUND_FLAG_WORDS) do
+            if try(function() return w.flags[pair[1]] end) then add(flags, pair[2]) end
+        end
+        local syn = w.syndrome_id >= 0 and df.syndrome.find(w.syndrome_id) or nil
+        out[#out + 1] = {
+            parts = parts, damage = damage, flags = flags,
+            pain = w.pain, bleeding = bleeding,
+            syndrome = syn and nonempty(syn.syn_name) or nil,
+            effect = is_syndrome_effect(w) or nil,
+        }
+        if #out >= 30 then break end
+    end
+    return out
+end
+
+local function sheet_syndromes(u)
+    local out, seen = arr{}, {}
+    for _, us in ipairs(u.syndromes.active) do
+        local syn = df.syndrome.find(us.type)
+        local name = syn and nonempty(syn.syn_name)
+        if name and not seen[name] then
+            seen[name] = true
+            out[#out + 1] = name
+        end
+    end
+    return out
+end
+
+local function sheet_work_details(u)
+    local out = arr{}
+    for _, wd in ipairs(df.global.plotinfo.labor_info.work_details) do
+        for _, id in ipairs(wd.assigned_units) do
+            if id == u.id then
+                out[#out + 1] = wd.name
+                break
+            end
+        end
+    end
+    return out
+end
+
+local function unit_sheet_inner(u, craw)
+    local caste = try(function() return craw.caste[u.caste] end)
+    local soul = u.status.current_soul
+    local pers = soul and soul.personality
+    local hf = hf_find(u.hist_figure_id)
+    local sheet = {
+        attributes = caste and try(sheet_attributes, u, caste) or arr{},
+        skills = try(sheet_skills, u) or arr{},
+        needs = pers and try(sheet_needs, pers) or arr{},
+        preferences = soul and try(sheet_preferences, soul) or arr{},
+        dreams = pers and try(sheet_dreams, pers) or arr{},
+        people = hf and try(sheet_people, hf) or arr{},
+        deities = hf and try(sheet_deities, hf) or arr{},
+        groups = hf and try(sheet_groups, hf) or arr{},
+        wounds = try(sheet_wounds, u) or arr{},
+        syndromes = try(sheet_syndromes, u) or arr{},
+        work_details = try(sheet_work_details, u) or arr{},
+        birth = (u.birth_year >= 0) and arr{u.birth_year, math.max(u.birth_time, 0)} or nil,
+        kills = try(dfhack.units.getKillCount, u),
+        pregnant = (try(function() return u.pregnancy_timer end) or 0) > 0 or nil,
+        custom_profession = nonempty(try(function() return u.custom_profession end)),
+        squad_position = u.military.squad_id >= 0 and u.military.squad_position or nil,
+    }
+    if pers then
+        local ok, memories, core = pcall(sheet_memories, pers)
+        sheet.memories = ok and memories or arr{}
+        sheet.core_memories = ok and core or arr{}
+        sheet.focus = try(function()
+            if pers.undistracted_focus <= 0 then return nil end
+            return math.floor(pers.current_focus * 100 / pers.undistracted_focus + 0.5)
+        end)
+        sheet.longterm_stress = try(function() return pers.longterm_stress end)
+        sheet.combat_hardened = try(function() return pers.combat_hardened end)
+        sheet.likes_outdoors = try(function() return pers.likes_outdoors end)
+    end
+    return sheet
+end
+
+local function unit_sheet(u, craw)
+    if not craw then return nil end
+    local ok, res = pcall(unit_sheet_inner, u, craw)
+    if ok then return res end
+    return {error = tostring(res)}
+end
+
 local function unit_row(u)
     local x, y, z = dfhack.units.getPosition(u)
     local soul = u.status.current_soul
@@ -776,6 +1244,7 @@ local function unit_row(u)
     local race_id = craw and craw.creature_id or nil
     local caste_id = try(function() return craw.caste[u.caste].caste_id end)
     local visible_name = dfhack.units.getVisibleName(u)
+    local traits, values, thoughts = unit_mind(u)
     return row(
         u.id,
         translate(visible_name, false),
@@ -794,7 +1263,7 @@ local function unit_row(u)
         job and try(dfhack.job.getName, job) or nil,
         u.military.squad_id,
         squad_name,
-        #u.body.wounds,
+        injury_count(u),
         try(function() return u.body.blood_count end),
         try(function() return u.body.blood_max end),
         try(function() return u.counters2.hunger_timer end) or 0,
@@ -810,7 +1279,8 @@ local function unit_row(u)
         race_id,
         caste_id,
         unit_look(u, craw),
-        unit_mind(u)
+        traits, values, thoughts,
+        unit_sheet(u, craw)
     )
 end
 
@@ -1147,7 +1617,7 @@ local function collect_summary(units_rows, item_count, building_count, announcem
                 local cat = dfhack.units.getStressCategory(u)
                 s.mood[cat + 1] = (s.mood[cat + 1] or 0) + 1
                 if cat <= 1 then stressed[#stressed + 1] = dfhack.units.getReadableName(u) end
-                if #u.body.wounds > 0 then injured[#injured + 1] = dfhack.units.getReadableName(u) end
+                if injury_count(u) > 0 then injured[#injured + 1] = dfhack.units.getReadableName(u) end
             elseif dfhack.units.isInvader(u) or (try(dfhack.units.isDanger, u) and not dfhack.units.isFortControlled(u)) then
                 s.hostiles = s.hostiles + 1
             elseif dfhack.units.isMerchant(u) then

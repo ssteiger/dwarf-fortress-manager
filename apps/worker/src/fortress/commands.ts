@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm'
 import type { Config } from '../config'
 import { runDfhackAction } from '../dfhack/actions'
 import { setUnitNickname } from '../dfhack/nickname'
+import { runUnitAction } from '../dfhack/unit-action'
 
 const COMMAND_BATCH_SIZE = 100
 
@@ -15,8 +16,9 @@ export async function recoverInterruptedCommands(): Promise<void> {
 }
 
 /**
- * Apply a bounded batch of queued commands: nicknames and whitelisted DFHack
- * actions. Runs before each snapshot, and on its own short cadence between.
+ * Apply a bounded batch of queued commands: nicknames, whitelisted DFHack
+ * actions and actions on one unit. Runs before each snapshot, and on its own
+ * short cadence between.
  */
 export async function processPendingCommands(config: Config): Promise<number> {
   const pending = await postgres_db
@@ -46,6 +48,8 @@ export async function processPendingCommands(config: Config): Promise<number> {
         await setUnitNickname(config, command.unit_id, command.nickname)
       } else if (command.kind === 'dfhack') {
         output = await runDfhackAction(config, command.action)
+      } else if (command.kind === 'unit_action') {
+        await runUnitAction(config, command.action, command.unit_id, command.arg)
       } else {
         throw new Error(`unknown command kind "${command.kind}"`)
       }

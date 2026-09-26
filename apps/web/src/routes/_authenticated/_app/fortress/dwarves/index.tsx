@@ -57,7 +57,8 @@ import {
   UnitConditionBadges,
 } from '../-components/FortChrome'
 import { ConcernBadges } from '../-components/Insights'
-import { DwarfDetails } from './-components/DwarfDetails'
+import { ShowInGameButton } from './-components/ActionsTab'
+import { DwarfDetails, type DwarfTab } from './-components/DwarfDetails'
 import {
   UnitLinks,
   legendsRefFor,
@@ -111,6 +112,7 @@ function DwarvesPage() {
   const [group, setGroup] = React.useState<Group>('citizen')
   const [showDead, setShowDead] = React.useState(false)
   const [selected, setSelected] = React.useState<FortUnit | null>(null)
+  const [drawerTab, setDrawerTab] = React.useState<DwarfTab>('overview')
   const [view, setView] = useView()
   const now = gameTimeOf(overview.data?.state)
 
@@ -509,11 +511,14 @@ function DwarvesPage() {
                       </DrawerDescription>
                     </div>
                   </div>
-                  <DrawerClose asChild>
-                    <Button size="icon" variant="ghost" aria-label="Close">
-                      <XIcon className="size-4" />
-                    </Button>
-                  </DrawerClose>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {isLiving(selected) ? <ShowInGameButton unit={selected} size="icon" /> : null}
+                    <DrawerClose asChild>
+                      <Button size="icon" variant="ghost" aria-label="Close">
+                        <XIcon className="size-4" />
+                      </Button>
+                    </DrawerClose>
+                  </div>
                 </div>
               </DrawerHeader>
               <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -521,11 +526,17 @@ function DwarvesPage() {
                   unitId={selected.id}
                   compact
                   legends={legendsRefFor(selected, legendsWorldId, knownFigures)}
+                  tab={drawerTab}
+                  onTabChange={setDrawerTab}
                 />
               </div>
               <DrawerFooter className="border-t">
                 <Button asChild>
-                  <Link to="/fortress/dwarves/$id" params={{ id: String(selected.id) }}>
+                  <Link
+                    to="/fortress/dwarves/$id"
+                    params={{ id: String(selected.id) }}
+                    search={drawerTab === 'overview' ? {} : { tab: drawerTab }}
+                  >
                     <Maximize2Icon className="size-4" />
                     Show full page
                   </Link>

@@ -868,11 +868,26 @@ function fill(text: string, unit: FortUnit): string {
     .replace(/\{self\}/g, p.self)
 }
 
+/** "has a temper like a dropped lantern", for a facet far enough from the middle; null otherwise. */
+export function facetPhrase(unit: FortUnit, facet: string, value: number): string | null {
+  const lex = FACETS[facet]
+  if (!lex || (value > 24 && value < 76)) return null
+  return fill((value >= 76 ? lex.high : lex.low)[0], unit)
+}
+
+/** "cannot abide a lie", for a belief held or rejected strongly enough; null otherwise. */
+export function valuePhrase(unit: FortUnit, value: string, strength: number): string | null {
+  const lex = VALUES[value]
+  if (!lex || Math.abs(strength) < 21) return null
+  return fill((strength > 0 ? lex.pos : lex.neg)[0], unit)
+}
+
 function entry(unit: FortUnit, key: string, weight: number, [text, ...names]: Entry): Draft {
   return { key, text: fill(text, unit), weight, names }
 }
 
-function skillLabel(token: string, unit: FortUnit): string {
+/** "engraving stone" for CARVE_STONE: a skill as it reads in a sentence. */
+export function skillLabel(token: string, unit: FortUnit): string {
   return fill(SKILL_LABELS[token] ?? humanize(token).toLowerCase(), unit)
 }
 

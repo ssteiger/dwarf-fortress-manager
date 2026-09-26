@@ -1,6 +1,7 @@
 import { config } from './config'
 import { installSnapshotScript, takeDump } from './dfhack/dump'
 import { installNicknameScript } from './dfhack/nickname'
+import { installUnitActionScript } from './dfhack/unit-action'
 import { processPendingCommands, recoverInterruptedCommands } from './fortress/commands'
 import { readStatus, storeLiveDump, storeMap, storeStatus } from './fortress/store'
 import { scanAndImportLegends } from './legends/import'
@@ -15,7 +16,8 @@ import { logger } from './utils/logger'
  *  3. Every DF_MAP_POLL_MS does the same with the map included.
  *  4. Once, in the background, imports any legends exports found next to the game.
  *  5. Every DF_COMMAND_POLL_MS between dumps, runs commands queued by the web
- *     app (nicknames, whitelisted DFHack actions), then dumps so the result shows.
+ *     app (nicknames, whitelisted DFHack actions, actions on one unit), then
+ *     dumps so the result shows.
  */
 
 let polling = false
@@ -122,20 +124,14 @@ async function startWorker() {
   )
 
   try {
-    const [snapshotRefreshed, nicknameRefreshed] = await Promise.all([
-      installSnapshotScript(config),
-      installNicknameScript(config),
+    const installed = await Promise.all([
+      installSnapshotScript(config).then((fresh) => ['fortress-snapshot.lua', fresh] as const),
+      installNicknameScript(config).then((fresh) => ['set-nickname.lua', fresh] as const),
+      installUnitActionScript(config).then((fresh) => ['unit-action.lua', fresh] as const),
     ])
-    console.log(
-      snapshotRefreshed
-        ? 'Installed fortress-snapshot.lua into dfhack-config/'
-        : 'fortress-snapshot.lua is up to date',
-    )
-    console.log(
-      nicknameRefreshed
-        ? 'Installed set-nickname.lua into dfhack-config/'
-        : 'set-nickname.lua is up to date',
-    )
+    for (const [name, fresh] of installed) {
+      console.log(fresh ? `Installed ${name} into dfhack-config/` : `${name} is up to date`)
+    }
   } catch (err) {
     console.error('Could not install DFHack scripts:', describeError(err))
     await logger.error(`Fortress worker: could not install DFHack scripts (${describeError(err)})`)

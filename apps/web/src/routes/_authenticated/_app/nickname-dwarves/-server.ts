@@ -9,8 +9,6 @@ import { createServerFn } from '@tanstack/react-start'
 import { desc, eq, sql } from 'drizzle-orm'
 
 import { type ModelConfig, complete, readModelConfig } from '~/lib/ai/model'
-import { pronouns } from '~/lib/fortress/insights'
-import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
 import {
   type ChronicleEvent,
   type DwarfFact,
@@ -18,10 +16,12 @@ import {
   type NicknameIdea,
   buildDossiers,
   factIdeas,
-} from './-dossier'
+} from '~/lib/fortress/dossier'
+import { pronouns } from '~/lib/fortress/insights'
+import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
 import { isLivingCitizen, livingCitizens } from './-utils'
 
-export type { NicknameIdea } from './-dossier'
+export type { NicknameIdea } from '~/lib/fortress/dossier'
 
 const SINGLETON_ID = 1
 const MAX_BATCH_SIZE = 250

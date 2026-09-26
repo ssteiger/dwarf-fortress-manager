@@ -1,11 +1,12 @@
 import { Badge } from '@fortress/ui'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { UnitPortrait } from '~/lib/df-assets/components'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
 import { useFortOverview, useFortUnit } from '~/lib/fortress/queries'
 import { FortBreadcrumbs, MoodBadge, PageHeader, StatusBanner } from '../-components/FortChrome'
-import { DwarfDetails } from './-components/DwarfDetails'
+import { ShowInGameButton } from './-components/ActionsTab'
+import { DwarfDetails, type DwarfTab, isDwarfTab } from './-components/DwarfDetails'
 import {
   UnitLinks,
   legendsRefFor,
@@ -22,8 +23,14 @@ const GROUP_EYEBROW = {
   other: 'Creature',
 } as const
 
+interface DwarfSearch {
+  tab?: DwarfTab
+}
+
 function DwarfPage() {
   const { id } = Route.useParams()
+  const { tab } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const numericId = Number.parseInt(id, 10)
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortUnit(numericId)
@@ -88,14 +95,34 @@ function DwarfPage() {
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
-        actions={unit ? <UnitLinks unit={unit} legends={legends} variant="button" /> : null}
+        actions={
+          unit ? (
+            <>
+              {living ? <ShowInGameButton unit={unit} /> : null}
+              <UnitLinks unit={unit} legends={legends} variant="button" />
+            </>
+          ) : null
+        }
       />
       <StatusBanner state={overview.data?.state} />
-      <DwarfDetails unitId={numericId} legends={legends} />
+      <DwarfDetails
+        unitId={numericId}
+        legends={legends}
+        tab={tab ?? 'overview'}
+        onTabChange={(next) =>
+          navigate({
+            search: next === 'overview' ? {} : { tab: next },
+            replace: true,
+            resetScroll: false,
+          })
+        }
+      />
     </div>
   )
 }
 
 export const Route = createFileRoute('/_authenticated/_app/fortress/dwarves/$id')({
+  validateSearch: (raw: Record<string, unknown>): DwarfSearch =>
+    isDwarfTab(raw.tab) ? { tab: raw.tab } : {},
   component: DwarfPage,
 })

@@ -186,6 +186,105 @@ export interface UnitLook {
 	generated?: GeneratedLook | null;
 }
 
+/** Someone a unit is linked to (family, lovers, masters) or has an opinion of. */
+export interface SheetPerson {
+	/** Historical figure id. */
+	hf: number;
+	/** A histfig_hf_link_type (MOTHER, SPOUSE, CHILD, LOVER, MASTER, ...), or "known" for an opinion. */
+	kind: string;
+	/** As the fortress writes names, e.g. "Urist Momuzlolor". */
+	name: string | null;
+	name_english: string | null;
+	race: string | null;
+	sex: number;
+	alive: boolean;
+	/** Their unit id; they may not be on the map. */
+	unit: number | null;
+	/** Opinions only, -100 to 100. Love sets the game's word for it: Friend above 49, Kindred spirit at 100, Disliked at -50 and below. */
+	love?: number;
+	trust?: number;
+	respect?: number;
+	loyalty?: number;
+	fear?: number;
+	/** How many times they have met. */
+	met?: number;
+	/** A vague_relationship_type such as childhood_friend, war_buddy, grudge, jealous_obsession. */
+	rank?: string | null;
+	/** reputation_type tokens they hold the other to: Friendly, Brawler, Storyteller, ... */
+	attitude?: string[];
+	/** The same figure is also listed through a family link. */
+	family?: boolean;
+}
+
+export interface SheetWound {
+	/** Body part names, e.g. "right lung". */
+	parts: string[];
+	/** "broken", "cut open", "tendon torn", "bruise", "scarred", "needs setting", ... */
+	damage: string[];
+	/** "severed", "infected", "sutured", "diagnosed", "something stuck in it". */
+	flags: string[];
+	pain: number;
+	bleeding: number;
+	/** The syndrome that caused it, e.g. "inebriation". */
+	syndrome?: string | null;
+	/** Only a syndrome's effect, not an injury (drink shows up this way). */
+	effect?: boolean;
+}
+
+/**
+ * The rest of what the game's unit screens show, for the character pages.
+ * Null for units without a creature raw; `error` when reading it failed.
+ */
+export interface UnitSheet {
+	/** [token, "P" physical | "M" mental, effective value, potential, the caste's 7 range cutoffs]. */
+	attributes: [string, "P" | "M", number, number, number[]][];
+	/** Every skill with a rating or experience: [token, rating, experience toward the next level, rust, skill class, whether its labor is enabled (null for skills without one)]. */
+	skills: [string, number, number, number, string | null, boolean | null][];
+	/** [need_type token, focus level (400 met, below -999 distracted), drain rate, deity for prayer], least met first. */
+	needs: [string, number, number, string | null][];
+	/** [unitpref_type token, what]. */
+	preferences: [string, string][];
+	/** [goal_type token, realised, the game's short name]. */
+	dreams: [string, boolean, string | null][];
+	/** [thought, emotion, strength, year, year tick, "short" | "long"]. */
+	memories?: [string, string, number, number, number, "short" | "long"][];
+	/** Memories that changed who they are: [thought, emotion, year, tick, facet, old, new, value, old, new]. */
+	core_memories?: [
+		string,
+		string,
+		number,
+		number,
+		string | null,
+		number | null,
+		number | null,
+		string | null,
+		number | null,
+		number | null,
+	][];
+	people: SheetPerson[];
+	/** [name, worship strength 0–100, spheres], most devout first. */
+	deities: [string, number, string[]][];
+	/** [entity name, historical_entity_type, histfig_entity_link_type]. */
+	groups: [string, string, string][];
+	wounds: SheetWound[];
+	syndromes: string[];
+	work_details: string[];
+	/** [year, year tick]. */
+	birth?: [number, number] | null;
+	kills?: number | null;
+	pregnant?: boolean | null;
+	/** Player-set profession title; null when they go by their profession. */
+	custom_profession?: string | null;
+	squad_position?: number | null;
+	/** Weighted need satisfaction as a percentage; 100 is undistracted. */
+	focus?: number | null;
+	longterm_stress?: number | null;
+	/** 0–100, how used to violence they are. */
+	combat_hardened?: number | null;
+	likes_outdoors?: number | null;
+	error?: string;
+}
+
 export interface FortUnit {
 	id: number;
 	name: string;
@@ -232,6 +331,8 @@ export interface FortUnit {
 	values?: [string, number][] | null;
 	/** [thought, emotion, strength, year, year tick], newest first. Absent in older dumps. */
 	thoughts?: [string, string, number, number, number][] | null;
+	/** Attributes, needs, preferences, people and more. Absent in older dumps and in unit lists. */
+	sheet?: UnitSheet | null;
 }
 
 export interface FortItem {
@@ -499,6 +600,69 @@ export type DfhackAction = keyof typeof DFHACK_ACTIONS;
 
 export function isDfhackAction(value: unknown): value is DfhackAction {
 	return typeof value === "string" && Object.hasOwn(DFHACK_ACTIONS, value);
+}
+
+/**
+ * What the web app may do to a single unit. It sends the key, the unit id and,
+ * for `title`, the text; unit-action.lua in the worker does the rest.
+ */
+export interface UnitActionSpec {
+	label: string;
+	/** What happens in the game, in a sentence. */
+	what: string;
+	/** The DFHack console command with the same effect; `{id}` and `{text}` are filled in. */
+	command: string;
+	/** Does something the game itself never would. */
+	cheat?: boolean;
+	/** Asked before running. */
+	confirm?: string;
+}
+
+export const MAX_UNIT_TITLE = 40;
+
+export const UNIT_ACTIONS = {
+	reveal: {
+		label: "Show in game",
+		what: "Centres the game's view on them and marks their tile until you click elsewhere.",
+		command:
+			"lua dfhack.gui.revealInDwarfmodeMap(xyz2pos(dfhack.units.getPosition(df.unit.find({id}))), true, true)",
+	},
+	title: {
+		label: "Give a title",
+		what: "Sets a custom profession, which the game shows in place of their profession everywhere. An empty title brings the usual one back.",
+		command: 'lua df.unit.find({id}).custom_profession = dfhack.utf2df("{text}")',
+	},
+	calm: {
+		label: "Clear their stress",
+		what: "Wipes out built-up stress and ends a tantrum, depression or obliviousness, as if the bad memories had never happened.",
+		command:
+			"lua reqscript('remove-stress').removeStress(df.unit.find({id}), -1000000)",
+		cheat: true,
+		confirm:
+			"This rewrites their mind: every bit of stress is gone at once, which the game would never do. Go ahead?",
+	},
+	fillneeds: {
+		label: "Fulfil every need",
+		what: "Marks every need as just met, so they are fully focused again, and clears their stress too.",
+		command: "fillneeds -unit {id}",
+		cheat: true,
+		confirm:
+			"Every need is marked as met and their stress is cleared, which the game would never do on its own. Go ahead?",
+	},
+	heal: {
+		label: "Heal completely",
+		what: "Removes every wound, refills their blood, grows back lost limbs and resets hunger, thirst and sleep. Syndromes stay.",
+		command: "full-heal -unit {id}",
+		cheat: true,
+		confirm:
+			"All their wounds vanish and lost limbs grow back, which the game would never do. Go ahead?",
+	},
+} as const satisfies Record<string, UnitActionSpec>;
+
+export type UnitAction = keyof typeof UNIT_ACTIONS;
+
+export function isUnitAction(value: unknown): value is UnitAction {
+	return typeof value === "string" && Object.hasOwn(UNIT_ACTIONS, value);
 }
 
 export const STRESS_LABELS = [

@@ -1,4 +1,10 @@
-import { type DfhackAction, type FortStatus, postgres_db, schema } from '@fortress/db-drizzle'
+import {
+  type DfhackAction,
+  type FortStatus,
+  type UnitAction,
+  postgres_db,
+  schema,
+} from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
 import { count, desc, eq, max } from 'drizzle-orm'
 
@@ -17,10 +23,12 @@ async function requireUser() {
 
 export interface WorkerCommand {
   id: number
-  kind: 'set_nickname' | 'dfhack'
-  action: DfhackAction | null
+  kind: 'set_nickname' | 'dfhack' | 'unit_action'
+  action: DfhackAction | UnitAction | null
   unitId: number | null
   nickname: string | null
+  /** unit_action: the text it took, such as a title. */
+  arg: string | null
   status: 'pending' | 'processing' | 'done' | 'failed'
   error: string | null
   output: string | null
@@ -102,6 +110,7 @@ export const getConnectionStatus = createServerFn({ method: 'GET' }).handler(
         action: c.action,
         unitId: c.unit_id,
         nickname: c.nickname,
+        arg: c.arg,
         status: c.status,
         error: c.error,
         output: c.output,

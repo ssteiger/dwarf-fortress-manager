@@ -19,6 +19,7 @@ import type {
 	FortWorld,
 	LegendsPayload,
 	RowTable,
+	UnitAction,
 } from "./fortress-types";
 
 export const logs = pgTable("logs", {
@@ -98,12 +99,15 @@ export const fort_commands = pgTable(
 	"fort_commands",
 	{
 		id: serial().primaryKey().notNull(),
-		kind: text().$type<"set_nickname" | "dfhack">().notNull(),
-		/** set_nickname: the unit and its new nickname. */
+		kind: text().$type<"set_nickname" | "dfhack" | "unit_action">().notNull(),
+		/** set_nickname and unit_action: the unit. */
 		unit_id: integer(),
+		/** set_nickname: the new nickname. */
 		nickname: text(),
-		/** dfhack: a key of DFHACK_ACTIONS; the worker maps it to the command. */
-		action: text().$type<DfhackAction>(),
+		/** dfhack: a key of DFHACK_ACTIONS; unit_action: a key of UNIT_ACTIONS. */
+		action: text().$type<DfhackAction | UnitAction>(),
+		/** unit_action: the text some actions take, such as a title. */
+		arg: text(),
 		/** dfhack: what the command printed. */
 		output: text(),
 		status: text()
@@ -117,7 +121,32 @@ export const fort_commands = pgTable(
 		started_at: timestamp({ withTimezone: true, mode: "string" }),
 		completed_at: timestamp({ withTimezone: true, mode: "string" }),
 	},
-	(t) => [index("fort_commands_pending_idx").on(t.status, t.created_at)],
+	(t) => [
+		index("fort_commands_pending_idx").on(t.status, t.created_at),
+		index("fort_commands_unit_idx").on(t.unit_id, t.created_at),
+	],
+);
+
+/** The player's own notes on one unit of one fortress. */
+export const fort_unit_notes = pgTable(
+	"fort_unit_notes",
+	{
+		id: serial().primaryKey().notNull(),
+		user_id: uuid().notNull(),
+		/** "save_dir:site_id", as the chronicle keys the fortress. */
+		fort_key: text().notNull(),
+		unit_id: integer().notNull(),
+		note: text().notNull().default(""),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("fort_unit_notes_target_unique").on(t.user_id, t.fort_key, t.unit_id),
+	],
 );
 
 /** One row per exported world (grouped by the legends file prefix). */

@@ -139,7 +139,8 @@ export const getFortUnits = createServerFn({ method: 'GET' }).handler(
     const row = rows[0]
     return {
       capturedAt: row?.captured_at ?? null,
-      units: decodeTable<FortUnit>(row?.units),
+      // The sheet is for one unit's page; the lists poll every few seconds.
+      units: decodeTable<FortUnit>(row?.units).map(({ sheet: _sheet, ...unit }) => unit),
     }
   },
 )

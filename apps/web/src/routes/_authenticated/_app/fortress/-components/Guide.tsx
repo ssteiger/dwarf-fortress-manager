@@ -224,7 +224,7 @@ function RunAction({ action }: { action: DfhackAction }) {
   )
 }
 
-function CopyCommand({ shortcut }: { shortcut: Shortcut }) {
+export function CopyCommand({ shortcut }: { shortcut: Shortcut }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(shortcut.command)
