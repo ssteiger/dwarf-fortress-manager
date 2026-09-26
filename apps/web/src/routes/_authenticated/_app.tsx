@@ -1,5 +1,5 @@
 import { AppLayout, type NavUserUser } from '@fortress/ui'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Outlet, createFileRoute, useLocation } from '@tanstack/react-router'
 import {
   BookOpenIcon,
@@ -14,9 +14,42 @@ import {
   SettingsIcon,
   UsersIcon,
 } from 'lucide-react'
+import * as React from 'react'
 import { toast } from 'sonner'
 
 import { logoutFn } from '~/lib/auth/server'
+import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
+import { isLiving, unitGroup } from '~/lib/fortress/format'
+import { getFortUnits } from '~/lib/fortress/server'
+
+const EDGE_DWARF_COUNT = 12
+
+/** A dozen of the fortress's living citizens, the same dozen from one dump to the next. */
+function FortressEdgeDwarves() {
+  const { data } = useQuery({
+    queryKey: ['fort', 'units'],
+    queryFn: () => getFortUnits(),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  })
+  const dwarves = React.useMemo<EdgeDwarf[]>(
+    () =>
+      (data?.units ?? [])
+        .filter(
+          (u) =>
+            u.race_id && isLiving(u) && unitGroup(u) === 'citizen' && !u.flags.includes('baby'),
+        )
+        .sort((a, b) => (Math.imul(a.id, 2654435761) >>> 0) - (Math.imul(b.id, 2654435761) >>> 0))
+        .slice(0, EDGE_DWARF_COUNT)
+        .map((u) => ({
+          key: u.id,
+          name: u.nickname || u.name.split(' ')[0] || u.readable,
+          unit: u,
+        })),
+    [data],
+  )
+  return <EdgeDwarves dwarves={dwarves} />
+}
 
 const NAV = [
   { title: 'Overview', url: '/fortress', icon: MountainIcon },
@@ -86,6 +119,7 @@ const Layout = () => {
       }}
     >
       <Outlet />
+      <FortressEdgeDwarves />
     </AppLayout>
   )
 }

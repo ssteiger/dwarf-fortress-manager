@@ -23,6 +23,11 @@ export interface AuthLayoutProps {
    * gradient mesh is rendered instead so the layout works out of the box.
    */
   imageSrc?: string
+  /**
+   * Replaces the whole left column (image, overlay and quote) with custom
+   * artwork that fills it.
+   */
+  artwork?: ReactNode
   /** Override the className of the outermost container. */
   className?: string
 }
@@ -41,32 +46,39 @@ export function AuthLayout({
   quote,
   footer,
   imageSrc,
+  artwork,
   className,
 }: AuthLayoutProps) {
   return (
     <main className={cn('bg-background', className)}>
       <div className="grid min-h-dvh lg:grid-cols-5">
-        <aside className="fixed inset-y-0 col-span-2 hidden w-2/5 lg:block">
-          {imageSrc ? (
-            <img alt="" src={imageSrc} className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 bg-[radial-gradient(at_18%_8%,oklch(0.45_0.08_95)_0%,transparent_55%),radial-gradient(at_82%_92%,oklch(0.28_0_0)_0%,transparent_55%),radial-gradient(at_55%_45%,oklch(0.22_0_0)_0%,transparent_60%),oklch(0.1_0_0)]" />
-          )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 backdrop-blur-[2px]" />
-          <div className="absolute inset-0 border-r border-white/10" />
-          {quote ? (
-            <div className="absolute right-12 bottom-12 left-12">
-              <blockquote className="space-y-3">
-                <p className="text-balance text-xl font-medium text-white">
-                  &ldquo;{quote.text}&rdquo;
-                </p>
-                {quote.author ? (
-                  <footer className="text-sm text-white/75">— {quote.author}</footer>
-                ) : null}
-              </blockquote>
-            </div>
-          ) : null}
-        </aside>
+        {artwork ? (
+          <aside className="fixed inset-y-0 col-span-2 hidden w-2/5 overflow-hidden lg:block">
+            {artwork}
+          </aside>
+        ) : (
+          <aside className="fixed inset-y-0 col-span-2 hidden w-2/5 lg:block">
+            {imageSrc ? (
+              <img alt="" src={imageSrc} className="absolute inset-0 h-full w-full object-cover" />
+            ) : (
+              <div className="absolute inset-0 bg-[radial-gradient(at_18%_8%,oklch(0.45_0.08_95)_0%,transparent_55%),radial-gradient(at_82%_92%,oklch(0.28_0_0)_0%,transparent_55%),radial-gradient(at_55%_45%,oklch(0.22_0_0)_0%,transparent_60%),oklch(0.1_0_0)]" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10 backdrop-blur-[2px]" />
+            <div className="absolute inset-0 border-r border-white/10" />
+            {quote ? (
+              <div className="absolute right-12 bottom-12 left-12">
+                <blockquote className="space-y-3">
+                  <p className="text-balance text-xl font-medium text-white">
+                    &ldquo;{quote.text}&rdquo;
+                  </p>
+                  {quote.author ? (
+                    <footer className="text-sm text-white/75">— {quote.author}</footer>
+                  ) : null}
+                </blockquote>
+              </div>
+            ) : null}
+          </aside>
+        )}
 
         <section className="flex flex-col p-6 lg:col-span-3 lg:col-start-3 lg:p-12">
           {logo || topRightAction ? (

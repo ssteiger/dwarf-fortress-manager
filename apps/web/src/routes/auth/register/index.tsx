@@ -2,51 +2,59 @@ import { AuthLayout } from '@fortress/ui'
 import { Link, createFileRoute } from '@tanstack/react-router'
 
 import { AuthLogo } from '../-components/AuthLogo'
+import {
+  DwarfRow,
+  ExpeditionEdgeDwarves,
+  FortressScene,
+} from '../-components/fortress-scene/FortressScene'
 import { UserAuthFormRegister } from './-components/UserAuthForm'
 
 const RegisterPage = () => {
   return (
-    <AuthLayout
-      logo={<AuthLogo />}
-      topRightAction={
-        <Link
-          to="/auth/login"
-          className="text-muted-foreground text-sm font-medium hover:text-foreground hover:underline"
-        >
-          Sign in
-        </Link>
-      }
-      quote={{
-        text: 'Dwarf Fortress Manager!',
-        author: 'Dwarf Fortress',
-      }}
-      footer={
-        <>
-          By signing up, you agree to our{' '}
-          <a href="/terms" className="underline hover:text-foreground">
-            Terms of Service
-          </a>{' '}
-          and{' '}
-          <a href="/privacy" className="underline hover:text-foreground">
-            Privacy Policy
-          </a>
-        </>
-      }
-    >
-      <div className="mb-8 space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
-        <p className="text-muted-foreground text-sm">Enter your details to get started.</p>
-      </div>
+    <>
+      <AuthLayout
+        logo={<AuthLogo />}
+        topRightAction={
+          <Link
+            to="/auth/login"
+            className="text-muted-foreground text-sm font-medium hover:text-foreground hover:underline"
+          >
+            Sign in
+          </Link>
+        }
+        artwork={<FortressScene />}
+        footer={
+          <>
+            By signing up, you agree to our{' '}
+            <a href="/terms" className="underline hover:text-foreground">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/privacy" className="underline hover:text-foreground">
+              Privacy Policy
+            </a>
+          </>
+        }
+      >
+        <DwarfRow className="mb-8 lg:hidden" />
+        <div className="mb-8 space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+          <p className="text-muted-foreground text-sm">
+            Found your fortress manager. It only takes an email.
+          </p>
+        </div>
 
-      <UserAuthFormRegister />
+        <UserAuthFormRegister />
 
-      <div className="text-muted-foreground mt-10 text-sm">
-        Already have an account?{' '}
-        <Link to="/auth/login" className="text-primary font-medium hover:underline">
-          Sign in
-        </Link>
-      </div>
-    </AuthLayout>
+        <div className="text-muted-foreground mt-10 text-sm">
+          Already have an account?{' '}
+          <Link to="/auth/login" className="text-primary font-medium hover:underline">
+            Sign in
+          </Link>
+        </div>
+      </AuthLayout>
+      <ExpeditionEdgeDwarves />
+    </>
   )
 }
 

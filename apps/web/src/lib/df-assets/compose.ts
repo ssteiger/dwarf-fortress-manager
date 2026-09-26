@@ -224,5 +224,42 @@ export async function composeLayers(
     const dy = layer.offset[1] + (height - c.height)
     ctx.drawImage(c, dx, dy)
   })
-  return { canvas, tileWidth: width, tileHeight: height }
+  return trimToBase(canvas, base.tileWidth, base.tileHeight)
+}
+
+/**
+ * Drop the empty part of oversized layers. A two-tile pony tail with three
+ * rows of hair above the head would otherwise double the stack's height,
+ * and whoever draws it at a fixed size would get a dwarf half as tall. The
+ * base tile always stays; the crop grows only as far as there are pixels,
+ * evenly on both sides so the body stays centred.
+ */
+function trimToBase(canvas: HTMLCanvasElement, baseWidth: number, baseHeight: number): Composite {
+  const { width, height } = canvas
+  if (width === baseWidth && height === baseHeight) {
+    return { canvas, tileWidth: width, tileHeight: height }
+  }
+  const data = context2d(canvas).getImageData(0, 0, width, height).data
+  let left = width
+  let right = -1
+  let top = height
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] === 0) continue
+      if (x < left) left = x
+      if (x > right) right = x
+      if (y < top) top = y
+    }
+  }
+  if (right < 0) return { canvas, tileWidth: width, tileHeight: height }
+  const baseLeft = Math.round((width - baseWidth) / 2)
+  const spill = Math.max(0, baseLeft - left, right + 1 - (baseLeft + baseWidth))
+  const x0 = baseLeft - spill
+  const y0 = Math.min(height - baseHeight, top)
+  const w = baseWidth + spill * 2
+  const h = height - y0
+  if (w === width && h === height) return { canvas, tileWidth: width, tileHeight: height }
+  const trimmed = makeCanvas(w, h)
+  context2d(trimmed).drawImage(canvas, x0, y0, w, h, 0, 0, w, h)
+  return { canvas: trimmed, tileWidth: w, tileHeight: h }
 }
