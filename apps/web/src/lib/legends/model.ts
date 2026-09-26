@@ -55,6 +55,32 @@ export function words(token: string | null | undefined): string {
   return token.replace(/_/g, ' ').replace(/:\d+$/, '').toLowerCase().trim()
 }
 
+const ENTITY_TYPES: Record<string, string> = {
+  sitegovernment: 'site government',
+  nomadicgroup: 'nomadic group',
+  migratinggroup: 'migrating group',
+  performancetroupe: 'performance troupe',
+  militaryunit: 'military unit',
+  merchantcompany: 'merchant company',
+}
+
+/** An entity's `plus.type` as words: "sitegovernment" -> "site government". */
+export function entityTypeLabel(type: string | null | undefined): string {
+  const w = words(type)
+  return ENTITY_TYPES[w] ?? w
+}
+
+/** "serpent man" -> "serpent men", "dwarf" -> "dwarves", "goblin" -> "goblins". */
+export function racePlural(race: string | null | undefined): string {
+  const w = words(race)
+  if (!w) return ''
+  if (w === 'dwarf') return 'dwarves'
+  if (/(^|\s)(wo)?man$/.test(w)) return w.replace(/man$/, 'men')
+  if (/(s|x|ch|sh)$/.test(w)) return `${w}es`
+  if (/[^aeiou]y$/.test(w)) return `${w.slice(0, -1)}ies`
+  return `${w}s`
+}
+
 /** Legends names arrive lowercase; capitalise like a proper noun. */
 export function titleCase(s: string): string {
   return s.replace(

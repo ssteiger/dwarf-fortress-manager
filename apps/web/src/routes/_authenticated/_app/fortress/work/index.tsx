@@ -14,12 +14,43 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
+import {
+  LeafIcon,
+  LifeBuoyIcon,
+  ListChecksIcon,
+  SnowflakeIcon,
+  SproutIcon,
+  SunIcon,
+} from 'lucide-react'
 import * as React from 'react'
 
+import {
+  fortAdvice,
+  jobQueue,
+  seasonNotes,
+  situations,
+  workshopBoard,
+} from '~/lib/fortress/advisor'
 import { formatNumber, splitPascal } from '~/lib/fortress/format'
-import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
+import { gameTimeOf, isGrownCitizen } from '~/lib/fortress/insights'
+import {
+  FORT_REFRESH_MS,
+  useFortConcerns,
+  useFortOverview,
+  useFortSupplies,
+  useFortUnits,
+} from '~/lib/fortress/queries'
 import { getFortWork } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatCard, StatusBanner } from '../-components/FortChrome'
+import {
+  AreaStrip,
+  Checklist,
+  JobQueueList,
+  NextSteps,
+  SituationList,
+  WorkshopList,
+} from '../-components/Advice'
+import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { GuideProvider } from '../-components/Guide'
 
 const WORKSHOP_TYPES = new Set(['Workshop', 'Furnace', 'TradeDepot'])
 
@@ -51,8 +82,43 @@ function WorkPage() {
     queryFn: () => getFortWork(),
     refetchInterval: FORT_REFRESH_MS * 2,
   })
+  const everyone = useFortUnits()
+  const concerns = useFortConcerns()
+  const supplies = useFortSupplies()
   const buildings = data?.buildings ?? []
   const jobs = data?.jobs ?? []
+  const units = everyone.data?.units ?? []
+  const state = overview.data?.state ?? null
+  const now = gameTimeOf(state)
+
+  const advisorInput = React.useMemo(
+    () => ({
+      summary: state?.summary ?? null,
+      units,
+      buildings,
+      jobs,
+      concerns: concerns.data ?? null,
+      supplies: supplies.data ?? null,
+      events: overview.data?.events ?? [],
+      now,
+    }),
+    [state, units, buildings, jobs, concerns.data, supplies.data, overview.data?.events, now],
+  )
+  const advice = React.useMemo(() => fortAdvice(advisorInput), [advisorInput])
+  const playbook = React.useMemo(() => situations(advisorInput), [advisorInput])
+  const queue = React.useMemo(() => jobQueue(jobs, units), [jobs, units])
+  const shops = React.useMemo(() => workshopBoard(buildings, units), [buildings, units])
+  const idle = React.useMemo(
+    () => units.filter((u) => isGrownCitizen(u) && !u.job && !u.squad && !u.mood),
+    [units],
+  )
+  const season = seasonNotes(now?.tick ?? null)
+  const ready = Boolean(state?.summary && data && everyone.data)
+  const counts = {
+    problem: advice.filter((a) => a.status === 'problem').length,
+    attention: advice.filter((a) => a.status === 'attention').length,
+    good: advice.filter((a) => a.status === 'good').length,
+  }
   const unitNames = React.useMemo(
     () => new Map((data?.units ?? []).map((u) => [u.id, u.name])),
     [data?.units],
@@ -142,115 +208,191 @@ function WorkPage() {
     [buildingNames, unitNames],
   )
 
-  const activeJobs = jobs.filter((j) => j.worker_id !== null).length
-  const suspended = jobs.filter((j) => j.suspended).length
-  const jobsByType = React.useMemo(() => {
-    const m = new Map<string, number>()
-    for (const j of jobs) m.set(j.name, (m.get(j.name) ?? 0) + 1)
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12)
-  }, [jobs])
-
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <PageHeader
-        eyebrow="Fortress"
-        title="Work and buildings"
-        description="What is being built, what is queued, and who is doing it."
-        updatedAt={data?.capturedAt}
-        isFetching={isFetching}
-        onRefresh={() => refetch()}
-      />
-      <StatusBanner state={overview.data?.state} />
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Jobs queued"
-          value={formatNumber(jobs.length)}
-          hint={`${activeJobs} being worked · ${suspended} suspended`}
+    <GuideProvider>
+      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+        <PageHeader
+          eyebrow="Fortress"
+          title="Work and advice"
+          description="What the fortress needs to thrive, what to do about it in the game, and who is doing what."
+          updatedAt={data?.capturedAt}
+          isFetching={isFetching}
+          onRefresh={() => refetch()}
         />
-        <StatCard
-          title="Workshops"
-          value={groups.workshops.length}
-          hint="including furnaces and the depot"
-        />
-        <StatCard
-          title="Stockpiles"
-          value={groups.stockpiles.length}
-          hint={`${formatNumber(groups.stockpiles.reduce((a, b) => a + (b.stockpile_items ?? 0), 0))} items stored`}
-        />
-        <StatCard
-          title="Under construction"
-          value={groups.unfinished.length}
-          hint="buildings not yet finished"
-          accentClassName="text-amber-500"
-        />
-      </div>
+        <StatusBanner state={overview.data?.state} />
 
-      {jobsByType.length ? (
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Most common jobs</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            {jobsByType.map(([name, count]) => (
-              <Badge key={name} variant="secondary" className="gap-1.5">
-                {name} <span className="tabular-nums opacity-70">{count}</span>
-              </Badge>
-            ))}
-          </CardContent>
-        </Card>
-      ) : null}
+        {ready ? (
+          <>
+            <AreaStrip advice={advice} />
 
-      <Tabs defaultValue="jobs">
-        <TabsList>
-          <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>
-          <TabsTrigger value="workshops">Workshops ({groups.workshops.length})</TabsTrigger>
-          <TabsTrigger value="stockpiles">Stockpiles ({groups.stockpiles.length})</TabsTrigger>
-          <TabsTrigger value="zones">Zones ({groups.zones.length})</TabsTrigger>
-          <TabsTrigger value="furniture">
-            Furniture &amp; other ({groups.furniture.length})
-          </TabsTrigger>
-        </TabsList>
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+              <div className="flex min-w-0 flex-col gap-4">
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ListChecksIcon className="size-4 text-primary" />
+                      Do these next
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {counts.problem
+                        ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'}, `
+                        : ''}
+                      {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, and{' '}
+                      {counts.good} check{counts.good === 1 ? '' : 's'} already fine. Open one for
+                      the steps in the game.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <NextSteps advice={advice} />
+                  </CardContent>
+                </Card>
 
-        <TabsContent value="jobs">
-          <Card className="overflow-hidden p-0">
-            {jobs.length === 0 ? (
-              <div className="p-6">
-                <EmptyState title="No jobs">
-                  {jobs.length
-                    ? 'Nothing matches.'
-                    : 'Nothing is queued, or no dump has been taken.'}
-                </EmptyState>
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <LifeBuoyIcon className="size-4 text-primary" />
+                      When things go wrong
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      What to do when trouble comes. What seems to be happening now is on top.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <SituationList situations={playbook} />
+                  </CardContent>
+                </Card>
               </div>
-            ) : (
-              <DataTable
-                data={jobs}
-                columns={jobColumns}
-                showSelectColumn={false}
-                showActionsColumn={false}
-                showToolbar={false}
-                enableSortingRemoval={false}
-                defaultSort={[{ id: 'worker', desc: false }]}
-                getRowId={(job) => String(job.id)}
-                rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
-              />
-            )}
-          </Card>
-        </TabsContent>
 
-        {(['workshops', 'stockpiles', 'zones', 'furniture'] as const).map((key) => (
-          <TabsContent key={key} value={key}>
-            <BuildingTable
-              buildings={groups[key]}
-              showJobs={key === 'workshops'}
-              showItems={key === 'stockpiles'}
-              unitNames={unitNames}
-            />
-          </TabsContent>
-        ))}
-      </Tabs>
-    </div>
+              <div className="flex min-w-0 flex-col gap-4">
+                {season ? (
+                  <Card className="gap-3">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <SeasonIcon season={season.season} />
+                        {season.season.charAt(0).toUpperCase()}
+                        {season.season.slice(1)}
+                        {state?.world ? ` of ${state.world.year}` : ''}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="flex flex-col gap-1.5 text-sm">
+                        {season.notes.map((note) => (
+                          <li key={note} className="flex gap-2">
+                            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
+                            {note}
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                ) : null}
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="text-base">What a thriving fortress has</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Every check, the good ones too. Click one for the details.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <Checklist advice={advice} />
+                  </CardContent>
+                </Card>
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="text-base">The work queue</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {formatNumber(jobs.length)} jobs, by kind.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <JobQueueList groups={queue} advice={advice} />
+                  </CardContent>
+                </Card>
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="text-base">Workshops and who can work them</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      The best hands at each, by skill. Enable the matching labor to put them to
+                      work.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <WorkshopList rows={shops} idle={idle} />
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">Reading the fortress…</p>
+        )}
+
+        <div>
+          <h2 className="mb-3 text-lg font-semibold tracking-tight">Every job and building</h2>
+          <Tabs defaultValue="jobs">
+            <TabsList>
+              <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>
+              <TabsTrigger value="workshops">Workshops ({groups.workshops.length})</TabsTrigger>
+              <TabsTrigger value="stockpiles">Stockpiles ({groups.stockpiles.length})</TabsTrigger>
+              <TabsTrigger value="zones">Zones ({groups.zones.length})</TabsTrigger>
+              <TabsTrigger value="furniture">
+                Furniture &amp; other ({groups.furniture.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="jobs">
+              <Card className="overflow-hidden p-0">
+                {jobs.length === 0 ? (
+                  <div className="p-6">
+                    <EmptyState title="No jobs">
+                      {jobs.length
+                        ? 'Nothing matches.'
+                        : 'Nothing is queued, or no dump has been taken.'}
+                    </EmptyState>
+                  </div>
+                ) : (
+                  <DataTable
+                    data={jobs}
+                    columns={jobColumns}
+                    showSelectColumn={false}
+                    showActionsColumn={false}
+                    showToolbar={false}
+                    enableSortingRemoval={false}
+                    defaultSort={[{ id: 'worker', desc: false }]}
+                    getRowId={(job) => String(job.id)}
+                    rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
+                  />
+                )}
+              </Card>
+            </TabsContent>
+
+            {(['workshops', 'stockpiles', 'zones', 'furniture'] as const).map((key) => (
+              <TabsContent key={key} value={key}>
+                <BuildingTable
+                  buildings={groups[key]}
+                  showJobs={key === 'workshops'}
+                  showItems={key === 'stockpiles'}
+                  unitNames={unitNames}
+                />
+              </TabsContent>
+            ))}
+          </Tabs>
+        </div>
+      </div>
+    </GuideProvider>
   )
+}
+
+function SeasonIcon({ season }: { season: string }) {
+  const Icon =
+    season === 'spring'
+      ? SproutIcon
+      : season === 'summer'
+        ? SunIcon
+        : season === 'autumn'
+          ? LeafIcon
+          : SnowflakeIcon
+  return <Icon className="size-4 text-primary" />
 }
 
 function BuildingTable({

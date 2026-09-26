@@ -15,16 +15,19 @@ import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/_a
 import { Route as AuthRegisterIndexRouteImport } from './routes/auth/register/index'
 import { Route as AuthLoginIndexRouteImport } from './routes/auth/login/index'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/_app/index'
+import { Route as AuthenticatedAppSettingsRouteRouteImport } from './routes/_authenticated/_app/settings/route'
 import { Route as AuthenticatedAppSettingsIndexRouteImport } from './routes/_authenticated/_app/settings/index'
 import { Route as AuthenticatedAppNicknameDwarvesIndexRouteImport } from './routes/_authenticated/_app/nickname-dwarves/index'
 import { Route as AuthenticatedAppLegendsIndexRouteImport } from './routes/_authenticated/_app/legends/index'
 import { Route as AuthenticatedAppFortressIndexRouteImport } from './routes/_authenticated/_app/fortress/index'
 import { Route as AuthenticatedAppActivityLogsIndexRouteImport } from './routes/_authenticated/_app/activity-logs/index'
 import { Route as AuthenticatedAppSettingsNotificationsIndexRouteImport } from './routes/_authenticated/_app/settings/notifications/index'
-import { Route as AuthenticatedAppSettingsDisplayIndexRouteImport } from './routes/_authenticated/_app/settings/display/index'
-import { Route as AuthenticatedAppSettingsAppearanceIndexRouteImport } from './routes/_authenticated/_app/settings/appearance/index'
+import { Route as AuthenticatedAppSettingsLegendsIndexRouteImport } from './routes/_authenticated/_app/settings/legends/index'
+import { Route as AuthenticatedAppSettingsConnectionIndexRouteImport } from './routes/_authenticated/_app/settings/connection/index'
 import { Route as AuthenticatedAppSettingsAccountIndexRouteImport } from './routes/_authenticated/_app/settings/account/index'
 import { Route as AuthenticatedAppLegendsWorldIndexRouteImport } from './routes/_authenticated/_app/legends/world/index'
+import { Route as AuthenticatedAppLegendsStoriesIndexRouteImport } from './routes/_authenticated/_app/legends/stories/index'
+import { Route as AuthenticatedAppLegendsJournalIndexRouteImport } from './routes/_authenticated/_app/legends/journal/index'
 import { Route as AuthenticatedAppLegendsHistoryIndexRouteImport } from './routes/_authenticated/_app/legends/history/index'
 import { Route as AuthenticatedAppLegendsArchiveIndexRouteImport } from './routes/_authenticated/_app/legends/archive/index'
 import { Route as AuthenticatedAppFortressWorkIndexRouteImport } from './routes/_authenticated/_app/fortress/work/index'
@@ -64,11 +67,17 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppSettingsRouteRoute =
+  AuthenticatedAppSettingsRouteRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppSettingsIndexRoute =
   AuthenticatedAppSettingsIndexRouteImport.update({
-    id: '/settings/',
-    path: '/settings/',
-    getParentRoute: () => AuthenticatedAppRoute,
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAppSettingsRouteRoute,
   } as any)
 const AuthenticatedAppNicknameDwarvesIndexRoute =
   AuthenticatedAppNicknameDwarvesIndexRouteImport.update({
@@ -96,32 +105,44 @@ const AuthenticatedAppActivityLogsIndexRoute =
   } as any)
 const AuthenticatedAppSettingsNotificationsIndexRoute =
   AuthenticatedAppSettingsNotificationsIndexRouteImport.update({
-    id: '/settings/notifications/',
-    path: '/settings/notifications/',
-    getParentRoute: () => AuthenticatedAppRoute,
+    id: '/notifications/',
+    path: '/notifications/',
+    getParentRoute: () => AuthenticatedAppSettingsRouteRoute,
   } as any)
-const AuthenticatedAppSettingsDisplayIndexRoute =
-  AuthenticatedAppSettingsDisplayIndexRouteImport.update({
-    id: '/settings/display/',
-    path: '/settings/display/',
-    getParentRoute: () => AuthenticatedAppRoute,
+const AuthenticatedAppSettingsLegendsIndexRoute =
+  AuthenticatedAppSettingsLegendsIndexRouteImport.update({
+    id: '/legends/',
+    path: '/legends/',
+    getParentRoute: () => AuthenticatedAppSettingsRouteRoute,
   } as any)
-const AuthenticatedAppSettingsAppearanceIndexRoute =
-  AuthenticatedAppSettingsAppearanceIndexRouteImport.update({
-    id: '/settings/appearance/',
-    path: '/settings/appearance/',
-    getParentRoute: () => AuthenticatedAppRoute,
+const AuthenticatedAppSettingsConnectionIndexRoute =
+  AuthenticatedAppSettingsConnectionIndexRouteImport.update({
+    id: '/connection/',
+    path: '/connection/',
+    getParentRoute: () => AuthenticatedAppSettingsRouteRoute,
   } as any)
 const AuthenticatedAppSettingsAccountIndexRoute =
   AuthenticatedAppSettingsAccountIndexRouteImport.update({
-    id: '/settings/account/',
-    path: '/settings/account/',
-    getParentRoute: () => AuthenticatedAppRoute,
+    id: '/account/',
+    path: '/account/',
+    getParentRoute: () => AuthenticatedAppSettingsRouteRoute,
   } as any)
 const AuthenticatedAppLegendsWorldIndexRoute =
   AuthenticatedAppLegendsWorldIndexRouteImport.update({
     id: '/legends/world/',
     path: '/legends/world/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLegendsStoriesIndexRoute =
+  AuthenticatedAppLegendsStoriesIndexRouteImport.update({
+    id: '/legends/stories/',
+    path: '/legends/stories/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppLegendsJournalIndexRoute =
+  AuthenticatedAppLegendsJournalIndexRouteImport.update({
+    id: '/legends/journal/',
+    path: '/legends/journal/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppLegendsHistoryIndexRoute =
@@ -188,6 +209,7 @@ const AuthenticatedAppFortressDwarvesIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedAppIndexRoute
   '/auth/callback': typeof AuthCallbackRoute
+  '/settings': typeof AuthenticatedAppSettingsRouteRouteWithChildren
   '/auth/login/': typeof AuthLoginIndexRoute
   '/auth/register/': typeof AuthRegisterIndexRoute
   '/activity-logs/': typeof AuthenticatedAppActivityLogsIndexRoute
@@ -205,10 +227,12 @@ export interface FileRoutesByFullPath {
   '/fortress/work/': typeof AuthenticatedAppFortressWorkIndexRoute
   '/legends/archive/': typeof AuthenticatedAppLegendsArchiveIndexRoute
   '/legends/history/': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/legends/journal/': typeof AuthenticatedAppLegendsJournalIndexRoute
+  '/legends/stories/': typeof AuthenticatedAppLegendsStoriesIndexRoute
   '/legends/world/': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/settings/account/': typeof AuthenticatedAppSettingsAccountIndexRoute
-  '/settings/appearance/': typeof AuthenticatedAppSettingsAppearanceIndexRoute
-  '/settings/display/': typeof AuthenticatedAppSettingsDisplayIndexRoute
+  '/settings/connection/': typeof AuthenticatedAppSettingsConnectionIndexRoute
+  '/settings/legends/': typeof AuthenticatedAppSettingsLegendsIndexRoute
   '/settings/notifications/': typeof AuthenticatedAppSettingsNotificationsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -231,10 +255,12 @@ export interface FileRoutesByTo {
   '/fortress/work': typeof AuthenticatedAppFortressWorkIndexRoute
   '/legends/archive': typeof AuthenticatedAppLegendsArchiveIndexRoute
   '/legends/history': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/legends/journal': typeof AuthenticatedAppLegendsJournalIndexRoute
+  '/legends/stories': typeof AuthenticatedAppLegendsStoriesIndexRoute
   '/legends/world': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/settings/account': typeof AuthenticatedAppSettingsAccountIndexRoute
-  '/settings/appearance': typeof AuthenticatedAppSettingsAppearanceIndexRoute
-  '/settings/display': typeof AuthenticatedAppSettingsDisplayIndexRoute
+  '/settings/connection': typeof AuthenticatedAppSettingsConnectionIndexRoute
+  '/settings/legends': typeof AuthenticatedAppSettingsLegendsIndexRoute
   '/settings/notifications': typeof AuthenticatedAppSettingsNotificationsIndexRoute
 }
 export interface FileRoutesById {
@@ -242,6 +268,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/_app': typeof AuthenticatedAppRouteWithChildren
   '/auth/callback': typeof AuthCallbackRoute
+  '/_authenticated/_app/settings': typeof AuthenticatedAppSettingsRouteRouteWithChildren
   '/_authenticated/_app/': typeof AuthenticatedAppIndexRoute
   '/auth/login/': typeof AuthLoginIndexRoute
   '/auth/register/': typeof AuthRegisterIndexRoute
@@ -260,10 +287,12 @@ export interface FileRoutesById {
   '/_authenticated/_app/fortress/work/': typeof AuthenticatedAppFortressWorkIndexRoute
   '/_authenticated/_app/legends/archive/': typeof AuthenticatedAppLegendsArchiveIndexRoute
   '/_authenticated/_app/legends/history/': typeof AuthenticatedAppLegendsHistoryIndexRoute
+  '/_authenticated/_app/legends/journal/': typeof AuthenticatedAppLegendsJournalIndexRoute
+  '/_authenticated/_app/legends/stories/': typeof AuthenticatedAppLegendsStoriesIndexRoute
   '/_authenticated/_app/legends/world/': typeof AuthenticatedAppLegendsWorldIndexRoute
   '/_authenticated/_app/settings/account/': typeof AuthenticatedAppSettingsAccountIndexRoute
-  '/_authenticated/_app/settings/appearance/': typeof AuthenticatedAppSettingsAppearanceIndexRoute
-  '/_authenticated/_app/settings/display/': typeof AuthenticatedAppSettingsDisplayIndexRoute
+  '/_authenticated/_app/settings/connection/': typeof AuthenticatedAppSettingsConnectionIndexRoute
+  '/_authenticated/_app/settings/legends/': typeof AuthenticatedAppSettingsLegendsIndexRoute
   '/_authenticated/_app/settings/notifications/': typeof AuthenticatedAppSettingsNotificationsIndexRoute
 }
 export interface FileRouteTypes {
@@ -271,6 +300,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth/callback'
+    | '/settings'
     | '/auth/login/'
     | '/auth/register/'
     | '/activity-logs/'
@@ -288,10 +318,12 @@ export interface FileRouteTypes {
     | '/fortress/work/'
     | '/legends/archive/'
     | '/legends/history/'
+    | '/legends/journal/'
+    | '/legends/stories/'
     | '/legends/world/'
     | '/settings/account/'
-    | '/settings/appearance/'
-    | '/settings/display/'
+    | '/settings/connection/'
+    | '/settings/legends/'
     | '/settings/notifications/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -314,16 +346,19 @@ export interface FileRouteTypes {
     | '/fortress/work'
     | '/legends/archive'
     | '/legends/history'
+    | '/legends/journal'
+    | '/legends/stories'
     | '/legends/world'
     | '/settings/account'
-    | '/settings/appearance'
-    | '/settings/display'
+    | '/settings/connection'
+    | '/settings/legends'
     | '/settings/notifications'
   id:
     | '__root__'
     | '/_authenticated'
     | '/_authenticated/_app'
     | '/auth/callback'
+    | '/_authenticated/_app/settings'
     | '/_authenticated/_app/'
     | '/auth/login/'
     | '/auth/register/'
@@ -342,10 +377,12 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/fortress/work/'
     | '/_authenticated/_app/legends/archive/'
     | '/_authenticated/_app/legends/history/'
+    | '/_authenticated/_app/legends/journal/'
+    | '/_authenticated/_app/legends/stories/'
     | '/_authenticated/_app/legends/world/'
     | '/_authenticated/_app/settings/account/'
-    | '/_authenticated/_app/settings/appearance/'
-    | '/_authenticated/_app/settings/display/'
+    | '/_authenticated/_app/settings/connection/'
+    | '/_authenticated/_app/settings/legends/'
     | '/_authenticated/_app/settings/notifications/'
   fileRoutesById: FileRoutesById
 }
@@ -400,12 +437,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/_app/settings': {
+      id: '/_authenticated/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedAppSettingsRouteRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/_app/settings/': {
       id: '/_authenticated/_app/settings/'
-      path: '/settings'
+      path: '/'
       fullPath: '/settings/'
       preLoaderRoute: typeof AuthenticatedAppSettingsIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+      parentRoute: typeof AuthenticatedAppSettingsRouteRoute
     }
     '/_authenticated/_app/nickname-dwarves/': {
       id: '/_authenticated/_app/nickname-dwarves/'
@@ -437,37 +481,51 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/_app/settings/notifications/': {
       id: '/_authenticated/_app/settings/notifications/'
-      path: '/settings/notifications'
+      path: '/notifications'
       fullPath: '/settings/notifications/'
       preLoaderRoute: typeof AuthenticatedAppSettingsNotificationsIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+      parentRoute: typeof AuthenticatedAppSettingsRouteRoute
     }
-    '/_authenticated/_app/settings/display/': {
-      id: '/_authenticated/_app/settings/display/'
-      path: '/settings/display'
-      fullPath: '/settings/display/'
-      preLoaderRoute: typeof AuthenticatedAppSettingsDisplayIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+    '/_authenticated/_app/settings/legends/': {
+      id: '/_authenticated/_app/settings/legends/'
+      path: '/legends'
+      fullPath: '/settings/legends/'
+      preLoaderRoute: typeof AuthenticatedAppSettingsLegendsIndexRouteImport
+      parentRoute: typeof AuthenticatedAppSettingsRouteRoute
     }
-    '/_authenticated/_app/settings/appearance/': {
-      id: '/_authenticated/_app/settings/appearance/'
-      path: '/settings/appearance'
-      fullPath: '/settings/appearance/'
-      preLoaderRoute: typeof AuthenticatedAppSettingsAppearanceIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+    '/_authenticated/_app/settings/connection/': {
+      id: '/_authenticated/_app/settings/connection/'
+      path: '/connection'
+      fullPath: '/settings/connection/'
+      preLoaderRoute: typeof AuthenticatedAppSettingsConnectionIndexRouteImport
+      parentRoute: typeof AuthenticatedAppSettingsRouteRoute
     }
     '/_authenticated/_app/settings/account/': {
       id: '/_authenticated/_app/settings/account/'
-      path: '/settings/account'
+      path: '/account'
       fullPath: '/settings/account/'
       preLoaderRoute: typeof AuthenticatedAppSettingsAccountIndexRouteImport
-      parentRoute: typeof AuthenticatedAppRoute
+      parentRoute: typeof AuthenticatedAppSettingsRouteRoute
     }
     '/_authenticated/_app/legends/world/': {
       id: '/_authenticated/_app/legends/world/'
       path: '/legends/world'
       fullPath: '/legends/world/'
       preLoaderRoute: typeof AuthenticatedAppLegendsWorldIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/legends/stories/': {
+      id: '/_authenticated/_app/legends/stories/'
+      path: '/legends/stories'
+      fullPath: '/legends/stories/'
+      preLoaderRoute: typeof AuthenticatedAppLegendsStoriesIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/legends/journal/': {
+      id: '/_authenticated/_app/legends/journal/'
+      path: '/legends/journal'
+      fullPath: '/legends/journal/'
+      preLoaderRoute: typeof AuthenticatedAppLegendsJournalIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/_app/legends/history/': {
@@ -543,13 +601,39 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAppSettingsRouteRouteChildren {
+  AuthenticatedAppSettingsIndexRoute: typeof AuthenticatedAppSettingsIndexRoute
+  AuthenticatedAppSettingsAccountIndexRoute: typeof AuthenticatedAppSettingsAccountIndexRoute
+  AuthenticatedAppSettingsConnectionIndexRoute: typeof AuthenticatedAppSettingsConnectionIndexRoute
+  AuthenticatedAppSettingsLegendsIndexRoute: typeof AuthenticatedAppSettingsLegendsIndexRoute
+  AuthenticatedAppSettingsNotificationsIndexRoute: typeof AuthenticatedAppSettingsNotificationsIndexRoute
+}
+
+const AuthenticatedAppSettingsRouteRouteChildren: AuthenticatedAppSettingsRouteRouteChildren =
+  {
+    AuthenticatedAppSettingsIndexRoute: AuthenticatedAppSettingsIndexRoute,
+    AuthenticatedAppSettingsAccountIndexRoute:
+      AuthenticatedAppSettingsAccountIndexRoute,
+    AuthenticatedAppSettingsConnectionIndexRoute:
+      AuthenticatedAppSettingsConnectionIndexRoute,
+    AuthenticatedAppSettingsLegendsIndexRoute:
+      AuthenticatedAppSettingsLegendsIndexRoute,
+    AuthenticatedAppSettingsNotificationsIndexRoute:
+      AuthenticatedAppSettingsNotificationsIndexRoute,
+  }
+
+const AuthenticatedAppSettingsRouteRouteWithChildren =
+  AuthenticatedAppSettingsRouteRoute._addFileChildren(
+    AuthenticatedAppSettingsRouteRouteChildren,
+  )
+
 interface AuthenticatedAppRouteChildren {
+  AuthenticatedAppSettingsRouteRoute: typeof AuthenticatedAppSettingsRouteRouteWithChildren
   AuthenticatedAppIndexRoute: typeof AuthenticatedAppIndexRoute
   AuthenticatedAppActivityLogsIndexRoute: typeof AuthenticatedAppActivityLogsIndexRoute
   AuthenticatedAppFortressIndexRoute: typeof AuthenticatedAppFortressIndexRoute
   AuthenticatedAppLegendsIndexRoute: typeof AuthenticatedAppLegendsIndexRoute
   AuthenticatedAppNicknameDwarvesIndexRoute: typeof AuthenticatedAppNicknameDwarvesIndexRoute
-  AuthenticatedAppSettingsIndexRoute: typeof AuthenticatedAppSettingsIndexRoute
   AuthenticatedAppFortressDwarvesIdRoute: typeof AuthenticatedAppFortressDwarvesIdRoute
   AuthenticatedAppFortressItemsIdRoute: typeof AuthenticatedAppFortressItemsIdRoute
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
@@ -560,14 +644,14 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFortressWorkIndexRoute: typeof AuthenticatedAppFortressWorkIndexRoute
   AuthenticatedAppLegendsArchiveIndexRoute: typeof AuthenticatedAppLegendsArchiveIndexRoute
   AuthenticatedAppLegendsHistoryIndexRoute: typeof AuthenticatedAppLegendsHistoryIndexRoute
+  AuthenticatedAppLegendsJournalIndexRoute: typeof AuthenticatedAppLegendsJournalIndexRoute
+  AuthenticatedAppLegendsStoriesIndexRoute: typeof AuthenticatedAppLegendsStoriesIndexRoute
   AuthenticatedAppLegendsWorldIndexRoute: typeof AuthenticatedAppLegendsWorldIndexRoute
-  AuthenticatedAppSettingsAccountIndexRoute: typeof AuthenticatedAppSettingsAccountIndexRoute
-  AuthenticatedAppSettingsAppearanceIndexRoute: typeof AuthenticatedAppSettingsAppearanceIndexRoute
-  AuthenticatedAppSettingsDisplayIndexRoute: typeof AuthenticatedAppSettingsDisplayIndexRoute
-  AuthenticatedAppSettingsNotificationsIndexRoute: typeof AuthenticatedAppSettingsNotificationsIndexRoute
 }
 
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
+  AuthenticatedAppSettingsRouteRoute:
+    AuthenticatedAppSettingsRouteRouteWithChildren,
   AuthenticatedAppIndexRoute: AuthenticatedAppIndexRoute,
   AuthenticatedAppActivityLogsIndexRoute:
     AuthenticatedAppActivityLogsIndexRoute,
@@ -575,7 +659,6 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppLegendsIndexRoute: AuthenticatedAppLegendsIndexRoute,
   AuthenticatedAppNicknameDwarvesIndexRoute:
     AuthenticatedAppNicknameDwarvesIndexRoute,
-  AuthenticatedAppSettingsIndexRoute: AuthenticatedAppSettingsIndexRoute,
   AuthenticatedAppFortressDwarvesIdRoute:
     AuthenticatedAppFortressDwarvesIdRoute,
   AuthenticatedAppFortressItemsIdRoute: AuthenticatedAppFortressItemsIdRoute,
@@ -593,16 +676,12 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppLegendsArchiveIndexRoute,
   AuthenticatedAppLegendsHistoryIndexRoute:
     AuthenticatedAppLegendsHistoryIndexRoute,
+  AuthenticatedAppLegendsJournalIndexRoute:
+    AuthenticatedAppLegendsJournalIndexRoute,
+  AuthenticatedAppLegendsStoriesIndexRoute:
+    AuthenticatedAppLegendsStoriesIndexRoute,
   AuthenticatedAppLegendsWorldIndexRoute:
     AuthenticatedAppLegendsWorldIndexRoute,
-  AuthenticatedAppSettingsAccountIndexRoute:
-    AuthenticatedAppSettingsAccountIndexRoute,
-  AuthenticatedAppSettingsAppearanceIndexRoute:
-    AuthenticatedAppSettingsAppearanceIndexRoute,
-  AuthenticatedAppSettingsDisplayIndexRoute:
-    AuthenticatedAppSettingsDisplayIndexRoute,
-  AuthenticatedAppSettingsNotificationsIndexRoute:
-    AuthenticatedAppSettingsNotificationsIndexRoute,
 }
 
 const AuthenticatedAppRouteWithChildren =

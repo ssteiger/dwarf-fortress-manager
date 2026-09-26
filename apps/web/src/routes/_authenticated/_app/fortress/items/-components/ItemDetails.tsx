@@ -11,12 +11,13 @@ import {
 } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import { MapIcon } from 'lucide-react'
+import { LightbulbIcon, MapIcon, TriangleAlertIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
 import { formatValue, humanize, splitPascal, unitDisplayName } from '~/lib/fortress/format'
 import { useFortItem } from '~/lib/fortress/queries'
+import { type ItemHint, itemHints } from '~/lib/fortress/stores'
 import { EmptyState, StatCard } from '../../-components/FortChrome'
 
 const PROMINENT_FLAGS = [
@@ -165,9 +166,11 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
 
   const otherFlags = item.flags.filter((flag) => !PROMINENT_FLAGS.includes(flag))
   const contentsValue = (data?.contents ?? []).reduce((sum, entry) => sum + entry.value, 0)
+  const hints = itemHints(item)
 
   return (
     <div className="flex flex-col gap-4">
+      {hints.length ? <ItemHints hints={hints} /> : null}
       <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
         <StatCard title="Value" value={formatValue(item.value)} />
         <StatCard
@@ -194,7 +197,7 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
             ) : data?.container ? (
               'Contained'
             ) : (
-              '—'
+              'Elsewhere'
             )
           }
           hint={
@@ -344,6 +347,39 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
           />
         </Card>
       ) : null}
+    </div>
+  )
+}
+
+/** What is wrong with the item and what it is good for. */
+function ItemHints({ hints }: { hints: ItemHint[] }) {
+  const trouble = hints.some((h) => h.problem)
+  return (
+    <div
+      className={cn(
+        'rounded-xl border p-4',
+        trouble ? 'border-amber-500/40 bg-amber-500/5' : 'bg-muted/30',
+      )}
+    >
+      <div className="mb-2 text-sm font-medium">What to do with it</div>
+      <ul className="flex flex-col gap-2">
+        {hints.map((hint) => {
+          const Icon = hint.problem ? TriangleAlertIcon : LightbulbIcon
+          return (
+            <li key={hint.title} className="flex gap-2.5 text-sm leading-relaxed">
+              <Icon
+                className={cn(
+                  'mt-0.5 size-4 shrink-0',
+                  hint.problem ? 'text-amber-600 dark:text-amber-400' : 'text-primary',
+                )}
+              />
+              <span>
+                <span className="font-medium">{hint.title}.</span> {hint.text}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }

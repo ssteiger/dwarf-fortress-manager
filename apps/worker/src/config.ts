@@ -28,6 +28,8 @@ export const config = {
   pollMs: intEnv('DF_POLL_MS', 30_000),
   /** How often to dump the map. Each map dump pauses the game for a few seconds. */
   mapPollMs: intEnv('DF_MAP_POLL_MS', 300_000),
+  /** How often to look for commands queued by the web app between dumps. */
+  commandPollMs: intEnv('DF_COMMAND_POLL_MS', 2_000),
   /** Set to "0" to skip the legends import entirely. */
   importLegends: process.env.DF_IMPORT_LEGENDS !== '0',
 } as const

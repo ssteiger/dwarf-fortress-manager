@@ -14,9 +14,12 @@ import { logger } from './utils/logger'
  *     units, items, buildings, jobs, and announcements, and writes it to Postgres.
  *  3. Every DF_MAP_POLL_MS does the same with the map included.
  *  4. Once, in the background, imports any legends exports found next to the game.
+ *  5. Every DF_COMMAND_POLL_MS between dumps, runs commands queued by the web
+ *     app (nicknames, whitelisted DFHack actions), then dumps so the result shows.
  */
 
 let polling = false
+let commanding = false
 let lastMapAt = 0
 let lastStatus: string | null = null
 
@@ -24,20 +27,37 @@ function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
+/** Run whatever the web app queued. Never overlaps itself. */
+async function runQueuedCommands(): Promise<number> {
+  if (commanding) return 0
+  commanding = true
+  try {
+    const processed = await processPendingCommands(config)
+    if (processed > 0) console.log(`Processed ${processed} fortress command(s).`)
+    return processed
+  } catch (err) {
+    console.error('Could not process fortress commands:', err)
+    await logger
+      .error(`Fortress worker: command processing failed (${describeError(err)})`)
+      .catch(() => {})
+    return 0
+  } finally {
+    commanding = false
+  }
+}
+
+/** Between dumps: pick up queued commands quickly, and dump right after running any. */
+async function commandTick(): Promise<void> {
+  if (polling) return
+  const processed = await runQueuedCommands()
+  if (processed > 0) await pollOnce()
+}
+
 async function pollOnce(): Promise<void> {
   if (polling) return
   polling = true
   try {
-    const processedCommands = await processPendingCommands(config).catch(async (err) => {
-      console.error('Could not process fortress commands:', err)
-      await logger
-        .error(`Fortress worker: command processing failed (${describeError(err)})`)
-        .catch(() => {})
-      return 0
-    })
-    if (processedCommands > 0) {
-      console.log(`Processed ${processedCommands} fortress command(s).`)
-    }
+    await runQueuedCommands()
 
     const due = Date.now() - lastMapAt >= config.mapPollMs
     const outcome = await takeDump(config, { withMap: due })
@@ -129,6 +149,9 @@ async function startWorker() {
   setInterval(() => {
     void pollOnce()
   }, config.pollMs)
+  setInterval(() => {
+    void commandTick()
+  }, config.commandPollMs)
 
   if (config.importLegends) {
     scanAndImportLegends(config.legendsDir).catch((err) => {

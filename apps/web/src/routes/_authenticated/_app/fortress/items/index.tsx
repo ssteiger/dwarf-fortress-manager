@@ -1,8 +1,10 @@
 import type { FortItem } from '@fortress/db-drizzle'
 import {
-  Badge,
   Button,
   Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   DataTable,
   Drawer,
   DrawerClose,
@@ -11,27 +13,51 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  cn,
 } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
-import { Maximize2Icon, XIcon } from 'lucide-react'
+import {
+  HammerIcon,
+  LifeBuoyIcon,
+  ListChecksIcon,
+  Maximize2Icon,
+  PiggyBankIcon,
+  XIcon,
+} from 'lucide-react'
 import * as React from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
 import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
-import { FORT_SLOW_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
-import { type ItemSortKey, getFortItems } from '~/lib/fortress/server'
+import { gameTimeOf } from '~/lib/fortress/insights'
+import {
+  FORT_SLOW_REFRESH_MS,
+  useFortConcerns,
+  useFortOverview,
+  useFortSupplies,
+  useFortUnits,
+} from '~/lib/fortress/queries'
+import { type ItemSortKey, getFortItems, getFortWork } from '~/lib/fortress/server'
+import {
+  type ItemView,
+  isItemView,
+  productionPlan,
+  storeSituations,
+  storeTiles,
+  storesAdvice,
+} from '~/lib/fortress/stores'
+import { NextSteps, SituationList } from '../-components/Advice'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { GuideProvider } from '../-components/Guide'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
-
-const ALL_TYPES = '__all__'
+import {
+  ProductionPlan,
+  StoreTiles,
+  TypeChips,
+  ViewChips,
+  ViewHint,
+  WealthBreakdown,
+} from './-components/Stores'
 
 const STATUS_FLAGS = [
   'artifact',
@@ -107,16 +133,7 @@ const ITEM_COLUMNS: ColumnDef<FortItem>[] = [
     accessorFn: (item) => STATUS_FLAGS.filter((flag) => item.flags.includes(flag)).join(' '),
     cell: ({ row }) => (
       <div className="flex flex-wrap gap-1">
-        {row.original.flags.includes('artifact') ? <Badge>Artifact</Badge> : null}
-        {row.original.flags.includes('forbid') ? (
-          <Badge variant="destructive">Forbidden</Badge>
-        ) : null}
-        {row.original.flags.includes('dump') ? <Badge variant="secondary">Dump</Badge> : null}
-        {row.original.flags.includes('melt') ? <Badge variant="secondary">Melt</Badge> : null}
-        {row.original.flags.includes('rotten') ? <Badge variant="destructive">Rotten</Badge> : null}
-        {row.original.flags.includes('owned') ? <Badge variant="outline">Owned</Badge> : null}
-        {row.original.flags.includes('trader') ? <Badge variant="outline">Merchant's</Badge> : null}
-        {row.original.flags.includes('foreign') ? <Badge variant="outline">Foreign</Badge> : null}
+        <ItemStatusBadges flags={row.original.flags} />
       </div>
     ),
   },
@@ -148,7 +165,7 @@ const ITEM_COLUMNS: ColumnDef<FortItem>[] = [
       if (item.holder_building_id !== null) return 'in building'
       if (item.container_id !== null) return 'in container'
       if (item.x !== null) return `${item.x},${item.y} z${item.z}`
-      return '—'
+      return 'elsewhere'
     },
   },
 ]
@@ -163,11 +180,156 @@ function useDebounced<T>(value: T, delayMs: number): T {
 }
 
 function ItemsPage() {
+  return (
+    <GuideProvider>
+      <ItemsBody />
+    </GuideProvider>
+  )
+}
+
+function ItemsBody() {
   const overview = useFortOverview()
+  const units = useFortUnits()
+  const concerns = useFortConcerns()
+  const supplies = useFortSupplies()
+  const work = useQuery({
+    queryKey: ['fort', 'work'],
+    queryFn: () => getFortWork(),
+    refetchInterval: FORT_SLOW_REFRESH_MS,
+  })
+  const state = overview.data?.state ?? null
+  const summary = state?.summary ?? null
+  const now = gameTimeOf(state)
+
+  const advisorInput = React.useMemo(
+    () => ({
+      summary,
+      units: units.data?.units ?? [],
+      buildings: work.data?.buildings ?? [],
+      jobs: work.data?.jobs ?? [],
+      concerns: concerns.data ?? null,
+      supplies: supplies.data ?? null,
+      events: overview.data?.events ?? [],
+      now,
+    }),
+    [summary, units.data, work.data, concerns.data, supplies.data, overview.data?.events, now],
+  )
+  const advice = React.useMemo(() => storesAdvice(advisorInput), [advisorInput])
+  const tiles = React.useMemo(() => storeTiles(advisorInput), [advisorInput])
+  const plan = React.useMemo(() => productionPlan(advisorInput), [advisorInput])
+  const playbook = React.useMemo(() => storeSituations(advisorInput), [advisorInput])
+  const ready = Boolean(summary && supplies.data && units.data && work.data)
+  const problems = advice.filter((a) => a.status === 'problem').length
+  const attention = advice.filter((a) => a.status === 'attention').length
+
+  return (
+    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <PageHeader
+        eyebrow="Fortress"
+        title="Stores and items"
+        description="What the fortress keeps, what it is running short of, and what to do about it in the game. Every item on the map is listed below."
+        updatedAt={supplies.data?.capturedAt}
+        isFetching={supplies.isFetching}
+        onRefresh={() => {
+          void supplies.refetch()
+          void work.refetch()
+        }}
+      />
+      <StatusBanner state={state} />
+
+      {ready ? (
+        <>
+          <StoreTiles tiles={tiles} advice={advice} />
+
+          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card className="gap-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ListChecksIcon className="size-4 text-primary" />
+                    What the stores need
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {problems ? `${problems} problem${problems === 1 ? '' : 's'} and ` : ''}
+                    {attention} thing{attention === 1 ? '' : 's'} to see to in what the fortress
+                    keeps. Open one for the steps in the game.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <NextSteps advice={advice} max={6} />
+                </CardContent>
+              </Card>
+
+              <Card className="gap-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <HammerIcon className="size-4 text-primary" />
+                    Worth making next
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    What a fortress this size should keep in store, against what it has. Open one to
+                    see where to make it and who can.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <ProductionPlan rows={plan} />
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-4">
+              <Card className="gap-3">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <PiggyBankIcon className="size-4 text-primary" />
+                    Where the wealth is
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <WealthBreakdown wealth={summary?.wealth ?? null} />
+                </CardContent>
+              </Card>
+
+              <Card className="gap-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <LifeBuoyIcon className="size-4 text-primary" />
+                    When things go wrong
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Trouble with the stores, and how to get through it. What seems to be happening
+                    now is on top.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <SituationList situations={playbook} />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">Reading the stores…</p>
+      )}
+
+      <ItemList />
+    </div>
+  )
+}
+
+const ALL_TYPES = null
+
+/** Every item in one view of the list, filterable by type and searchable. */
+function ItemList() {
+  const { view: urlView } = Route.useSearch()
+  const navigate = Route.useNavigate()
+  const view: ItemView = urlView ?? 'fortress'
   const [search, setSearch] = React.useState('')
-  const [type, setType] = React.useState<string>(ALL_TYPES)
-  const [onlyForbidden, setOnlyForbidden] = React.useState(false)
-  const [page, setPage] = React.useState(0)
+  // Type and page belong to the view they were picked in and reset with it.
+  const [picked, setPicked] = React.useState<{ view: ItemView; type: string | null; page: number }>(
+    { view, type: ALL_TYPES, page: 0 },
+  )
+  const { type, page } = picked.view === view ? picked : { type: ALL_TYPES, page: 0 }
   const [pageSize, setPageSize] = React.useState(100)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'value', desc: true }])
   const sortColumn = sorting[0]
@@ -176,14 +338,14 @@ function ItemsPage() {
   const q = useDebounced(search, 250)
   const [selected, setSelected] = React.useState<FortItem | null>(null)
 
-  const { data, isFetching, refetch } = useQuery({
-    queryKey: ['fort', 'items', q, type, onlyForbidden, page, pageSize, sortKey, sortDir],
+  const { data, isFetching } = useQuery({
+    queryKey: ['fort', 'items', view, q, type, page, pageSize, sortKey, sortDir],
     queryFn: () =>
       getFortItems({
         data: {
           q,
-          type: type === ALL_TYPES ? undefined : type,
-          onlyForbidden,
+          view,
+          type: type ?? undefined,
           page,
           pageSize,
           sortKey,
@@ -193,84 +355,43 @@ function ItemsPage() {
     refetchInterval: FORT_SLOW_REFRESH_MS,
     placeholderData: keepPreviousData,
   })
-
-  const typeOptions = React.useMemo(
-    () => Object.entries(data?.types ?? {}).sort((a, b) => b[1] - a[1]),
-    [data?.types],
-  )
-  const changeFilter = (fn: () => void) => {
-    fn()
-    setPage(0)
-  }
+  const setView = (next: ItemView) =>
+    navigate({
+      search: (prev) => ({ ...prev, view: next === 'fortress' ? undefined : next }),
+      resetScroll: false,
+    })
+  const setType = (next: string | null) => setPicked({ view, type: next, page: 0 })
+  const setPage = (next: number) => setPicked({ view, type, page: next })
+  const current = data?.view === view ? data : undefined
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <PageHeader
-        eyebrow="Fortress"
-        title="Items"
-        description={
-          data
-            ? `${formatNumber(data.total)} items on the map and in the stores, most valuable first. Click a row to inspect one.`
-            : 'Everything the fortress owns, once a dump has been taken.'
-        }
-        updatedAt={data?.capturedAt}
-        isFetching={isFetching}
-        onRefresh={() => refetch()}
-      />
-      <StatusBanner state={overview.data?.state} />
+    <section id="items-list" className="flex scroll-mt-4 flex-col gap-4">
+      <div>
+        <h2 className="text-lg font-semibold tracking-tight">Every item</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {data
+            ? `${formatNumber(data.views.fortress)} items in the fortress${data.views.elsewhere ? `, and ${formatNumber(data.views.elsewhere)} artifacts and books the game knows of elsewhere` : ''}. Click one to see what to do with it.`
+            : 'Everything the fortress owns, once a dump has been taken.'}
+          {isFetching ? ' Updating…' : ''}
+        </p>
+      </div>
 
-      {data && typeOptions.length ? (
-        <div className="flex flex-wrap gap-2">
-          {typeOptions.slice(0, 14).map(([name, count]) => (
-            <button
-              type="button"
-              key={name}
-              onClick={() => changeFilter(() => setType(type === name ? ALL_TYPES : name))}
-              className={cn(
-                'rounded-full border px-3 py-1.5 text-sm transition-colors hover:bg-accent',
-                type === name &&
-                  'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-              )}
-            >
-              {humanize(name)} <span className="opacity-70">{formatNumber(count)}</span>
-              {data.valueByType[name] ? (
-                <span className="ml-1 opacity-70">· {formatValue(data.valueByType[name])}</span>
-              ) : null}
-            </button>
-          ))}
-        </div>
+      <ViewChips view={view} counts={data?.views} onChange={setView} />
+      {current ? <ViewHint view={view} count={current.inView} value={current.viewValue} /> : null}
+      {current ? (
+        <TypeChips
+          types={current.types}
+          valueByType={current.valueByType}
+          samples={current.samples}
+          selected={type}
+          onSelect={setType}
+        />
       ) : null}
 
       <Card className="overflow-hidden p-0">
-        <div className="flex flex-wrap items-center gap-3 border-b p-4">
-          <Select value={type} onValueChange={(v) => changeFilter(() => setType(v))}>
-            <SelectTrigger className="h-9 w-[200px]">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_TYPES}>All types</SelectItem>
-              {typeOptions.map(([name, count]) => (
-                <SelectItem key={name} value={name}>
-                  {humanize(name)} ({count})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={onlyForbidden}
-              onChange={(e) => changeFilter(() => setOnlyForbidden(e.target.checked))}
-            />
-            forbidden only
-          </label>
-        </div>
-
         {!data || data.total === 0 ? (
           <div className="p-6">
-            <EmptyState title="No items">
-              {data?.total ? 'Nothing matches this filter.' : 'No dump has been taken yet.'}
-            </EmptyState>
+            <EmptyState title="No items">No dump has been taken yet.</EmptyState>
           </div>
         ) : (
           <DataTable
@@ -300,7 +421,7 @@ function ItemsPage() {
             onRowClick={setSelected}
             emptyState={{
               title: 'No items',
-              subtitle: 'Nothing matches this search.',
+              subtitle: q || type ? 'Nothing matches this search.' : 'Nothing in this view.',
             }}
           />
         )}
@@ -357,10 +478,16 @@ function ItemsPage() {
           ) : null}
         </DrawerContent>
       </Drawer>
-    </div>
+    </section>
   )
 }
 
+interface ItemsSearch {
+  view?: ItemView
+}
+
 export const Route = createFileRoute('/_authenticated/_app/fortress/items/')({
+  validateSearch: (raw: Record<string, unknown>): ItemsSearch =>
+    isItemView(raw.view) && raw.view !== 'fortress' ? { view: raw.view } : {},
   component: ItemsPage,
 })

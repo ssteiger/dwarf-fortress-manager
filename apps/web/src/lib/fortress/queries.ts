@@ -1,6 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
-import { getFortItem, getFortOverview, getFortUnit } from './server'
+import {
+  getFortConcerns,
+  getFortItem,
+  getFortOverview,
+  getFortSupplies,
+  getFortUnit,
+  getFortUnits,
+} from './server'
 
 /** Shared polling cadence for the fortress pages (reads Postgres, not the game). */
 export const FORT_REFRESH_MS = 5_000
@@ -11,6 +18,31 @@ export function useFortOverview() {
     queryKey: ['fort', 'overview'],
     queryFn: () => getFortOverview(),
     refetchInterval: FORT_REFRESH_MS,
+  })
+}
+
+/** Every unit in the last dump; shared by the overview, the roster and the edge dwarves. */
+export function useFortUnits() {
+  return useQuery({
+    queryKey: ['fort', 'units'],
+    queryFn: () => getFortUnits(),
+    refetchInterval: FORT_REFRESH_MS * 2,
+  })
+}
+
+export function useFortConcerns() {
+  return useQuery({
+    queryKey: ['fort', 'concerns'],
+    queryFn: () => getFortConcerns(),
+    refetchInterval: FORT_SLOW_REFRESH_MS,
+  })
+}
+
+export function useFortSupplies() {
+  return useQuery({
+    queryKey: ['fort', 'supplies'],
+    queryFn: () => getFortSupplies(),
+    refetchInterval: FORT_SLOW_REFRESH_MS,
   })
 }
 

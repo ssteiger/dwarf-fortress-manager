@@ -73,6 +73,17 @@ export function unitDisplayName(unit: Pick<FortUnit, 'name' | 'readable'>): stri
   return unit.name || unit.readable
 }
 
+/**
+ * How announcements name a unit: "Urist McDwarf", or "`Nick' McDwarf" once
+ * nicknamed. The second needle catches the nicknamed form by its surname.
+ */
+export function mentionNeedles(name: string): string[] {
+  const clean = name.trim()
+  if (!clean) return []
+  const parts = clean.split(/\s+/)
+  return parts.length > 1 ? [clean, `' ${parts[parts.length - 1]}`] : [clean]
+}
+
 export function sexLabel(sex: number): string {
   if (sex === 1) return 'male'
   if (sex === 0) return 'female'

@@ -99,7 +99,7 @@ function ChroniclePage() {
       <PageHeader
         eyebrow="Fortress"
         title="Chronicle"
-        description="Every announcement the game has made since the worker started, newest first."
+        description="Every announcement the game has made since the worker started, newest first. Announcements undone by loading an earlier save are left out."
         updatedAt={dataUpdatedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}

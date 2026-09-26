@@ -2,6 +2,7 @@ import type { LegendsPayload } from '@fortress/db-drizzle'
 import { Badge, Skeleton } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { plusOf, str } from '~/lib/legends/events'
@@ -15,6 +16,8 @@ import {
   words,
 } from '~/lib/legends/model'
 import { getLegendsMap, getLegendsRecord } from '~/lib/legends/server'
+import { recordVisit } from '~/lib/legends/trail'
+import { PinButton } from '../-components/Journal'
 import {
   Breadcrumbs,
   Section,
@@ -22,6 +25,7 @@ import {
   recordName,
   useLegendsWorlds,
 } from '../-components/LegendsChrome'
+import { NarrateButton } from '../-components/Narrator'
 import { RawFacts } from '../-components/RawFacts'
 import {
   ArtifactSections,
@@ -37,6 +41,7 @@ import {
   describeRecord,
 } from '../-components/RecordSections'
 import { Timeline } from '../-components/Timeline'
+import { TrailBar } from '../-components/Trail'
 import { EmptyState } from '../../fortress/-components/FortChrome'
 
 /** Kinds whose page shows the world map. */
@@ -48,6 +53,15 @@ const MAP_KINDS = new Set([
   'mountain_peak',
   'river',
   'landmass',
+  'historical_event_collection',
+])
+
+/** Kinds whose history is worth a narrator's telling. */
+const NARRATED_KINDS = new Set([
+  'historical_figure',
+  'site',
+  'entity',
+  'artifact',
   'historical_event_collection',
 ])
 
@@ -96,21 +110,35 @@ function RecordPage() {
   const tab = browseTabForKind(kind)
 
   // What the game draws for this record, beside the title.
-  const spriteSubject = record
-    ? {
-        kind,
-        id: numericId,
-        race:
-          kind === 'historical_figure'
-            ? (record.type ?? str(payload.race))
-            : kind === 'creature'
-              ? str(plus.creature_id)
-              : raceToken(str(plus.race) ?? str(payload.race)),
-        caste: str(payload.caste),
-        type: record.type,
-        item: { type: str(plus.item_type), subtype: str(plus.item_subtype) },
-      }
-    : null
+  const spriteSubject = React.useMemo(() => {
+    if (!record) return null
+    const p = record.payload as LegendsPayload
+    const extra = plusOf(p)
+    return {
+      kind,
+      id: numericId,
+      race:
+        kind === 'historical_figure'
+          ? (record.type ?? str(p.race))
+          : kind === 'creature'
+            ? str(extra.creature_id)
+            : raceToken(str(extra.race) ?? str(p.race)),
+      caste: str(p.caste),
+      type: record.type,
+      item: { type: str(extra.item_type), subtype: str(extra.item_subtype) },
+    }
+  }, [record, kind, numericId])
+
+  React.useEffect(() => {
+    if (!record || worldId === null) return
+    recordVisit(worldId, {
+      kind: record.kind,
+      id: record.id,
+      title,
+      detail: subtitle.length > 90 ? `${subtitle.slice(0, 88)}…` : subtitle,
+      sprite: spriteSubject,
+    })
+  }, [record, worldId, title, subtitle, spriteSubject])
 
   const chips: string[] = []
   if (record?.type && kind !== 'historical_figure') chips.push(words(record.type))
@@ -136,7 +164,7 @@ function RecordPage() {
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <Breadcrumbs
         items={[
-          { label: 'Legends', to: '/legends/world', search: { world: worldId ?? undefined } },
+          { label: 'Legends', to: '/legends', search: { world: worldId ?? undefined } },
           ...(selectedWorld
             ? [
                 {
@@ -154,8 +182,9 @@ function RecordPage() {
           { label: title },
         ]}
       />
+      {worldId !== null ? <TrailBar worldId={worldId} current={{ kind, id: numericId }} /> : null}
 
-      <header className="flex items-start gap-4">
+      <header className="flex flex-wrap items-start gap-4">
         {spriteSubject ? (
           <LegendsSprite
             subject={spriteSubject}
@@ -164,7 +193,7 @@ function RecordPage() {
             title={`${title} as drawn in the game`}
           />
         ) : null}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1 basis-64">
           <p className="text-sm text-muted-foreground">{kindLabel(kind)}</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">{title}</h1>
           {subtitle ? (
@@ -182,6 +211,23 @@ function RecordPage() {
             </div>
           ) : null}
         </div>
+        {record && worldId !== null ? (
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            {NARRATED_KINDS.has(kind) ? (
+              <NarrateButton
+                worldId={worldId}
+                subject={{ kind: 'record', recordKind: kind, id: numericId }}
+                title={title}
+              />
+            ) : null}
+            <PinButton
+              worldId={worldId}
+              target={{ kind, id: String(numericId), title }}
+              size="sm"
+              label="Pin to journal"
+            />
+          </div>
+        ) : null}
       </header>
 
       {detail.isLoading || (worldId === null && legends.isLoading) ? (

@@ -10,6 +10,7 @@ import {
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import { type CurrentUser, getCurrentUser } from '~/lib/auth/server'
+import { BOOT_SCRIPT } from '~/lib/preferences'
 import appCss from '~/lib/styles/app.css?url'
 
 export const Route = createRootRouteWithContext<{
@@ -61,10 +62,7 @@ function RootDocument({ children }: { readonly children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <ScriptOnce>
-          {/* Stone (dark) is the default, like the game; parchment (light) is opt-in. */}
-          {`document.documentElement.classList.toggle('dark', localStorage.theme !== 'light')`}
-        </ScriptOnce>
+        <ScriptOnce>{BOOT_SCRIPT}</ScriptOnce>
 
         {children}
 

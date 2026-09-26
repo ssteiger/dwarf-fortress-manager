@@ -9,8 +9,10 @@ import {
 	text,
 	timestamp,
 	uniqueIndex,
+	uuid,
 } from "drizzle-orm/pg-core";
 import type {
+	DfhackAction,
 	FortMapPayload,
 	FortStatus,
 	FortSummary,
@@ -96,9 +98,14 @@ export const fort_commands = pgTable(
 	"fort_commands",
 	{
 		id: serial().primaryKey().notNull(),
-		kind: text().$type<"set_nickname">().notNull(),
-		unit_id: integer().notNull(),
-		nickname: text().notNull(),
+		kind: text().$type<"set_nickname" | "dfhack">().notNull(),
+		/** set_nickname: the unit and its new nickname. */
+		unit_id: integer(),
+		nickname: text(),
+		/** dfhack: a key of DFHACK_ACTIONS; the worker maps it to the command. */
+		action: text().$type<DfhackAction>(),
+		/** dfhack: what the command printed. */
+		output: text(),
 		status: text()
 			.$type<"pending" | "processing" | "done" | "failed">()
 			.notNull()
@@ -169,5 +176,41 @@ export const legends_records = pgTable(
 		index("legends_records_entity_ids_idx").using("gin", t.entity_ids),
 		index("legends_records_site_ids_idx").using("gin", t.site_ids),
 		index("legends_records_artifact_ids_idx").using("gin", t.artifact_ids),
+	],
+);
+
+/**
+ * A reader's journal for legends mode: pins and notes on records, events,
+ * spans of years and stories, per user and per world. `target_id` is text so
+ * one table holds record ids, "from-to" spans and story keys alike.
+ */
+export const legends_notes = pgTable(
+	"legends_notes",
+	{
+		id: serial().primaryKey().notNull(),
+		user_id: uuid().notNull(),
+		world_id: integer()
+			.notNull()
+			.references(() => legends_worlds.id, { onDelete: "cascade" }),
+		target_kind: text().notNull(),
+		target_id: text().notNull(),
+		title: text().notNull().default(""),
+		note: text().notNull().default(""),
+		tags: text().array().notNull().default([]),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		uniqueIndex("legends_notes_target_unique").on(
+			t.user_id,
+			t.world_id,
+			t.target_kind,
+			t.target_id,
+		),
+		index("legends_notes_user_world_idx").on(t.user_id, t.world_id, t.updated_at),
 	],
 );

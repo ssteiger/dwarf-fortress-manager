@@ -1,109 +1,127 @@
 import type { FortUnit } from '@fortress/db-drizzle/fortress-types'
 
-const GIVEN_NAMES = [
-  'Mosus',
-  'Tuesday',
-  'Goon',
-  'Urist',
-  'Dingo',
-  'Wombo',
-  'Bungo',
-  'Stabby',
-  'Mister',
-  'Grumbus',
-  'Tuna',
-  'Socks',
-  'Moldy',
-  'Kevin',
-  'Plump',
-  'Turbo',
-  'Biscuit',
-  'Crumbus',
-  'Doombert',
-  'Fungus',
-  'Greeble',
-  'Honkers',
-  'Lunchbox',
-  'Nubbins',
-  'Oatmeal',
-  'Pants',
-  'Quackson',
-  'Rumble',
-  'Spork',
-  'Tungsten',
-  'Waffles',
-  'Zorp',
-] as const
+export function isLivingCitizen(unit: FortUnit): boolean {
+  return (
+    unit.flags.includes('citizen') && !unit.flags.includes('dead') && !unit.flags.includes('ghost')
+  )
+}
 
-const GENERIC_TITLES = [
-  'Sackstab',
-  'Terminator',
-  'Master',
-  'Beardcrime',
-  'McHammer',
-  'Aleproblem',
-  'Pickleord',
-  'Cave Johnson',
-  'Toe Biter',
-  'Rock Licker',
-  'Goblin Bonker',
-  'Barrelmancer',
-  'Pantsbane',
-  'Cheese Fist',
-  'Lunch Destroyer',
-  'Health Hazard',
-] as const
+export function livingCitizens(units: FortUnit[]): FortUnit[] {
+  return units
+    .filter(isLivingCitizen)
+    .sort((a, b) => a.readable.localeCompare(b.readable) || a.id - b.id)
+}
 
-const ROLE_TITLES: [needles: string[], titles: string[]][] = [
-  [
-    ['MINER', 'MINING'],
-    ['Vein Inspector', 'Tunnel Visionary', 'Granite Dentist', 'Pick Enthusiast', 'Cave Auditor'],
+// ---------------------------------------------------------------------------
+// Alliteration: "Bad Bargain" -> "Bob the Bad Bargain"
+
+/** Letter -> [his names, her names]: stuffy, old-fashioned, faintly ridiculous. */
+const FIRST_NAMES: Record<string, [string[], string[]]> = {
+  A: [
+    ['Arnold', 'Albert', 'Alfred', 'Archibald', 'Ambrose', 'Augustus', 'Alistair'],
+    ['Agnes', 'Agatha', 'Alma', 'Adelaide', 'Augusta', 'Ada', 'Althea'],
   ],
-  [
-    ['BREWER', 'BREWING'],
-    ['Ale Liability', 'Barrel Prophet', 'Tavern Chemist', 'Booze Wizard', 'Emergency Brewer'],
+  B: [
+    ['Bob', 'Barnaby', 'Bertram', 'Boris', 'Basil', 'Bartholomew', 'Bruno'],
+    ['Bertha', 'Beryl', 'Brunhilde', 'Betty', 'Bernadette', 'Blanche', 'Bettina'],
   ],
-  [
-    ['COOK', 'COOKING'],
-    ['Lunch Destroyer', 'Soup Architect', 'Biscuit Warlord', 'Kitchen Menace', 'Plump Helmet Chef'],
+  C: [
+    ['Clive', 'Cedric', 'Cornelius', 'Cuthbert', 'Clarence', 'Cyril', 'Conrad'],
+    ['Clara', 'Constance', 'Cordelia', 'Cecily', 'Clementine', 'Cornelia', 'Colette'],
   ],
-  [
-    ['DOCTOR', 'SURGEON', 'DIAGNOS', 'MEDICAL', 'BONE_SETTING', 'SUTUR'],
-    ['Sock Surgeon', 'Bone Negotiator', 'Diagnosis Goblin', 'Health Hazard', 'Emergency Carpenter'],
+  D: [
+    ['Doug', 'Desmond', 'Dudley', 'Dmitri', 'Duncan', 'Dietrich', 'Dexter'],
+    ['Doris', 'Dolores', 'Dorothy', 'Dagmar', 'Delphine', 'Daphne', 'Dymphna'],
   ],
-  [
-    ['SMITH', 'FORGE', 'METAL', 'ARMOR', 'WEAPON'],
-    ['Hammer Attorney', 'Forge Goblin', 'Anvil Enthusiast', 'Metal Screamer', 'Steel Whisperer'],
+  E: [
+    ['Edgar', 'Egbert', 'Ernest', 'Eugene', 'Elmer', 'Eustace', 'Elmo'],
+    ['Edna', 'Ethel', 'Eunice', 'Esmeralda', 'Edith', 'Enid', 'Eudora'],
   ],
-  [
-    ['CARPENTER', 'WOOD', 'BOWYER'],
-    ['Chair Engineer', 'Plank Sinatra', 'Saw Supervisor', 'Splinter Wizard', 'Table Prophet'],
+  F: [
+    ['Fred', 'Ferdinand', 'Fergus', 'Felix', 'Floyd', 'Franz', 'Fitzgerald'],
+    ['Frieda', 'Florence', 'Fanny', 'Fenella', 'Flora', 'Fern', 'Francesca'],
   ],
-  [
-    ['MASON', 'STONE', 'ENGRAV', 'ARCHITECT'],
-    ['Rock Licker', 'Wall Enthusiast', 'Granite Poet', 'Brick Whisperer', 'Floor Historian'],
+  G: [
+    ['Gustaav', 'Gerald', 'Gordon', 'Godfrey', 'Gunther', 'Gilbert', 'Gideon'],
+    ['Gertrude', 'Gladys', 'Greta', 'Gwendolyn', 'Gilda', 'Griselda', 'Georgina'],
   ],
-  [
-    ['FARMER', 'PLANT', 'HERBAL', 'GROWER'],
-    ['Mud Baron', 'Turnip Marshal', 'Seed Accountant', 'Mushroom Oracle', 'Crop Goblin'],
+  H: [
+    ['Horace', 'Herbert', 'Humphrey', 'Hank', 'Hector', 'Hubert', 'Harold'],
+    ['Hilda', 'Harriet', 'Hortense', 'Hazel', 'Henrietta', 'Helga', 'Hester'],
   ],
-  [
-    ['FISH', 'HUNTER', 'TRAPPER', 'ANIMAL'],
-    ['Carp Nemesis', 'Creature Botherer', 'Net Prophet', 'Wildlife Auditor', 'Fish Criminal'],
+  I: [
+    ['Igor', 'Ignatius', 'Ivan', 'Irving', 'Ingmar', 'Isidore'],
+    ['Ingrid', 'Irma', 'Imelda', 'Isolde', 'Ida', 'Imogen'],
   ],
-  [
-    ['SOLDIER', 'AXE', 'SWORD', 'SPEAR', 'HAMMER', 'CROSSBOW', 'WRESTL'],
-    ['Goblin Bonker', 'Violence Clerk', 'Axe Diplomat', 'Siege Enjoyer', 'Helmet Inspector'],
+  J: [
+    ['Jeff', 'Jasper', 'Jebediah', 'Julius', 'Jonas', 'Jethro'],
+    ['Joan', 'Judith', 'Josephine', 'Jemima', 'Juno', 'Jolene'],
   ],
-  [
-    ['MECHANIC', 'ENGINEER', 'SIEGE', 'PUMP'],
-    ['Lever Enjoyer', 'Trap Academic', 'Gear Goblin', 'Machine Whisperer', 'OSHA Concern'],
+  K: [
+    ['Kevin', 'Klaus', 'Kenneth', 'Kurt', 'Kasimir', 'Konrad'],
+    ['Karen', 'Klara', 'Kitty', 'Kunigunde', 'Katja', 'Kristin'],
   ],
-  [
-    ['CRAFT', 'CLOTH', 'LEATHER', 'WEAVER', 'CLOTHIER'],
-    ['Sock Architect', 'Leather Wizard', 'Craft Gremlin', 'Thread Menace', 'Artisan Goblin'],
+  L: [
+    ['Lionel', 'Leopold', 'Lars', 'Lothar', 'Lloyd', 'Ludwig', 'Leland'],
+    ['Lorraine', 'Lucinda', 'Lotte', 'Loretta', 'Lydia', 'Lavinia', 'Lorna'],
   ],
-]
+  M: [
+    ['Mortimer', 'Marvin', 'Magnus', 'Maurice', 'Milo', 'Montgomery', 'Mervyn'],
+    ['Mildred', 'Martha', 'Maude', 'Margit', 'Myrtle', 'Marjorie', 'Mathilde'],
+  ],
+  N: [
+    ['Norbert', 'Nigel', 'Neville', 'Nils', 'Ned', 'Norman', 'Nestor'],
+    ['Nora', 'Nellie', 'Norma', 'Nadia', 'Nettie', 'Nancy', 'Norberta'],
+  ],
+  O: [
+    ['Oswald', 'Otto', 'Olaf', 'Oscar', 'Orville', 'Ogden', 'Octavius'],
+    ['Olga', 'Ottilie', 'Opal', 'Odette', 'Olive', 'Ophelia', 'Oona'],
+  ],
+  P: [
+    ['Percy', 'Percival', 'Phil', 'Pieter', 'Pip', 'Peregrine', 'Poindexter'],
+    ['Prudence', 'Petunia', 'Phyllis', 'Polly', 'Pearl', 'Penelope', 'Philippa'],
+  ],
+  Q: [
+    ['Quentin', 'Quincy', 'Quirinus'],
+    ['Queenie', 'Quilla', 'Quinta'],
+  ],
+  R: [
+    ['Rupert', 'Reginald', 'Roland', 'Rolf', 'Rudy', 'Rodney', 'Ralph'],
+    ['Rosalind', 'Ruth', 'Rhoda', 'Rosie', 'Ramona', 'Rowena', 'Roberta'],
+  ],
+  S: [
+    ['Stanley', 'Sigmund', 'Sven', 'Seymour', 'Sebastian', 'Sherman', 'Silas', 'Samson'],
+    ['Sybil', 'Sally', 'Svetlana', 'Sadie', 'Sieglinde', 'Susannah', 'Selma', 'Sophronia'],
+  ],
+  T: [
+    ['Theodore', 'Tobias', 'Terrence', 'Thaddeus', 'Torvald', 'Tarquin', 'Thurston'],
+    ['Trudy', 'Tabitha', 'Tilda', 'Theodora', 'Tamsin', 'Tallulah', 'Tatiana'],
+  ],
+  U: [
+    ['Urist', 'Ulrich', 'Ulf', 'Umberto', 'Upton'],
+    ['Ursula', 'Una', 'Ulla', 'Uma', 'Ulrike'],
+  ],
+  V: [
+    ['Vernon', 'Victor', 'Vladimir', 'Vince', 'Valentin', 'Virgil'],
+    ['Vera', 'Velma', 'Violet', 'Vivian', 'Valda', 'Vesna'],
+  ],
+  W: [
+    ['Walter', 'Wilbur', 'Wendell', 'Winston', 'Wolfgang', 'Wallace', 'Wilfred'],
+    ['Wilma', 'Winifred', 'Wanda', 'Wendy', 'Wilhelmina', 'Winona', 'Willa'],
+  ],
+  X: [
+    ['Xavier', 'Xander'],
+    ['Xena', 'Xenia'],
+  ],
+  Y: [
+    ['Yuri', 'Yannick', 'Yorick'],
+    ['Yolanda', 'Yvonne', 'Yvette'],
+  ],
+  Z: [
+    ['Zachary', 'Zebedee', 'Zoltan'],
+    ['Zelda', 'Zora', 'Zsuzsa'],
+  ],
+}
 
 function stableHash(value: string): number {
   let hash = 2166136261
@@ -114,61 +132,61 @@ function stableHash(value: string): number {
   return hash >>> 0
 }
 
-function roleTitles(unit: FortUnit): readonly string[] {
-  if (unit.flags.includes('baby')) return ['Tiny Screamer', 'Milk Inspector', 'Sock Oppressor']
-  if (unit.flags.includes('child')) return ['Tiny Menace', 'Chore Dodger', 'Future Liability']
-  if (unit.positions.length > 0) {
-    return [
-      'Paperwork Tyrant',
-      'Meeting Summoner',
-      'Fancy Hat',
-      'Mandate Goblin',
-      'Important Beard',
-    ]
+/**
+ * The nickname behind a first name that starts with the same letter:
+ * "Guesswork" -> "Gertrude Guesswork", "Bad Bargain" -> "Bob the Bad Bargain".
+ * Several-word names take "the". Stable for a given dwarf and nickname; the
+ * nickname comes back unchanged when it has no letter to match or the result
+ * would not fit in `maxLength`. First names in `used` are passed over while
+ * the letter has others left, and the one chosen is added to it.
+ */
+export function alliterate(
+  nickname: string,
+  unit: Pick<FortUnit, 'id' | 'sex'>,
+  maxLength: number,
+  used?: Set<string>,
+): string {
+  const trimmed = nickname.trim()
+  const core = trimmed.replace(/^the\s+/i, '')
+  const letter = core.normalize('NFKD').charAt(0).toUpperCase()
+  const lists = FIRST_NAMES[letter]
+  if (!lists) return nickname
+  const pool = unit.sex === 1 ? lists[0] : unit.sex === 0 ? lists[1] : [...lists[0], ...lists[1]]
+  const start = stableHash(`${unit.id}:${core.toLowerCase()}`) % pool.length
+  const rotated = [...pool.slice(start), ...pool.slice(0, start)]
+  const first = rotated.find((name) => !used?.has(name)) ?? rotated[0]
+  used?.add(first)
+  const fits = (text: string) => Array.from(text).length <= maxLength
+  const withThe = `${first} the ${core}`
+  const plain = `${first} ${core}`
+  if ((core !== trimmed || /\s/.test(core)) && fits(withThe)) return withThe
+  if (fits(plain)) return plain
+  return nickname
+}
+
+/**
+ * Alliterated forms for every dwarf's ideas, keyed by `alliterationKey`.
+ * Every dwarf's first idea is served before anyone's second, so the names a
+ * fortress sees first repeat a first name only once a letter runs out.
+ */
+export function alliterateAll(
+  entries: { unit: Pick<FortUnit, 'id' | 'sex'>; nicknames: string[] }[],
+  maxLength: number,
+): Map<string, string> {
+  const used = new Set<string>()
+  const out = new Map<string, string>()
+  const rounds = Math.max(0, ...entries.map((e) => e.nicknames.length))
+  for (let round = 0; round < rounds; round++) {
+    for (const { unit, nicknames } of entries) {
+      const nickname = nicknames[round]
+      if (!nickname) continue
+      const key = alliterationKey(unit.id, nickname)
+      if (!out.has(key)) out.set(key, alliterate(nickname, unit, maxLength, used))
+    }
   }
-
-  const strongestSkills = unit.skills
-    .slice()
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([skill]) => skill)
-  const role = [unit.profession, ...strongestSkills].join(' ').toUpperCase()
-  return (
-    ROLE_TITLES.find(([needles]) => needles.some((needle) => role.includes(needle)))?.[1] ??
-    GENERIC_TITLES
-  )
+  return out
 }
 
-function characterModifier(unit: FortUnit): string | null {
-  if (unit.wounds > 0) return 'Scarred'
-  if (unit.stress_category <= 1) return 'Doomed'
-  if (unit.stress_category >= 6) return 'Giddy'
-  if (unit.age >= 100) return 'Ancient'
-  if (unit.squad) return 'Battle'
-  return null
-}
-
-export function livingCitizens(units: FortUnit[]): FortUnit[] {
-  return units
-    .filter(
-      (unit) =>
-        unit.flags.includes('citizen') &&
-        !unit.flags.includes('dead') &&
-        !unit.flags.includes('ghost'),
-    )
-    .sort((a, b) => a.readable.localeCompare(b.readable) || a.id - b.id)
-}
-
-/** Stable across polling, but informed by the dwarf's work and current condition. */
-export function suggestedNickname(unit: FortUnit): string {
-  const strongestSkill = unit.skills.reduce(
-    (best, skill) => (skill[1] > (best?.[1] ?? -1) ? skill : best),
-    undefined as [string, number] | undefined,
-  )?.[0]
-  const hash = stableHash(`${unit.id}:${unit.readable}:${unit.profession}:${strongestSkill ?? ''}`)
-  const givenName = GIVEN_NAMES[hash % GIVEN_NAMES.length]
-  const titles = roleTitles(unit)
-  const roleTitle = titles[Math.floor(hash / GIVEN_NAMES.length) % titles.length]
-  const modifier = characterModifier(unit)
-  return [givenName, modifier, roleTitle].filter(Boolean).join(' ')
+export function alliterationKey(unitId: number, nickname: string): string {
+  return `${unitId}:${nickname.toLowerCase()}`
 }

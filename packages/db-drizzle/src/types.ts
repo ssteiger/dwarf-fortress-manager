@@ -24,3 +24,4 @@ export type LegendsWorld = InferSelectModel<typeof schema.legends_worlds>;
 export type LegendsImport = InferSelectModel<typeof schema.legends_imports>;
 export type LegendsRecord = InferSelectModel<typeof schema.legends_records>;
 export type NewLegendsRecord = InferInsertModel<typeof schema.legends_records>;
+export type LegendsNote = InferSelectModel<typeof schema.legends_notes>;

@@ -384,6 +384,123 @@ export const FORT_FLAG = {
 	TRAFFIC_MASK: 0x3,
 } as const;
 
+/**
+ * The DFHack commands the web app may ask the worker to run. The web app
+ * sends only the key; the worker looks up the exact command here, so nothing
+ * else can reach the game's console.
+ */
+export interface DfhackActionSpec {
+	command: string;
+	args: readonly string[];
+	/** Button text. */
+	label: string;
+	/** What happens in the game, in a sentence. */
+	what: string;
+	/** Asked before running, for commands that are not safe to repeat. */
+	confirm?: string;
+}
+
+export const DFHACK_ACTIONS = {
+	unsuspend: {
+		command: "unsuspend",
+		args: [],
+		label: "Resume suspended jobs",
+		what: "Resumes constructions suspended by items in the way, unreachable materials or scared workers. Jobs that would block others stay suspended.",
+	},
+	suspendmanager: {
+		command: "enable",
+		args: ["suspendmanager"],
+		label: "Keep resuming stuck jobs",
+		what: "Turns on suspendmanager, which keeps resuming stuck constructions and holds back ones that would trap a worker or cave in.",
+	},
+	burial: {
+		command: "burial",
+		args: [],
+		label: "Make tombs for coffins",
+		what: "Creates a tomb zone for every built coffin that is not in one yet, so the dead can be buried there.",
+	},
+	tailor: {
+		command: "enable",
+		args: ["tailor"],
+		label: "Keep dwarves clothed",
+		what: "Turns on tailor: once a day it swaps tattered clothes for fresh ones and orders more clothes when there are too few.",
+	},
+	seedwatch: {
+		command: "enable",
+		args: ["seedwatch"],
+		label: "Protect seeds from cooks",
+		what: "Turns on seedwatch: plants and seeds are kept out of the kitchen while fewer than 30 of that seed are left.",
+	},
+	autofarm: {
+		command: "enable",
+		args: ["autofarm"],
+		label: "Manage crops automatically",
+		what: "Turns on autofarm: farm plots are planted with whatever crop runs lowest, as long as there are seeds.",
+	},
+	recheckOrders: {
+		command: "orders",
+		args: ["recheck"],
+		label: "Re-check work orders",
+		what: "Makes the manager re-check every work order's conditions, which stops orders whose materials ran out from spamming cancellations.",
+	},
+	sortOrders: {
+		command: "orders",
+		args: ["sort"],
+		label: "Sort work orders",
+		what: "Puts one-time orders ahead of repeating ones, so they get done.",
+	},
+	basicOrders: {
+		command: "orders",
+		args: ["import", "library/basic"],
+		label: "Add basic work orders",
+		what: "Adds DFHack's library of standing orders for drink, food, mugs, barrels, bins, cloth and more, each with a stock condition.",
+		confirm:
+			"This adds a few dozen work orders on top of the ones you have. Running it again adds them again. Add them?",
+	},
+	smeltingOrders: {
+		command: "orders",
+		args: ["import", "library/smelting"],
+		label: "Add smelting work orders",
+		what: "Adds DFHack's standing orders to smelt the ores you have into bars, each with a stock condition.",
+		confirm:
+			"This adds a set of smelting orders on top of the ones you have. Running it again adds them again. Add them?",
+	},
+	furnaceOrders: {
+		command: "orders",
+		args: ["import", "library/furnace"],
+		label: "Add furnace work orders",
+		what: "Adds DFHack's standing orders for furnace work such as charcoal and coke for fuel, each with a stock condition.",
+		confirm:
+			"This adds a set of furnace orders on top of the ones you have. Running it again adds them again. Add them?",
+	},
+	combine: {
+		command: "combine",
+		args: ["all", "-q"],
+		label: "Merge partial stacks",
+		what: "Merges half-empty stacks of food, drink, ammo and other goods in every stockpile, which frees barrels, bins and stockpile space.",
+	},
+	banCooking: {
+		command: "ban-cooking",
+		args: ["all"],
+		label: "Keep brewables and seeds from cooks",
+		what: "Stops cooks from using up seeds, brewable plants, honey, milk, oil, tallow and thread plants, which are worth more as what they make.",
+	},
+	cleanowned: {
+		command: "cleanowned",
+		args: ["X"],
+		label: "Take away tattered clothes",
+		what: "Confiscates rotten and badly worn items your dwarves own and marks them for the garbage dump, so they change into fresh clothes from the stores.",
+		confirm:
+			"Your dwarves lose the worn-out items they own, and need new clothes in the stores to change into. Go ahead?",
+	},
+} as const satisfies Record<string, DfhackActionSpec>;
+
+export type DfhackAction = keyof typeof DFHACK_ACTIONS;
+
+export function isDfhackAction(value: unknown): value is DfhackAction {
+	return typeof value === "string" && Object.hasOwn(DFHACK_ACTIONS, value);
+}
+
 export const STRESS_LABELS = [
 	"miserable",
 	"unhappy",

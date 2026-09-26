@@ -1,4 +1,4 @@
-import type { FortBuilding } from '@fortress/db-drizzle'
+import type { FortBuilding, FortUnit } from '@fortress/db-drizzle'
 import {
   Badge,
   Card,
@@ -12,7 +12,8 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import { MapIcon } from 'lucide-react'
+import { ChevronDownIcon, LightbulbIcon, MapIcon } from 'lucide-react'
+import * as React from 'react'
 import type { ReactNode } from 'react'
 
 import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
@@ -28,9 +29,26 @@ import {
   splitPascal,
   thirstState,
 } from '~/lib/fortress/format'
-import { useFortUnit } from '~/lib/fortress/queries'
+import { concernGuide } from '~/lib/fortress/guides'
+import {
+  type Concern,
+  type GameTime,
+  emotionTone,
+  gameAgo,
+  gameTimeOf,
+  isCitizenish,
+  makeNameLinker,
+  storyKind,
+  thoughtHint,
+  thoughtPhrase,
+  unitConcerns,
+  unitStory,
+} from '~/lib/fortress/insights'
+import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/queries'
 import { type CarriedItem, getFortEvents } from '~/lib/fortress/server'
 import { EmptyState, StatCard, UnitConditionBadges } from '../../-components/FortChrome'
+import { GuideBody } from '../../-components/Guide'
+import { AnnouncementText, StoryIcon } from '../../-components/Insights'
 import type { UnitLegendsRef } from './UnitLinks'
 
 const HUNGER_DANGER = 75_000
@@ -118,11 +136,23 @@ export function DwarfDetails({
   legends?: UnitLegendsRef | null
 }) {
   const { data, isLoading } = useFortUnit(unitId)
+  const overview = useFortOverview()
+  const everyone = useFortUnits()
+  const now = gameTimeOf(overview.data?.state)
+  const link = React.useMemo(() => makeNameLinker(everyone.data?.units ?? []), [everyone.data])
   const unit = data?.unit ?? null
   const mentionedName = unit?.name.trim() ?? ''
   const mentions = useQuery({
     queryKey: ['fort', 'events', 'unit', mentionedName],
-    queryFn: () => getFortEvents({ data: { q: mentionedName, limit: 8 } }),
+    queryFn: () =>
+      getFortEvents({
+        data: {
+          unitName: mentionedName,
+          fortressOnly: true,
+          withoutCancellations: true,
+          limit: 12,
+        },
+      }),
     enabled: mentionedName.length > 0,
     staleTime: 30_000,
   })
@@ -151,8 +181,27 @@ export function DwarfDetails({
     unit.blood !== null && unit.blood_max ? Math.round((unit.blood / unit.blood_max) * 100) : null
   const carriedValue = (data?.inventory ?? []).reduce((sum, row) => sum + (row.item?.value ?? 0), 0)
 
+  const concerns = unitConcerns(unit, now)
+
   return (
     <div className="flex flex-col gap-4">
+      <Card className="gap-3 py-4">
+        <CardContent className="flex flex-col gap-3 px-4">
+          <p className="text-base leading-relaxed">{unitStory(unit, now)}</p>
+          {concerns.length ? (
+            <ul className="flex flex-col gap-2">
+              {concerns.map((c) => (
+                <ConcernRow key={c.key} concern={c} unit={unit} />
+              ))}
+            </ul>
+          ) : living && isCitizenish(unit) ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing troubles them that you could fix.
+            </p>
+          ) : null}
+        </CardContent>
+      </Card>
+
       <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
         <StatCard
           title="Doing"
@@ -364,6 +413,7 @@ export function DwarfDetails({
                     <ThoughtRow
                       key={`${thought[0]}-${thought[1]}-${thought[3]}-${thought[4]}`}
                       thought={thought}
+                      now={now}
                     />
                   ))}
                 </ul>
@@ -395,7 +445,7 @@ export function DwarfDetails({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex flex-wrap items-center justify-between gap-3 text-base">
-              Records
+              Their story in the fortress
               <span className="flex items-center gap-3 text-sm font-normal">
                 {legends ? (
                   <Link
@@ -423,12 +473,15 @@ export function DwarfDetails({
             {mentionedName ? (
               mentions.data?.length ? (
                 <ul className="flex flex-col gap-2 text-sm">
-                  {mentions.data.slice(0, compact ? 4 : 8).map((event) => (
+                  {mentions.data.slice(0, compact ? 5 : 12).map((event) => (
                     <li key={event.id} className="flex gap-3">
+                      <StoryIcon kind={storyKind(event)} className="mt-0.5" />
+                      <span className="min-w-0 flex-1">
+                        <AnnouncementText parts={link(event.text)} />
+                      </span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">
                         {formatGameTick(event.game_year, event.game_tick) || '—'}
                       </span>
-                      <span>{event.text}</span>
                     </li>
                   ))}
                 </ul>
@@ -475,6 +528,48 @@ export function DwarfDetails({
   )
 }
 
+/** One trouble, with its step-by-step guide folded underneath. */
+function ConcernRow({ concern, unit }: { concern: Concern; unit: FortUnit }) {
+  const [open, setOpen] = React.useState(false)
+  const guide = React.useMemo(() => concernGuide(concern, unit), [concern, unit])
+  return (
+    <li
+      className={cn(
+        'rounded-lg border px-3 py-2 text-sm',
+        concern.severity === 'danger' && 'border-red-500/40 bg-red-500/10',
+        concern.severity === 'warning' && 'border-amber-500/40 bg-amber-500/5',
+      )}
+    >
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="font-medium">{concern.label}</span>
+        {guide.steps.length ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
+          >
+            {open ? 'Hide the steps' : 'Step by step'}
+            <ChevronDownIcon
+              className={cn('size-3.5 transition-transform', open && 'rotate-180')}
+            />
+          </button>
+        ) : null}
+      </div>
+      {open ? (
+        <div className="mt-2 border-t pt-3">
+          <GuideBody guide={{ ...guide, units: undefined }} compact />
+        </div>
+      ) : concern.hint ? (
+        <span className="mt-0.5 flex gap-1.5 text-muted-foreground">
+          <LightbulbIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+          {concern.hint}
+        </span>
+      ) : null}
+    </li>
+  )
+}
+
 function tokenLabel(token: string): string {
   if (token.includes('_')) return humanize(token)
   return splitPascal(token)
@@ -485,18 +580,6 @@ function facetLevel(value: number): string {
   if (value <= 40) return 'low'
   if (value >= 76) return 'very high'
   return 'high'
-}
-
-function emotionTone(emotion: string): 'bad' | 'good' | 'neutral' {
-  const name = emotion.toLowerCase()
-  if (/anything|interest|empathy|sympathy/.test(name)) return 'neutral'
-  if (
-    /anger|anguish|anxi|apath|bitter|contempt|despair|disgust|fear|fright|frustrat|grief|grouch|hate|horror|irritat|loath|lonely|loneli|miser|mortif|nervous|panic|pessim|restless|sad|shame|shock|terror|uneas|worry|agitat|empti|outrage/.test(
-      name,
-    )
-  )
-    return 'bad'
-  return 'good'
 }
 
 function FacetRow({ name, value }: { name: string; value: number }) {
@@ -518,26 +601,43 @@ function FacetRow({ name, value }: { name: string; value: number }) {
 
 function ThoughtRow({
   thought,
+  now,
 }: {
   thought: [string, string, number, number, number]
+  now: GameTime | null
 }) {
   const [name, emotion, , year, tick] = thought
   const tone = emotionTone(emotion)
+  const phrase = thoughtPhrase(name, emotion)
+  const hint = tone === 'bad' ? thoughtHint(name) : undefined
   return (
-    <li className="flex flex-wrap items-baseline gap-x-3 text-sm">
-      <span className="min-w-0 flex-1">{tokenLabel(name)}</span>
-      {emotion ? (
-        <span
-          className={cn(
-            tone === 'bad' && 'text-red-600 dark:text-red-400',
-            tone === 'good' && 'text-emerald-700 dark:text-emerald-400',
-            tone === 'neutral' && 'text-muted-foreground',
-          )}
-        >
-          {tokenLabel(emotion)}
+    <li className="flex flex-col gap-0.5 text-sm">
+      <div className="flex flex-wrap items-baseline gap-x-3">
+        <span className="min-w-0 flex-1">
+          {phrase.charAt(0).toUpperCase()}
+          {phrase.slice(1)}
+        </span>
+        {emotion ? (
+          <span
+            className={cn(
+              tone === 'bad' && 'text-red-600 dark:text-red-400',
+              tone === 'good' && 'text-emerald-700 dark:text-emerald-400',
+              tone === 'neutral' && 'text-muted-foreground',
+            )}
+          >
+            {tokenLabel(emotion).toLowerCase()}
+          </span>
+        ) : null}
+        <span className="tabular-nums text-muted-foreground" title={formatGameTick(year, tick)}>
+          {gameAgo({ year, tick }, now) ?? formatGameTick(year, tick)}
+        </span>
+      </div>
+      {hint ? (
+        <span className="flex gap-1.5 text-xs text-muted-foreground">
+          <LightbulbIcon className="mt-px size-3 shrink-0 text-primary" aria-hidden />
+          {hint}
         </span>
       ) : null}
-      <span className="tabular-nums text-muted-foreground">{formatGameTick(year, tick)}</span>
     </li>
   )
 }

@@ -1,4 +1,4 @@
-import type { LegendsRecord, LegendsWorld } from '@fortress/db-drizzle'
+import type { FortState, JsonObject, LegendsRecord, LegendsWorld } from '@fortress/db-drizzle'
 import {
   Badge,
   Card,
@@ -15,7 +15,15 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
-import { ChevronRightIcon, GlobeIcon, HourglassIcon, LibraryIcon } from 'lucide-react'
+import {
+  ChevronRightIcon,
+  CompassIcon,
+  GlobeIcon,
+  HourglassIcon,
+  LibraryIcon,
+  NotebookPenIcon,
+  SparklesIcon,
+} from 'lucide-react'
 import type * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
@@ -37,6 +45,8 @@ import {
   getLegendsWorldSummary,
 } from '~/lib/legends/server'
 import { EmptyState, PageHeader } from '../../fortress/-components/FortChrome'
+import { PinButton } from './Journal'
+import { QuickSearch } from './QuickSearch'
 
 /** Every legends page shares the list of imported worlds. */
 export function useLegendsWorlds() {
@@ -58,22 +68,71 @@ export function parseWorldSearch(raw: Record<string, unknown>): { world?: number
   return world !== undefined ? { world } : {}
 }
 
-export type LegendsSection = 'world' | 'history' | 'archive'
+export type LegendsSection = 'overview' | 'world' | 'history' | 'stories' | 'archive' | 'journal'
 
 const SECTION_LINKS = [
+  { key: 'overview' as const, label: 'Overview', to: '/legends', icon: CompassIcon },
   { key: 'world' as const, label: 'The world', to: '/legends/world', icon: GlobeIcon },
   { key: 'history' as const, label: 'History', to: '/legends/history', icon: HourglassIcon },
+  { key: 'stories' as const, label: 'Stories', to: '/legends/stories', icon: SparklesIcon },
   { key: 'archive' as const, label: 'Archive', to: '/legends/archive', icon: LibraryIcon },
+  { key: 'journal' as const, label: 'Journal', to: '/legends/journal', icon: NotebookPenIcon },
 ]
+
+/** The running fortress's place in the world, as the worker last saw it. */
+export interface LiveFortress {
+  fortName: string | null
+  worldName: string | null
+  /** The world's name in the game's own language, as legends exports store it. */
+  worldNative: string | null
+  civId: number | null
+  /** The fortress's site government. */
+  groupId: number | null
+  siteId: number | null
+}
+
+function liveFortress(state: FortState | null | undefined): LiveFortress | null {
+  if (!state) return null
+  const world = (state.world && typeof state.world === 'object' ? state.world : {}) as JsonObject
+  const id = (v: unknown) => (typeof v === 'number' && v >= 0 ? v : null)
+  return {
+    fortName: state.fort_name ?? (typeof world.site_name === 'string' ? world.site_name : null),
+    worldName: state.world_name ?? (typeof world.name === 'string' ? world.name : null),
+    worldNative: typeof world.name_native === 'string' ? world.name_native : null,
+    civId: id(world.civ_id),
+    groupId: id(world.group_id),
+    siteId: id(world.site_id),
+  }
+}
+
+const sameName = (a: string | null | undefined, b: string | null | undefined) =>
+  !!a && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
+
+/**
+ * Legends exports keep the world's native name and its English one
+ * (`alt_name`); the fortress snapshot has the English name and the native.
+ */
+export function isLiveWorld(
+  world: LegendsWorld,
+  live: LiveFortress | null,
+  liveName?: string | null,
+) {
+  return (
+    sameName(world.alt_name, live?.worldName ?? liveName) ||
+    sameName(world.name, live?.worldName ?? liveName) ||
+    sameName(world.name, live?.worldNative)
+  )
+}
 
 export function useSelectedWorld(requestedId?: number) {
   const overview = useFortOverview()
   const legends = useLegendsWorlds()
   const worlds = legends.data?.worlds ?? []
-  const liveWorldName = legends.data?.liveWorldName ?? overview.data?.state?.world_name ?? null
+  const live = liveFortress(overview.data?.state)
+  const liveWorldName = legends.data?.liveWorldName ?? live?.worldName ?? null
   const selectedWorld =
     worlds.find((w) => w.id === requestedId) ??
-    worlds.find((w) => w.name && w.name === liveWorldName) ??
+    worlds.find((w) => isLiveWorld(w, live, liveWorldName)) ??
     worlds[0] ??
     null
   return {
@@ -82,7 +141,8 @@ export function useSelectedWorld(requestedId?: number) {
     selectedWorld,
     worldId: selectedWorld?.id ?? null,
     liveWorldName,
-    matchesLive: !!selectedWorld?.name && selectedWorld.name === liveWorldName,
+    live,
+    matchesLive: !!selectedWorld && isLiveWorld(selectedWorld, live, liveWorldName),
   }
 }
 
@@ -99,10 +159,12 @@ export function LegendsShell({
     counts: Record<string, number>
     summary: LegendsWorldSummary | undefined
     summaryLoading: boolean
+    live: LiveFortress | null
+    matchesLive: boolean
   }) => React.ReactNode
 }) {
   const navigate = useNavigate()
-  const { legends, worlds, selectedWorld, worldId, liveWorldName, matchesLive } =
+  const { legends, worlds, selectedWorld, worldId, liveWorldName, live, matchesLive } =
     useSelectedWorld(requestedWorld)
   const counts = selectedWorld?.record_counts ?? {}
   const totalRecords = Object.values(counts).reduce((a, b) => a + b, 0)
@@ -176,34 +238,39 @@ export function LegendsShell({
         )
       ) : (
         <>
-          <nav
-            aria-label="Legends sections"
-            className="bg-muted text-muted-foreground inline-flex h-10 w-fit items-center justify-center rounded-lg p-[3px]"
-          >
-            {SECTION_LINKS.map((item) => {
-              const Icon = item.icon
-              const active = item.key === section
-              return (
-                <Link
-                  key={item.key}
-                  to={item.to}
-                  search={{ world: worldId }}
-                  className={cn(
-                    "inline-flex h-[calc(100%-1px)] items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium whitespace-nowrap text-foreground transition-[color,box-shadow] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-                    active && 'bg-background shadow-sm dark:border-input dark:bg-input/30',
-                  )}
-                >
-                  <Icon /> {item.label}
-                </Link>
-              )
-            })}
-          </nav>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <nav
+              aria-label="Legends sections"
+              className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"
+            >
+              {SECTION_LINKS.map((item) => {
+                const Icon = item.icon
+                const active = item.key === section
+                return (
+                  <Link
+                    key={item.key}
+                    to={item.to}
+                    search={{ world: worldId }}
+                    className={cn(
+                      "inline-flex h-[calc(100%-1px)] items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium whitespace-nowrap text-foreground transition-[color,box-shadow] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+                      active && 'bg-background shadow-sm dark:border-input dark:bg-input/30',
+                    )}
+                  >
+                    <Icon /> {item.label}
+                  </Link>
+                )
+              })}
+            </nav>
+            <QuickSearch worldId={worldId} />
+          </div>
           {children({
             worldId,
             selectedWorld,
             counts,
             summary: summary.data,
             summaryLoading: summary.isLoading,
+            live,
+            matchesLive,
           })}
         </>
       )}
@@ -248,6 +315,15 @@ export function RecordLink({
   )
 }
 
+/**
+ * True when names of this kind were looked up and this id was not among
+ * them: the export mentions a record it does not contain.
+ */
+export function isUnrecorded(names: NameIndex, kind: string, id: number): boolean {
+  const known = names[kind]
+  return known !== undefined && known[id] === undefined
+}
+
 /** Link to a record by id when its name is in the index, plain text otherwise. */
 export function NamedRef({
   kind,
@@ -264,6 +340,15 @@ export function NamedRef({
 }) {
   if (id === null || id === undefined || id < 0)
     return <span className="text-muted-foreground">{fallback ?? 'none'}</span>
+  if (isUnrecorded(names, kind, id))
+    return (
+      <span
+        className="text-muted-foreground"
+        title={`${kindLabel(kind)} #${id} is mentioned but not in this legends export`}
+      >
+        an unrecorded {kindLabel(kind).toLowerCase()}
+      </span>
+    )
   const name = names[kind]?.[id]
   return <RecordLink kind={kind} id={id} name={name ?? null} worldId={worldId} />
 }
@@ -484,11 +569,20 @@ export function EventLine({
   names,
   worldId,
   showDate = true,
+  pinnable = true,
+  dateLabel,
+  after,
 }: {
   event: LegendsRecord
   names: NameIndex
   worldId: number | null
   showDate?: boolean
+  /** Show the journal pin on hover. */
+  pinnable?: boolean
+  /** Replaces the event's own date, e.g. with the years of a run. */
+  dateLabel?: string
+  /** Rendered after the sentence, e.g. a count of similar events. */
+  after?: React.ReactNode
 }) {
   const p = event.payload
   const plus = plusOf(p)
@@ -498,11 +592,17 @@ export function EventLine({
   const described = describeEvent(event, names)
   const year = typeof p.year === 'number' ? p.year : null
   const seconds = typeof p.seconds72 === 'number' ? p.seconds72 : null
+  const date = dateLabel ?? (showDate ? legendsDate(year, seconds) : null)
   return (
-    <li className="grid grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)] gap-x-4 gap-y-1 py-1.5">
-      <span className="pt-0.5 text-sm text-muted-foreground tabular-nums">
-        {showDate ? legendsDate(year, seconds) : ''}
-      </span>
+    <li
+      className={cn(
+        'group grid gap-x-4 gap-y-1 py-1.5',
+        date !== null ? 'grid-cols-[minmax(6.5rem,auto)_minmax(0,1fr)]' : 'grid-cols-1',
+      )}
+    >
+      {date !== null ? (
+        <span className="pt-0.5 text-sm text-muted-foreground tabular-nums">{date}</span>
+      ) : null}
       <span className="flex items-baseline gap-2">
         <span
           className={cn(
@@ -511,9 +611,26 @@ export function EventLine({
           )}
           title={category?.label ?? (type ? words(type) : 'event')}
         />
-        <span className={cn('leading-relaxed', !described.known && 'text-muted-foreground')}>
+        <span
+          className={cn(
+            'min-w-0 flex-1 leading-relaxed',
+            !described.known && 'text-muted-foreground',
+          )}
+        >
           <Fragments fragments={described.fragments} worldId={worldId} />
+          {after}
         </span>
+        {pinnable && worldId !== null ? (
+          <PinButton
+            worldId={worldId}
+            target={{
+              kind: 'event',
+              id: String(event.id),
+              title: `${titleCase(legendsDate(year, seconds))}: ${described.fragments.map((f) => f.text).join('')}`,
+            }}
+            className="-my-1 shrink-0 self-center opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 aria-pressed:opacity-100"
+          />
+        ) : null}
       </span>
     </li>
   )

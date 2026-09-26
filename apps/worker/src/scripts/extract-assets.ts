@@ -13,7 +13,9 @@
  *   vanilla_plants_graphics, vanilla_world_map, and a few smaller ones.
  * - Text raws next to the images describe them:
  *     [TILE_PAGE:NAME] + [FILE:images/x.png] + [TILE_DIM:w:h] + [PAGE_DIM_PIXELS:w:h]
- *       -> one sprite sheet and its grid size
+ *       -> one sprite sheet and its grid size. Many pages give [PAGE_DIM:cols:rows]
+ *          instead and a few give wrong pixels, so the index takes the size
+ *          from the PNG itself.
  *     [TILE_GRAPHICS:PAGE:col:row:TILE_NAME(:frame)]
  *       -> one named tile on a sheet (terrain, flows, liquids, ...)
  *     [CREATURE_GRAPHICS:ID] / [CREATURE_CASTE_GRAPHICS:ID:CASTE] followed by
@@ -634,6 +636,82 @@ function copyInto(src: string, destRel: string): void {
   fs.copyFileSync(src, dest)
 }
 
+/** Width and height from a PNG's IHDR chunk, or null when the file is missing or not a PNG. */
+function pngSize(file: string): [number, number] | null {
+  if (!fs.existsSync(file)) return null
+  const fd = fs.openSync(file, 'r')
+  try {
+    const header = Buffer.alloc(24)
+    if (fs.readSync(fd, header, 0, 24, 0) < 24) return null
+    if (header.readUInt32BE(0) !== 0x89504e47 || header.toString('ascii', 12, 16) !== 'IHDR') {
+      return null
+    }
+    return [header.readUInt32BE(16), header.readUInt32BE(20)]
+  } finally {
+    fs.closeSync(fd)
+  }
+}
+
+/**
+ * Give every sheet its real pixel size and put every sprite on its sheet.
+ *
+ * Some raws address a sheet by running tile number rather than column and
+ * row: [SKELETON_WITH_SKULL:BONE_PILE:1:0] is the second tile of a sheet one
+ * tile wide, which the game draws from the row below. Such coordinates wrap
+ * the same way here. Sheets the install does not ship a PNG for are dropped
+ * together with the sprites on them, so callers fall through to their next
+ * candidate instead of drawing an empty box.
+ */
+function settlePages(index: AssetIndex, rules: Map<string, CreatureLayerRules>): string[] {
+  const dropped: string[] = []
+  for (const [name, page] of Object.entries(index.pages)) {
+    const size = page.file ? pngSize(path.join(OUT_DIR, page.file)) : null
+    if (!size || !page.tileWidth || !page.tileHeight) {
+      delete index.pages[name]
+      dropped.push(name)
+      continue
+    }
+    page.pageWidth = size[0]
+    page.pageHeight = size[1]
+  }
+
+  const place = (sprite: Pick<TileSprite, 'page' | 'x' | 'y'>): boolean => {
+    const page = index.pages[sprite.page]
+    if (!page) return false
+    const cols = Math.floor(page.pageWidth / page.tileWidth)
+    if (cols > 0 && sprite.x >= cols) {
+      const n = sprite.y * cols + sprite.x
+      sprite.x = n % cols
+      sprite.y = Math.floor(n / cols)
+    }
+    return true
+  }
+  const keep = (map: Record<string, TileSprite>) => {
+    for (const [key, sprite] of Object.entries(map)) if (!place(sprite)) delete map[key]
+  }
+
+  keep(index.tiles)
+  for (const states of Object.values(index.creatures)) keep(states)
+  for (const [token, entry] of Object.entries(index.items)) {
+    if (entry.artifact && !place(entry.artifact)) entry.artifact = undefined
+    if (!place(entry.default)) delete index.items[token]
+  }
+  for (const plant of Object.values(index.plants)) {
+    for (const slot of ['seed', 'picked', 'shrub', 'growth'] as const) {
+      const sprite = plant[slot]
+      if (sprite && !place(sprite)) delete plant[slot]
+    }
+  }
+  for (const creature of rules.values()) {
+    for (const set of creature.sets) {
+      for (const group of set.groups) group.layers = group.layers.filter(place)
+      set.groups = set.groups.filter((group) => group.layers.length > 0)
+    }
+    creature.sets = creature.sets.filter((set) => set.groups.length > 0)
+  }
+  return dropped
+}
+
 function main() {
   const gameDir = config.gameDir
   const vanillaDir = path.join(gameDir, 'data', 'vanilla')
@@ -704,8 +782,11 @@ function main() {
     }
   }
 
+  const droppedPages = settlePages(ctx.index, ctx.rules)
+
   let layerCount = 0
   for (const [creature, rules] of ctx.rules) {
+    if (!rules.sets.length) continue
     fs.writeFileSync(path.join(OUT_DIR, 'layers', `${creature}.json`), JSON.stringify(rules))
     ctx.index.layeredCreatures.push(creature)
     for (const set of rules.sets) for (const group of set.groups) layerCount += group.layers.length
@@ -725,6 +806,9 @@ function main() {
   console.log(
     `  ${index.layeredCreatures.length} layered creatures with ${layerCount} layer rules (${ctx.templates.size} templates expanded), ${Object.keys(index.palettes.DEFAULT?.colors ?? {}).length} standard palette colours`,
   )
+  if (droppedPages.length) {
+    console.log(`  skipped sheets without a PNG in the install: ${droppedPages.join(', ')}`)
+  }
   console.log(`  -> ${OUT_DIR} (gitignored, local only)`)
 }
 

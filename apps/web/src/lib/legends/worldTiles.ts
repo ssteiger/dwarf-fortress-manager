@@ -1,13 +1,8 @@
 import { type DfAssetIndex, type TileSprite, tileSprite, tileVariantAt } from '~/lib/df-assets'
 import { words } from './model'
-import type { MapRegion, MapSite } from './server'
+import type { LegendsMapData, MapSite } from './server'
 
-/**
- * Which of the game's world-map sprites stand for the legends export's
- * coarse region and site types. The export only says "Forest" or "Desert"
- * where the game knows the exact biome, so each type maps to the closest
- * vanilla tile family; evil and good lands use the game's own variants.
- */
+/** The game's world-map sprites for legends data: terrain, rivers, sites and artifacts. */
 
 /** Sprite sheets the world map draws from. */
 export const WORLD_MAP_PAGES = [
@@ -18,90 +13,242 @@ export const WORLD_MAP_PAGES = [
   'WORLD_MAP_EL_CLIFF',
 ] as const
 
-interface TerrainLook {
-  /** Base tile family on WORLD_MAP_TILES (or the elevation sheet for mountains). */
-  base: string
-  /** Optional 32px overlay family (forests, mountains). */
-  overlay?: string
-  /** Whether the family has _EVIL/_GOOD variants worth trying. */
-  aligned?: boolean
-}
-
-const TERRAIN: Record<string, TerrainLook> = {
-  Grassland: { base: 'GRASSLAND_TEMP', aligned: true },
-  Hills: { base: 'HILLS', aligned: true },
-  Forest: { base: 'GRASSLAND_TEMP', overlay: 'FOREST_BROADLEAF_TEMP', aligned: true },
-  Mountains: { base: 'WORLD_EL_MOUNTAINS', overlay: 'MOUNTAIN_MID', aligned: true },
-  Lake: { base: 'LAKE', aligned: true },
-  Wetland: { base: 'MARSH', aligned: true },
-  Tundra: { base: 'TUNDRA', aligned: true },
-  Desert: { base: 'SAND_DESERT', aligned: true },
-  Glacier: { base: 'GLACIER', aligned: true },
-  Ocean: { base: 'OCEAN', aligned: true },
-}
-
-const OPEN_SEA: TerrainLook = { base: 'OCEAN' }
-
-function alignmentSuffix(evilness: string | null): string {
-  if (evilness === 'evil') return '_EVIL'
-  if (evilness === 'good') return '_GOOD'
-  return ''
-}
-
-/** A family with the alignment suffix when the sheet has it, else the plain family. */
-function alignedFamily(
-  index: DfAssetIndex,
-  family: string,
-  region: MapRegion | null,
-  aligned: boolean | undefined,
-): string {
-  if (!aligned || !region) return family
-  const suffixed = `${family}${alignmentSuffix(region.evilness)}`
-  return index.tiles[suffixed] || index.tiles[`${suffixed}:1`] ? suffixed : family
-}
+/*
+ * Legends only records a region's coarse type ("Forest", "Wetland"), not the
+ * game's biome, so the plan below picks the closest vanilla families and
+ * fills in what the type leaves out from the neighbourhood: forests turn to
+ * conifers and then taiga towards the tundra, mountains rise from foothills
+ * at a range's edge to high peaks inside it, open sea deepens away from the
+ * coast, and each region keeps one of its type's looks (swamp or marsh,
+ * grassland or savanna) so neighbouring regions read as separate places.
+ * Evil and good regions use the game's own variants of every family.
+ */
 
 export interface TerrainSprites {
   base: TileSprite | null
   overlay: TileSprite | null
 }
 
-/** The sprites for one world tile, chosen deterministically from its position. */
-export function terrainSprites(
-  index: DfAssetIndex,
-  region: MapRegion | null,
-  x: number,
-  y: number,
-): TerrainSprites {
-  const look = (region?.type && TERRAIN[region.type]) || (region ? TERRAIN.Grassland : OPEN_SEA)
-  const base = tileVariantAt(index, alignedFamily(index, look.base, region, look.aligned), x, y)
-  const overlay = look.overlay
-    ? tileVariantAt(index, alignedFamily(index, look.overlay, region, look.aligned), x, y)
-    : null
-  return { base, overlay }
+export interface TerrainPlan {
+  /** Ground per world tile (16px). */
+  base: (TileSprite | null)[]
+  /** 32px forest, mountain or peak sprite per tile; drawn at twice the tile size, bottom-anchored. */
+  overlay: (TileSprite | null)[]
+  /** River piece per tile, null where no river runs. */
+  river: (TileSprite | null)[]
 }
 
-/** The 32px overlay for a mountain peak or volcano. */
-export function peakSprite(
-  index: DfAssetIndex,
-  volcano: boolean,
-  x: number,
-  y: number,
-): TileSprite | null {
-  return tileVariantAt(index, volcano ? 'VOLCANO' : 'MOUNTAIN_PEAK', x, y)
+const COLD_TAIGA = 5
+const COLD_CONIFER = 14
+
+function hash(a: number, b: number, salt: number): number {
+  let h =
+    Math.imul(a + 1, 374761393) ^ Math.imul(b + 1, 668265263) ^ Math.imul(salt + 1, 2246822519)
+  h = Math.imul(h ^ (h >>> 13), 1274126177)
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296
 }
+
+function alignedFamily(index: DfAssetIndex, family: string, evilness: string | null): string {
+  const suffix = evilness === 'evil' ? '_EVIL' : evilness === 'good' ? '_GOOD' : ''
+  if (!suffix) return family
+  const suffixed = `${family}${suffix}`
+  return index.tiles[suffixed] || index.tiles[`${suffixed}:1`] ? suffixed : family
+}
+
+/** Steps (4-neighbour) from each tile to the nearest source, through passable tiles. */
+function distanceField(
+  width: number,
+  height: number,
+  isSource: (i: number) => boolean,
+  passable: (i: number) => boolean,
+): Int32Array {
+  const far = width + height
+  const dist = new Int32Array(width * height).fill(far)
+  const queue: number[] = []
+  for (let i = 0; i < dist.length; i++) {
+    if (isSource(i)) {
+      dist[i] = 0
+      queue.push(i)
+    }
+  }
+  for (let head = 0; head < queue.length; head++) {
+    const cur = queue[head]
+    const x = cur % width
+    const y = (cur - x) / width
+    const next = dist[cur] + 1
+    const visit = (n: number) => {
+      if (dist[n] > next && passable(n)) {
+        dist[n] = next
+        queue.push(n)
+      }
+    }
+    if (x > 0) visit(cur - 1)
+    if (x < width - 1) visit(cur + 1)
+    if (y > 0) visit(cur - width)
+    if (y < height - 1) visit(cur + width)
+  }
+  return dist
+}
+
+/** Ground family for a tile; `pick` is the region's own 0..1 roll, `cold` steps to tundra or glacier. */
+function groundFamily(type: string | null, pick: number, cold: number, fromLand: number): string {
+  switch (type) {
+    case null:
+    case 'Ocean':
+      return fromLand >= 3 ? 'OCEAN_DEEP' : 'OCEAN'
+    case 'Mountains':
+      return 'ROCKY_HILLS'
+    case 'Forest':
+      return cold < COLD_TAIGA ? 'TUNDRA' : 'GRASSLAND_TEMP'
+    case 'Grassland':
+      if (cold < 2) return 'TUNDRA'
+      if (cold < COLD_TAIGA) return 'GRASSLAND_TEMP'
+      return pick < 0.25 ? 'SAVANNA_TEMP' : pick < 0.4 ? 'SHRUBLAND' : 'GRASSLAND_TEMP'
+    case 'Hills':
+      return pick < 0.3 ? 'ROCKY_HILLS' : 'HILLS'
+    case 'Wetland':
+      return pick < 0.5 ? 'SWAMP' : 'MARSH'
+    case 'Desert':
+      return pick < 0.5 ? 'SAND_DESERT' : pick < 0.75 ? 'ROCKY_PLAINS' : 'BADLANDS'
+    case 'Tundra':
+      return 'TUNDRA'
+    case 'Glacier':
+      return 'GLACIER'
+    case 'Lake':
+      return 'LAKE'
+    default:
+      return 'GRASSLAND_TEMP'
+  }
+}
+
+/** Forest or mountain sprite family; `depth` is steps inside a mountain range. */
+function overlayFamily(type: string | null, cold: number, depth: number): string | null {
+  if (type === 'Mountains') {
+    return depth <= 1 ? 'MOUNTAIN_LOW' : depth === 2 ? 'MOUNTAIN_MID' : 'MOUNTAIN_HIGH'
+  }
+  if (type === 'Forest') {
+    return cold < COLD_TAIGA
+      ? 'FOREST_TAIGA'
+      : cold < COLD_CONIFER
+        ? 'FOREST_CONIFER_TEMP'
+        : 'FOREST_BROADLEAF_TEMP'
+  }
+  return null
+}
+
+const RIVER_FAMILY = { 1: 'BROOK', 2: 'RIVER', 3: 'RIVER_MAJOR' } as const
 
 /**
- * Directional river tile from which neighbours also carry water, e.g.
- * RIVER_NS for a straight stretch. `size` 1 is a brook, 3 a major river.
+ * Directional river piece from which neighbours also carry water, e.g.
+ * RIVER_NS for a straight stretch. A river's last tile turns towards the
+ * lake or sea beside it so it visibly flows in.
  */
-export function riverSprite(
+function riverPiece(
   index: DfAssetIndex,
-  size: 1 | 2 | 3,
-  neighbours: { n: boolean; s: boolean; w: boolean; e: boolean },
+  data: LegendsMapData,
+  sizes: Uint8Array,
+  types: (string | null)[],
+  i: number,
 ): TileSprite | null {
-  const family = size === 1 ? 'BROOK' : size === 2 ? 'RIVER' : 'RIVER_MAJOR'
-  const dirs = `${neighbours.n ? 'N' : ''}${neighbours.s ? 'S' : ''}${neighbours.w ? 'W' : ''}${neighbours.e ? 'E' : ''}`
+  const { width, height } = data
+  const x = i % width
+  const y = (i - x) / width
+  const inside = (nx: number, ny: number) => nx >= 0 && ny >= 0 && nx < width && ny < height
+  const flows = (nx: number, ny: number) => inside(nx, ny) && sizes[ny * width + nx] > 0
+  const open = { N: flows(x, y - 1), S: flows(x, y + 1), W: flows(x - 1, y), E: flows(x + 1, y) }
+  if (Number(open.N) + Number(open.S) + Number(open.W) + Number(open.E) <= 1) {
+    const sides: ['N' | 'S' | 'W' | 'E', number, number][] = [
+      ['N', 0, -1],
+      ['S', 0, 1],
+      ['W', -1, 0],
+      ['E', 1, 0],
+    ]
+    for (const [side, dx, dy] of sides) {
+      if (open[side] || !inside(x + dx, y + dy)) continue
+      const t = types[(y + dy) * width + x + dx]
+      if (t === null || t === 'Lake' || t === 'Ocean') {
+        open[side] = true
+        break
+      }
+    }
+  }
+  const family = RIVER_FAMILY[sizes[i] as 1 | 2 | 3] ?? 'BROOK'
+  const dirs = `${open.N ? 'N' : ''}${open.S ? 'S' : ''}${open.W ? 'W' : ''}${open.E ? 'E' : ''}`
+  if (dirs === 'NS' || dirs === 'WE') return tileVariantAt(index, `${family}_${dirs}`, x, y)
   return tileSprite(index, dirs ? `${family}_${dirs}` : `${family}_0`)
+}
+
+/** Every tile's sprites, worked out once per map. */
+export function planTerrain(index: DfAssetIndex, data: LegendsMapData): TerrainPlan {
+  const { width, height } = data
+  const count = width * height
+  const types = Array.from({ length: count }, (_, i) => {
+    const r = data.tiles[i]
+    return r >= 0 ? (data.regions[r]?.type ?? null) : null
+  })
+  const cold = distanceField(
+    width,
+    height,
+    (i) => types[i] === 'Tundra' || types[i] === 'Glacier',
+    () => true,
+  )
+  const depth = distanceField(
+    width,
+    height,
+    (i) => types[i] !== 'Mountains',
+    (i) => types[i] === 'Mountains',
+  )
+  const fromLand = distanceField(
+    width,
+    height,
+    (i) => types[i] !== null && types[i] !== 'Ocean',
+    () => true,
+  )
+  const sizes = new Uint8Array(count)
+  for (const r of data.rivers) sizes[r.tile] = Math.max(sizes[r.tile], r.size)
+  const peaks = new Map(data.peaks.map((p) => [p.y * width + p.x, p.volcano]))
+
+  const base: (TileSprite | null)[] = new Array(count)
+  const overlay: (TileSprite | null)[] = new Array(count)
+  const river: (TileSprite | null)[] = new Array(count)
+  for (let i = 0; i < count; i++) {
+    const x = i % width
+    const y = (i - x) / width
+    const r = data.tiles[i]
+    const region = r >= 0 ? data.regions[r] : null
+    const evilness = region?.evilness ?? null
+    const pick = region ? hash(region.id, 0, 77) : 0
+    const ground = groundFamily(types[i], pick, cold[i], fromLand[i])
+    base[i] = tileVariantAt(index, alignedFamily(index, ground, evilness), x, y)
+    const peak = peaks.get(i)
+    // Trees and rocks stay off rivers so the water shows; peaks always stand.
+    const family =
+      peak !== undefined
+        ? peak
+          ? 'VOLCANO'
+          : 'MOUNTAIN_PEAK'
+        : sizes[i]
+          ? null
+          : overlayFamily(types[i], cold[i], depth[i])
+    overlay[i] = family
+      ? tileVariantAt(index, alignedFamily(index, family, evilness), x * 7 + 3, y * 13 + 5)
+      : null
+    river[i] = sizes[i] ? riverPiece(index, data, sizes, types, i) : null
+  }
+  return { base, overlay, river }
+}
+
+const LEGEND_LOOK: Record<string, [string, string | null]> = {
+  Grassland: ['GRASSLAND_TEMP', null],
+  Hills: ['HILLS', null],
+  Forest: ['GRASSLAND_TEMP', 'FOREST_BROADLEAF_TEMP'],
+  Mountains: ['ROCKY_HILLS', 'MOUNTAIN_MID'],
+  Lake: ['LAKE', null],
+  Wetland: ['SWAMP', null],
+  Tundra: ['TUNDRA', null],
+  Desert: ['SAND_DESERT', null],
+  Glacier: ['GLACIER', null],
+  Ocean: ['OCEAN', null],
 }
 
 /** The game's world-map marker for a site; unclaimed settlements show as ruins. */
@@ -277,9 +424,10 @@ const ARTIFACT_TYPE_TILES: Record<string, string[]> = {
   BACKPACK: ['ITEM_BACKPACK'],
 }
 
-/** Sample sprites for the legend under the map. */
+/** Representative sprites for a region type, for legends and chips. */
 export function legendTerrain(index: DfAssetIndex, type: string): TerrainSprites {
-  return terrainSprites(index, { id: -1, name: null, type, evilness: null, tiles: 0 }, 0, 0)
+  const [ground, over] = LEGEND_LOOK[type] ?? LEGEND_LOOK.Grassland
+  return { base: tileSprite(index, ground), overlay: over ? tileSprite(index, over) : null }
 }
 
 export function tileSpriteByName(index: DfAssetIndex, name: string): TileSprite | null {

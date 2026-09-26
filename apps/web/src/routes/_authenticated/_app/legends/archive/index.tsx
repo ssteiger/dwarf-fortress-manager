@@ -1,13 +1,28 @@
-import { DataTable, MultiSelect } from '@fortress/ui'
+import {
+  DataTable,
+  MultiSelect,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
-import { yearSpan } from '~/lib/legends/events'
-import { BROWSE_TABS, kindLabel, titleCase, words } from '~/lib/legends/model'
-import { type LegendsHit, type LegendsSortKey, browseLegends } from '~/lib/legends/server'
+import { EVENT_CATEGORIES, yearSpan } from '~/lib/legends/events'
+import { BROWSE_TABS, kindLabel, racePlural, titleCase, words } from '~/lib/legends/model'
+import {
+  type LegendsBrowseQuery,
+  type LegendsHit,
+  type LegendsSortKey,
+  type LegendsWorldSummary,
+  browseLegends,
+} from '~/lib/legends/server'
+import { EventsArchive, YearInput } from '../-components/EventsArchive'
 import {
   LegendsShell,
   RecordLink,
@@ -22,11 +37,29 @@ interface ArchiveSearch {
   archive?: string
   q?: string
   type?: string
+  /** Figures: living or dead at export. */
+  alive?: 'alive' | 'dead'
+  /** Figures: mortals, gods, or forces. */
+  nature?: 'mortal' | 'deity' | 'force'
+  /** Figures: members of; sites: held by; events: involving. */
+  civ?: number
+  /** Figures: born between; events: happened between. */
+  from?: number
+  to?: number
+  /** Events: category keys, comma separated. */
+  cat?: string
+  hf?: number
+  site?: number
+  artifact?: number
+  order?: 'asc' | 'desc'
+  page?: number
 }
 
+const EVENTS_TAB = { key: 'events', label: 'Events' } as const
 const NONE_TYPE = '__none__'
+const ANY = '__any__'
 
-function parseTypeFilter(raw: unknown): string[] {
+function parseList(raw: unknown): string[] {
   if (Array.isArray(raw))
     return raw.filter((value): value is string => typeof value === 'string' && value.length > 0)
   if (typeof raw === 'string' && raw)
@@ -35,6 +68,11 @@ function parseTypeFilter(raw: unknown): string[] {
       .map((value) => value.trim())
       .filter(Boolean)
   return []
+}
+
+function parseNumber(raw: unknown): number | undefined {
+  const n = typeof raw === 'number' ? raw : Number.parseInt(String(raw ?? ''), 10)
+  return Number.isFinite(n) ? n : undefined
 }
 
 function typeLabel(type: string | null): string {
@@ -105,6 +143,11 @@ const ARCHIVE_COLUMNS: (worldId: number) => ColumnDef<LegendsHit>[] = (worldId) 
   },
 ]
 
+/** The most storied first for figures; alphabetical elsewhere. */
+function defaultSorting(tabKey: string): SortingState {
+  return tabKey === 'figures' ? [{ id: 'events', desc: true }] : [{ id: 'name', desc: false }]
+}
+
 function ArchivePage() {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
@@ -113,53 +156,134 @@ function ArchivePage() {
 
   return (
     <LegendsShell section="archive" world={search.world}>
-      {({ worldId, counts }) => (
-        <ArchiveBody
-          worldId={worldId}
-          counts={counts}
-          archive={search.archive ?? 'figures'}
-          q={search.q ?? ''}
-          type={parseTypeFilter(search.type)}
-          onArchive={(archive) => setSearch({ archive, q: undefined, type: undefined })}
-          onQuery={(q) => setSearch({ q: q || undefined }, true)}
-          onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
-        />
+      {({ worldId, counts, summary }) => (
+        <Section
+          title="The archive"
+          description="Every record in the export, and every recorded event. Search by name or race, narrow by what matters, sort by any column."
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {[...BROWSE_TABS.slice(0, -1), EVENTS_TAB, BROWSE_TABS[BROWSE_TABS.length - 1]].map(
+                (t) => {
+                  const kinds = 'kinds' in t ? t.kinds : ['historical_event']
+                  const n = kinds.length
+                    ? kinds.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0)
+                    : null
+                  const showCount = n && !('types' in t && t.types)
+                  return (
+                    <FilterChip
+                      key={t.key}
+                      active={t.key === (search.archive ?? 'figures')}
+                      onClick={() =>
+                        navigate({
+                          search: { world: worldId, archive: t.key },
+                        })
+                      }
+                      count={showCount ? n : undefined}
+                    >
+                      {t.label}
+                    </FilterChip>
+                  )
+                },
+              )}
+            </div>
+            {search.archive === EVENTS_TAB.key ? (
+              <EventsArchive
+                worldId={worldId}
+                years={summary?.years ?? null}
+                filters={{
+                  from: search.from,
+                  to: search.to,
+                  categories: parseList(search.cat),
+                  hf: search.hf,
+                  civ: search.civ,
+                  site: search.site,
+                  artifact: search.artifact,
+                  order: search.order ?? 'asc',
+                  page: search.page ?? 0,
+                }}
+                onChange={(patch) => {
+                  const { categories, page, ...rest } = patch
+                  setSearch({
+                    ...rest,
+                    ...(categories !== undefined
+                      ? { cat: categories.length ? categories.join(',') : undefined }
+                      : {}),
+                    ...(page !== undefined ? { page: page || undefined } : {}),
+                  })
+                }}
+              />
+            ) : (
+              <RecordsArchive
+                worldId={worldId}
+                summary={summary}
+                archive={search.archive ?? 'figures'}
+                q={search.q ?? ''}
+                type={parseList(search.type)}
+                facets={{
+                  alive: search.alive,
+                  nature: search.nature,
+                  civ: search.civ,
+                  from: search.from,
+                  to: search.to,
+                }}
+                onQuery={(q) => setSearch({ q: q || undefined }, true)}
+                onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
+                onFacets={(patch) => setSearch(patch)}
+              />
+            )}
+          </div>
+        </Section>
       )}
     </LegendsShell>
   )
 }
 
-function ArchiveBody({
+interface Facets {
+  alive?: 'alive' | 'dead'
+  nature?: 'mortal' | 'deity' | 'force'
+  civ?: number
+  from?: number
+  to?: number
+}
+
+function RecordsArchive({
   worldId,
-  counts,
+  summary,
   archive,
   q,
   type,
-  onArchive,
+  facets,
   onQuery,
   onType,
+  onFacets,
 }: {
   worldId: number
-  counts: Record<string, number>
+  summary: LegendsWorldSummary | undefined
   archive: string
   q: string
   type: string[]
-  onArchive: (key: string) => void
+  facets: Facets
   onQuery: (q: string) => void
   onType: (type: string[]) => void
+  onFacets: (patch: Partial<Facets>) => void
 }) {
   const tab = BROWSE_TABS.find((t) => t.key === archive) ?? BROWSE_TABS[0]
   const [search, setSearchText] = React.useState(q)
   const [debounced, setDebounced] = React.useState(q)
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(50)
-  const [sorting, setSorting] = React.useState<SortingState>([{ id: 'name', desc: false }])
+  const [sorting, setSorting] = React.useState<SortingState>(() => defaultSorting(tab.key))
 
   React.useEffect(() => {
     setSearchText(q)
     setDebounced(q)
     setPage(0)
   }, [q])
+  React.useEffect(() => {
+    setSorting(defaultSorting(tab.key))
+    setPage(0)
+  }, [tab.key])
 
   const timer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
   React.useEffect(() => () => clearTimeout(timer.current ?? undefined), [])
@@ -176,42 +300,33 @@ function ArchiveBody({
 
   const sortKey = (sorting[0]?.id ?? 'name') as LegendsSortKey
   const sortDir = sorting[0]?.desc ? 'desc' : 'asc'
+  const isFigures = tab.key === 'figures'
+  const isSites = tab.key === 'sites'
 
+  const browseQuery: LegendsBrowseQuery = {
+    worldId,
+    kinds: tab.kinds,
+    types: tab.types,
+    type: type.length ? type : undefined,
+    namedOnly: tab.namedOnly,
+    q: debounced,
+    page,
+    pageSize,
+    sortKey,
+    sortDir,
+    ...(isFigures
+      ? { alive: facets.alive, nature: facets.nature, bornFrom: facets.from, bornTo: facets.to }
+      : {}),
+    ...(isFigures || isSites ? { entityId: facets.civ } : {}),
+  }
   const results = useQuery({
-    queryKey: [
-      'legends',
-      'browse',
-      worldId,
-      tab.key,
-      debounced,
-      type,
-      page,
-      pageSize,
-      sortKey,
-      sortDir,
-    ],
-    queryFn: () =>
-      browseLegends({
-        data: {
-          worldId,
-          kinds: tab.kinds,
-          types: tab.types,
-          type: type.length ? type : undefined,
-          namedOnly: tab.namedOnly,
-          q: debounced,
-          page,
-          pageSize,
-          sortKey,
-          sortDir,
-        },
-      }),
+    queryKey: ['legends', 'browse', browseQuery],
+    queryFn: () => browseLegends({ data: browseQuery }),
     placeholderData: keepPreviousData,
     staleTime: 60_000,
   })
 
   const columns = React.useMemo(() => ARCHIVE_COLUMNS(worldId), [worldId])
-  const tabCount = (t: (typeof BROWSE_TABS)[number]) =>
-    t.kinds.length ? t.kinds.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0) : null
   const typeOptions = React.useMemo(
     () =>
       (results.data?.types ?? []).map((row) => ({
@@ -220,95 +335,175 @@ function ArchiveBody({
       })),
     [results.data?.types],
   )
+  const civilizations = React.useMemo(
+    () => [...(summary?.civilizations ?? [])].sort((a, b) => b.sites - a.sites || a.id - b.id),
+    [summary?.civilizations],
+  )
+  const setFacet = (patch: Partial<Facets>) => {
+    setPage(0)
+    onFacets(patch)
+  }
 
   return (
-    <Section
-      title="The archive"
-      description="Every record in the export. Search by name or race; filter by type; sort by any column."
-    >
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {BROWSE_TABS.map((t) => {
-            const n = tabCount(t)
-            return (
-              <FilterChip
-                key={t.key}
-                active={t.key === tab.key}
-                onClick={() => {
-                  onArchive(t.key)
-                  setPage(0)
-                }}
-                count={n && !t.types ? n : undefined}
-              >
-                {t.label}
-              </FilterChip>
-            )
-          })}
-        </div>
-        <DataTable
-          data={results.data?.rows ?? []}
-          columns={columns}
-          isLoading={results.isLoading}
-          showSelectColumn={false}
-          showActionsColumn={false}
-          showToolbar={false}
-          enableSortingRemoval={false}
-          sorting={sorting}
-          onSortingChange={(next) => {
-            setSorting(next.length ? next : [{ id: 'name', desc: false }])
-            setPage(0)
-          }}
-          search={search}
-          onSearch={onSearchInput}
-          pagination={{ pageIndex: page, pageSize }}
-          onPaginationChange={(next) => {
-            setPage(next.pageIndex)
-            setPageSize(next.pageSize)
-          }}
-          rowCount={results.data?.total ?? 0}
-          getRowId={(hit) => `${hit.kind}-${hit.id}`}
-          emptyState={{
-            title: 'Nothing found',
-            subtitle:
-              debounced || type.length
-                ? 'Try another spelling, a race, a different type, or a different part of the archive.'
-                : 'This part of the archive is empty.',
-          }}
-          toolbar={
-            typeOptions.length > 1 ? (
-              <MultiSelect
-                options={typeOptions}
-                value={type}
-                defaultValue={type}
-                onValueChange={(next) => {
-                  const all = typeOptions.length > 0 && next.length === typeOptions.length
-                  onType(all ? [] : next)
-                  setPage(0)
-                }}
-                placeholder="All types"
-                variant="secondary"
-                maxCount={2}
-                className="min-h-9 w-[min(100%,20rem)] border-input bg-background text-sm dark:bg-background"
-                aria-label="Filter by type"
+    <>
+      {isFigures || isSites ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+          {isFigures ? (
+            <>
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    [undefined, 'Anyone'],
+                    ['alive', 'Living'],
+                    ['dead', 'Dead'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <FilterChip
+                    key={label}
+                    active={facets.alive === value}
+                    onClick={() => setFacet({ alive: value })}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+              <div className="flex items-center gap-1">
+                {(
+                  [
+                    [undefined, 'All natures'],
+                    ['mortal', 'Mortals'],
+                    ['deity', 'Gods'],
+                    ['force', 'Forces'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <FilterChip
+                    key={label}
+                    active={facets.nature === value}
+                    onClick={() => setFacet({ nature: value })}
+                  >
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
+            </>
+          ) : null}
+          <Select
+            value={facets.civ === undefined ? ANY : String(facets.civ)}
+            onValueChange={(v) => setFacet({ civ: v === ANY ? undefined : Number(v) })}
+          >
+            <SelectTrigger className="h-9 w-[260px]" aria-label="Civilization">
+              <SelectValue
+                placeholder={isSites ? 'Held by any civilization' : 'Any civilization'}
               />
-            ) : null
-          }
-        />
-      </div>
-    </Section>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ANY}>
+                {isSites ? 'Held by any civilization' : 'Any civilization'}
+              </SelectItem>
+              {civilizations.map((civ) => (
+                <SelectItem key={civ.id} value={String(civ.id)}>
+                  {civ.name ? titleCase(civ.name) : `Civilization #${civ.id}`}
+                  {civ.race ? ` · ${racePlural(civ.race)}` : ''}
+                  {civ.sites ? ` · ${civ.sites} sites` : ''}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {isFigures ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Born</span>
+              <YearInput
+                label="Born from year"
+                value={facets.from}
+                placeholder={summary?.years ? String(summary.years.min) : 'from'}
+                onCommit={(from) => setFacet({ from })}
+              />
+              <span className="text-sm text-muted-foreground">to</span>
+              <YearInput
+                label="Born to year"
+                value={facets.to}
+                placeholder={summary?.years ? String(summary.years.max) : 'to'}
+                onCommit={(to) => setFacet({ to })}
+              />
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <DataTable
+        data={results.data?.rows ?? []}
+        columns={columns}
+        isLoading={results.isLoading}
+        showSelectColumn={false}
+        showActionsColumn={false}
+        showToolbar={false}
+        enableSortingRemoval={false}
+        sorting={sorting}
+        onSortingChange={(next) => {
+          setSorting(next.length ? next : defaultSorting(tab.key))
+          setPage(0)
+        }}
+        search={search}
+        onSearch={onSearchInput}
+        pagination={{ pageIndex: page, pageSize }}
+        onPaginationChange={(next) => {
+          setPage(next.pageIndex)
+          setPageSize(next.pageSize)
+        }}
+        rowCount={results.data?.total ?? 0}
+        getRowId={(hit) => `${hit.kind}-${hit.id}`}
+        emptyState={{
+          title: 'Nothing found',
+          subtitle:
+            debounced || type.length || Object.values(facets).some((v) => v !== undefined)
+              ? 'Try another spelling, a race, a different type, or loosen a filter.'
+              : 'This part of the archive is empty.',
+        }}
+        toolbar={
+          typeOptions.length > 1 ? (
+            <MultiSelect
+              options={typeOptions}
+              value={type}
+              defaultValue={type}
+              onValueChange={(next) => {
+                const all = typeOptions.length > 0 && next.length === typeOptions.length
+                onType(all ? [] : next)
+                setPage(0)
+              }}
+              placeholder="All types"
+              variant="secondary"
+              maxCount={2}
+              className="min-h-9 w-[min(100%,20rem)] border-input bg-background text-sm dark:bg-background"
+              aria-label="Filter by type"
+            />
+          ) : null
+        }
+      />
+    </>
   )
 }
+
+const ARCHIVE_KEYS = new Set([...BROWSE_TABS.map((t) => t.key), EVENTS_TAB.key])
+const CATEGORY_KEYS = new Set(EVENT_CATEGORIES.map((c) => c.key))
 
 export const Route = createFileRoute('/_authenticated/_app/legends/archive/')({
   validateSearch: (raw: Record<string, unknown>): ArchiveSearch => {
     const out: ArchiveSearch = {}
     const world = parseWorldParam(raw.world)
     if (world !== undefined) out.world = world
-    if (typeof raw.archive === 'string' && BROWSE_TABS.some((t) => t.key === raw.archive))
-      out.archive = raw.archive
+    if (typeof raw.archive === 'string' && ARCHIVE_KEYS.has(raw.archive)) out.archive = raw.archive
     if (typeof raw.q === 'string' && raw.q) out.q = raw.q
-    const type = parseTypeFilter(raw.type)
+    const type = parseList(raw.type)
     if (type.length) out.type = type.join(',')
+    if (raw.alive === 'alive' || raw.alive === 'dead') out.alive = raw.alive
+    if (raw.nature === 'mortal' || raw.nature === 'deity' || raw.nature === 'force')
+      out.nature = raw.nature
+    for (const key of ['civ', 'from', 'to', 'hf', 'site', 'artifact', 'page'] as const) {
+      const n = parseNumber(raw[key])
+      if (n !== undefined) out[key] = n
+    }
+    const cat = parseList(raw.cat).filter((c) => CATEGORY_KEYS.has(c))
+    if (cat.length) out.cat = cat.join(',')
+    if (raw.order === 'asc' || raw.order === 'desc') out.order = raw.order
     return out
   },
   component: ArchivePage,

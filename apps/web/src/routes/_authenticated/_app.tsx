@@ -19,8 +19,10 @@ import { toast } from 'sonner'
 
 import { logoutFn } from '~/lib/auth/server'
 import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
+import { FortWatcher } from '~/lib/fortress/FortWatcher'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { getFortUnits } from '~/lib/fortress/server'
+import { usePreferences, usePreferencesSync } from '~/lib/preferences'
 
 const EDGE_DWARF_COUNT = 12
 
@@ -74,6 +76,8 @@ const Layout = () => {
   const { user } = Route.useRouteContext()
   const queryClient = useQueryClient()
   const location = useLocation()
+  const { edgeDwarves } = usePreferences()
+  usePreferencesSync()
 
   const logOutMutation = useMutation({
     mutationFn: logoutFn,
@@ -119,7 +123,8 @@ const Layout = () => {
       }}
     >
       <Outlet />
-      <FortressEdgeDwarves />
+      {edgeDwarves && <FortressEdgeDwarves />}
+      <FortWatcher />
     </AppLayout>
   )
 }

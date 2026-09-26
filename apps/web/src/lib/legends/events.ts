@@ -225,6 +225,12 @@ export function eventCategory(type: string | null | undefined): EventCategory | 
   return type ? (CATEGORY_BY_TYPE.get(type) ?? null) : null
 }
 
+/**
+ * Gatherings that recur every season and rarely move a story along. A figure
+ * who entered 1,600 competitions has a life story buried under them.
+ */
+export const ROUTINE_TYPES = ['competition', 'gamble', 'performance', 'ceremony', 'procession']
+
 export type Fragment = { text: string } | { link: { kind: string; id: number }; text: string }
 
 export interface DescribedEvent {
@@ -297,6 +303,20 @@ function has(ctx: Ctx, key: string): boolean {
   return v !== null && v >= 0
 }
 
+/** Fight subtypes as "first side ___ second side [place]___". */
+const BATTLE_VERBS: Record<string, [string, string?]> = {
+  attacked: ['attacked'],
+  scuffle: ['scuffled with'],
+  'got into a brawl': ['got into a brawl with'],
+  confront: ['confronted'],
+  ambushed: ['ambushed'],
+  'happen upon': ['happened upon'],
+  surprised: ['surprised'],
+  '2 lost after receiving wounds': ['wounded and beat'],
+  '2 lost after giving wounds': ['beat', ' despite being wounded'],
+  '2 lost after mutual wounds': ['beat', ', both taking wounds'],
+}
+
 const TEMPLATES: Record<string, (ctx: Ctx) => void> = {
   'hf died': (ctx) => {
     hf(ctx, 'hfid')
@@ -314,11 +334,13 @@ const TEMPLATES: Record<string, (ctx: Ctx) => void> = {
     text(ctx, '.')
   },
   'hf simple battle event': (ctx) => {
+    const subtype = words(str(ctx.p.subtype))
+    const [verb, after] = BATTLE_VERBS[subtype] ?? [subtype || 'fought']
     hf(ctx, 'group_1_hfid')
-    text(ctx, ` ${words(str(ctx.p.subtype)) || 'fought'} `)
+    text(ctx, ` ${verb} `)
     hf(ctx, 'group_2_hfid')
     place(ctx)
-    text(ctx, '.')
+    text(ctx, `${after ?? ''}.`)
   },
   'hf wounded': (ctx) => {
     hf(ctx, 'woundee_hfid')
@@ -996,7 +1018,14 @@ const TEMPLATES: Record<string, (ctx: Ctx) => void> = {
     if (has(ctx, 'winner_hfid')) {
       text(ctx, '; ')
       hf(ctx, 'winner_hfid')
-      text(ctx, competitors.length > 1 ? ` won against ${competitors.length - 1} others` : ' won')
+      text(
+        ctx,
+        competitors.length > 2
+          ? ` won against ${competitors.length - 1} others`
+          : competitors.length === 2
+            ? ' won against one other'
+            : ' won',
+      )
     }
     text(ctx, '.')
   },
@@ -1153,4 +1182,13 @@ export function describeEvent(event: LegendsRecord, names: NameIndex): Described
     text(ctx, extras.join(', '))
   }
   return { fragments: ctx.out, known: false }
+}
+
+/** The same sentence as plain text, for notes, exports and the narrator. */
+export function eventSentence(event: LegendsRecord, names: NameIndex): string {
+  return describeEvent(event, names)
+    .fragments.map((f) => f.text)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim()
 }

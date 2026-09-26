@@ -1,13 +1,7 @@
 import { Badge, Button, Card, cn } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  Maximize2Icon,
-  ZoomInIcon,
-  ZoomOutIcon,
-} from 'lucide-react'
+import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { FORT_SLOW_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
@@ -20,6 +14,8 @@ import {
   isHidden,
   tileStyle,
 } from '~/lib/fortress/tiles'
+import { MapHint, MapMinimap, MapZoomControls } from '~/lib/map/MapControls'
+import { usePanZoom } from '~/lib/map/usePanZoom'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 
 const UNIT_COLORS = {
@@ -60,7 +56,7 @@ function MapPage() {
       <PageHeader
         eyebrow="Fortress"
         title="Map"
-        description="One z-level at a time, drawn from the last map dump. Scroll to zoom, drag to pan, double-click to zoom in. Unrevealed rock stays dark unless you choose to see it."
+        description="One z-level at a time, drawn from the last map dump. Scroll or pinch to zoom, drag to pan, double-click to zoom in, and use < and > to change level like in the game. Unrevealed rock stays dark unless you choose to see it."
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
@@ -81,6 +77,7 @@ function MapPage() {
               reveal={reveal}
               showBuildings={showBuildings}
               onHover={setHover}
+              onStepLevel={step}
             />
           </Card>
           <div className="flex flex-col gap-4">
@@ -222,54 +219,7 @@ function Legend() {
   )
 }
 
-/** Screen = tile * scale + offset. `scale` is CSS pixels per tile. */
-interface View {
-  scale: number
-  x: number
-  y: number
-}
-
-interface Size {
-  width: number
-  height: number
-}
-
 const MAX_SCALE = 64
-const ZOOM_STEP = 1.5
-/** Keep at least this many CSS pixels of map inside the viewport when panning. */
-const PAN_MARGIN = 96
-/** Pointer movement below this is a click, not a drag. */
-const DRAG_THRESHOLD = 3
-
-function fitView(grid: LevelGrid, size: Size): View {
-  const scale = Math.max(Math.min(size.width / grid.width, size.height / grid.height), 0.5)
-  return {
-    scale,
-    x: (size.width - grid.width * scale) / 2,
-    y: (size.height - grid.height * scale) / 2,
-  }
-}
-
-function clampView(view: View, grid: LevelGrid, size: Size): View {
-  const minScale = fitView(grid, size).scale / 2
-  const scale = Math.min(Math.max(view.scale, minScale), MAX_SCALE)
-  const mapW = grid.width * scale
-  const mapH = grid.height * scale
-  const x = Math.min(Math.max(view.x, PAN_MARGIN - mapW), size.width - PAN_MARGIN)
-  const y = Math.min(Math.max(view.y, PAN_MARGIN - mapH), size.height - PAN_MARGIN)
-  return { scale, x, y }
-}
-
-/** Zoom by `factor` keeping the screen point (px, py) fixed. */
-function zoomAt(view: View, factor: number, px: number, py: number): View {
-  const scale = view.scale * factor
-  const ratio = scale / view.scale
-  return {
-    scale,
-    x: px - (px - view.x) * ratio,
-    y: py - (py - view.y) * ratio,
-  }
-}
 
 /** Paint the level once at one pixel per tile; the viewport scales this image. */
 function paintBase(
@@ -323,24 +273,19 @@ function MapCanvas({
   reveal,
   showBuildings,
   onHover,
+  onStepLevel,
 }: {
   data: FortMapLevel
   reveal: boolean
   showBuildings: boolean
   onHover: (info: { x: number; y: number; label: string } | null) => void
+  /** +1 for the level above, -1 for the one below. */
+  onStepLevel: (delta: number) => void
 }) {
-  const containerRef = React.useRef<HTMLDivElement>(null)
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
-  const [size, setSize] = React.useState<Size>({ width: 0, height: 0 })
-  const [view, setView] = React.useState<View | null>(null)
-  const [dragging, setDragging] = React.useState(false)
-  const dragRef = React.useRef<{
-    pointerId: number
-    startX: number
-    startY: number
-    origin: View
-    moved: boolean
-  } | null>(null)
+  const [pointer, setPointer] = React.useState<{ px: number; py: number; label: string } | null>(
+    null,
+  )
 
   const grid = React.useMemo(
     () => decodeLevel(data.blocks, data.xCount, data.yCount),
@@ -358,48 +303,20 @@ function MapCanvas({
     return out
   }, [grid])
 
-  // Track the viewport size. The first measurement also sets the initial (fitted) view.
-  React.useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const observer = new ResizeObserver((entries) => {
-      const rect = entries[0]?.contentRect
-      if (!rect || rect.width === 0 || rect.height === 0) return
-      const next = { width: rect.width, height: rect.height }
-      setSize(next)
-      setView((current) => (current ? clampView(current, grid, next) : fitView(grid, next)))
-    })
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [grid])
-
-  // Wheel zoom has to be a native, non-passive listener so we can stop the page scrolling.
-  React.useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      const rect = canvas.getBoundingClientRect()
-      const px = e.clientX - rect.left
-      const py = e.clientY - rect.top
-      // Pixel-mode deltas (trackpads) are small and frequent; line-mode (mouse wheels) are large.
-      const delta = e.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? e.deltaY : e.deltaY * 16
-      const factor = Math.exp(-delta * 0.002)
-      setView((current) =>
-        current ? clampView(zoomAt(current, factor, px, py), grid, size) : current,
-      )
-    }
-    canvas.addEventListener('wheel', onWheel, { passive: false })
-    return () => canvas.removeEventListener('wheel', onWheel)
-  }, [grid, size])
+  const pz = usePanZoom({ width: grid.width, height: grid.height, maxScale: MAX_SCALE })
+  const { view, size } = pz
 
   // Draw. Everything here is pure canvas output, no React state.
   React.useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !view || !base || size.width === 0 || size.height === 0) return
     const dpr = window.devicePixelRatio || 1
-    canvas.width = Math.round(size.width * dpr)
-    canvas.height = Math.round(size.height * dpr)
+    const pw = Math.round(size.width * dpr)
+    const ph = Math.round(size.height * dpr)
+    if (canvas.width !== pw || canvas.height !== ph) {
+      canvas.width = pw
+      canvas.height = ph
+    }
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -416,6 +333,24 @@ function MapCanvas({
     const tx1 = Math.min(grid.width - 1, Math.ceil((size.width - ox) / scale))
     const ty1 = Math.min(grid.height - 1, Math.ceil((size.height - oy) / scale))
     const visible = (x: number, y: number) => x >= tx0 && x <= tx1 && y >= ty0 && y <= ty1
+
+    // A faint grid once tiles are big enough to count.
+    if (scale >= 14) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)'
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      for (let x = tx0; x <= tx1 + 1; x++) {
+        const sx = Math.round(ox + x * scale) + 0.5
+        ctx.moveTo(sx, oy + ty0 * scale)
+        ctx.lineTo(sx, oy + (ty1 + 1) * scale)
+      }
+      for (let y = ty0; y <= ty1 + 1; y++) {
+        const sy = Math.round(oy + y * scale) + 0.5
+        ctx.moveTo(ox + tx0 * scale, sy)
+        ctx.lineTo(ox + (tx1 + 1) * scale, sy)
+      }
+      ctx.stroke()
+    }
 
     // Dig designations: outlines when tiles are big enough, a tint when they are not.
     if (scale >= 3) {
@@ -447,6 +382,26 @@ function MapCanvas({
           (b.y2 - b.y1 + 1) * scale - 1,
         )
       }
+      // Names on buildings once there is room for them.
+      if (scale >= 22) {
+        ctx.font = '500 11px ui-sans-serif, system-ui, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.lineJoin = 'round'
+        for (const b of data.buildings) {
+          if (b.x2 < tx0 || b.x1 > tx1 || b.y2 < ty0 || b.y1 > ty1) continue
+          const w = (b.x2 - b.x1 + 1) * scale
+          const label = b.name || b.type
+          if (!label || ctx.measureText(label).width > w - 4) continue
+          const cx = ox + ((b.x1 + b.x2 + 1) / 2) * scale
+          const cy = oy + ((b.y1 + b.y2 + 1) / 2) * scale
+          ctx.strokeStyle = 'rgba(0,0,0,0.8)'
+          ctx.lineWidth = 3
+          ctx.strokeText(label, cx, cy)
+          ctx.fillStyle = 'rgba(255,255,255,0.9)'
+          ctx.fillText(label, cx, cy)
+        }
+      }
     }
 
     // Units stay visible at any zoom: never smaller than a few pixels.
@@ -465,14 +420,16 @@ function MapCanvas({
     }
   }, [view, size, base, grid, designated, data.buildings, data.units, showBuildings])
 
-  const tileAt = (clientX: number, clientY: number): { x: number; y: number } | null => {
+  const tileAt = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current
     if (!canvas || !view) return null
     const rect = canvas.getBoundingClientRect()
-    const x = Math.floor((clientX - rect.left - view.x) / view.scale)
-    const y = Math.floor((clientY - rect.top - view.y) / view.scale)
+    const px = clientX - rect.left
+    const py = clientY - rect.top
+    const x = Math.floor((px - view.x) / view.scale)
+    const y = Math.floor((py - view.y) / view.scale)
     if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return null
-    return { x, y }
+    return { x, y, px, py }
   }
 
   const describe = (x: number, y: number): string => {
@@ -492,117 +449,92 @@ function MapCanvas({
     return parts.join(' · ')
   }
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!view || e.button !== 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    dragRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      origin: view,
-      moved: false,
-    }
-  }
-
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current
-    if (drag && drag.pointerId === e.pointerId) {
-      const dx = e.clientX - drag.startX
-      const dy = e.clientY - drag.startY
-      if (!drag.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return
-      if (!drag.moved) {
-        drag.moved = true
-        setDragging(true)
-        onHover(null)
-      }
-      setView(
-        clampView({ ...drag.origin, x: drag.origin.x + dx, y: drag.origin.y + dy }, grid, size),
-      )
+    pz.handlers.onPointerMove(e)
+    if (pz.isPressed()) {
+      if (pointer) setPointer(null)
+      onHover(null)
       return
     }
     const tile = tileAt(e.clientX, e.clientY)
-    onHover(tile ? { ...tile, label: describe(tile.x, tile.y) } : null)
-  }
-
-  const endDrag = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== e.pointerId) return
-    dragRef.current = null
-    setDragging(false)
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId)
+    if (!tile) {
+      setPointer(null)
+      onHover(null)
+      return
     }
+    const label = describe(tile.x, tile.y)
+    setPointer({ px: tile.px, py: tile.py, label: `${tile.x},${tile.y} · ${label}` })
+    onHover({ x: tile.x, y: tile.y, label })
   }
 
-  const handleDoubleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!view) return
-    const rect = e.currentTarget.getBoundingClientRect()
-    setView(clampView(zoomAt(view, 2, e.clientX - rect.left, e.clientY - rect.top), grid, size))
-  }
-
-  const zoomCenter = (factor: number) => {
-    if (!view) return
-    setView(clampView(zoomAt(view, factor, size.width / 2, size.height / 2), grid, size))
-  }
-
-  const fitScale = size.width > 0 ? fitView(grid, size).scale : 1
-  const zoomPercent = view ? Math.round((view.scale / fitScale) * 100) : 100
+  const zoomedIn = view ? view.scale > pz.fitScale * 1.25 : false
 
   return (
-    <div ref={containerRef} className="relative h-[70vh] min-h-[420px] w-full select-none bg-black">
+    <div
+      ref={pz.containerRef}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: focus enables the keyboard shortcuts
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === '<' || e.key === 'PageUp') onStepLevel(1)
+        else if (e.key === '>' || e.key === 'PageDown') onStepLevel(-1)
+        else {
+          pz.handlers.onKeyDown(e)
+          return
+        }
+        e.preventDefault()
+      }}
+      className="relative h-[70vh] min-h-[420px] w-full select-none bg-black outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+    >
       <canvas
         ref={canvasRef}
-        onPointerDown={handlePointerDown}
+        onPointerDown={pz.handlers.onPointerDown}
         onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-        onPointerLeave={(e) => {
-          if (!dragRef.current) onHover(null)
-          endDrag(e)
+        onPointerUp={pz.handlers.onPointerUp}
+        onPointerCancel={pz.handlers.onPointerCancel}
+        onPointerLeave={() => {
+          setPointer(null)
+          onHover(null)
         }}
-        onDoubleClick={handleDoubleClick}
+        onDoubleClick={pz.handlers.onDoubleClick}
         className={cn(
           'absolute inset-0 h-full w-full',
-          dragging ? 'cursor-grabbing' : 'cursor-grab',
+          pz.dragging ? 'cursor-grabbing' : 'cursor-crosshair',
         )}
         style={{ imageRendering: 'pixelated', touchAction: 'none' }}
       />
-      <div className="absolute top-2 right-2 flex items-center gap-1 rounded-md border border-white/10 bg-background/80 p-1 shadow-sm backdrop-blur">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label="Zoom out"
-          onClick={() => zoomCenter(1 / ZOOM_STEP)}
+      {pointer && !pz.dragging ? (
+        <div
+          className="pointer-events-none absolute z-10 max-w-xs rounded-md border bg-popover/95 px-2 py-1 text-xs text-popover-foreground shadow-md"
+          style={{
+            left: Math.min(pointer.px + 14, Math.max(0, size.width - 260)),
+            top: Math.min(pointer.py + 14, Math.max(0, size.height - 40)),
+          }}
         >
-          <ZoomOutIcon className="size-4" />
-        </Button>
-        <span className="min-w-[3.5rem] text-center text-xs tabular-nums text-muted-foreground">
-          {zoomPercent}%
-        </span>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label="Zoom in"
-          onClick={() => zoomCenter(ZOOM_STEP)}
-        >
-          <ZoomInIcon className="size-4" />
-        </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8"
-          aria-label="Fit the whole level"
-          onClick={() => setView(fitView(grid, size))}
-        >
-          <Maximize2Icon className="size-4" />
-        </Button>
-      </div>
-      {view && view.scale >= 1 ? (
-        <div className="pointer-events-none absolute bottom-2 left-2 rounded bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
-          {view.scale.toFixed(view.scale < 4 ? 1 : 0)} px / tile
+          {pointer.label}
         </div>
+      ) : null}
+      <MapZoomControls
+        className="absolute top-2 right-2"
+        zoomPercent={pz.zoomPercent}
+        onZoomIn={pz.zoomIn}
+        onZoomOut={pz.zoomOut}
+        onFit={pz.fit}
+      />
+      {zoomedIn && view ? (
+        <MapMinimap
+          className="absolute top-14 right-2"
+          image={base}
+          contentWidth={grid.width}
+          contentHeight={grid.height}
+          view={view}
+          size={size}
+          onCentre={pz.centreOn}
+        />
+      ) : null}
+      {view ? (
+        <MapHint className="absolute bottom-2 left-2 tabular-nums">
+          {view.scale.toFixed(view.scale < 4 ? 1 : 0)} px / tile · &lt; &gt; change level · 0 fits
+        </MapHint>
       ) : null}
     </div>
   )

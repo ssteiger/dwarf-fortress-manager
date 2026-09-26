@@ -1,5 +1,6 @@
-/* Self-hosted DM Sans (variable; latin subsets load on demand). */
-@import "@fontsource-variable/dm-sans";
+/* Self-hosted Atkinson Hyperlegible Next from Google Fonts (variable, 200–800; latin subsets load on demand). */
+@import "@fontsource-variable/atkinson-hyperlegible-next";
+@import "@fontsource-variable/atkinson-hyperlegible-next/wght-italic.css";
 @import "@fontsource-variable/geist-mono";
 
 @import "tailwindcss" source("../../");
@@ -10,7 +11,7 @@
 
 @theme {
   /* Proportional text for the interface; mono only for code and coordinates. */
-  --font-sans: "DM Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-sans);
 }
@@ -63,4 +64,33 @@ pre {
   white-space: normal;
   overflow-wrap: break-word;
   vertical-align: top;
+}
+
+/* Settings → General. Everything is sized in rem, so the root size scales the whole app. */
+html[data-text="large"] {
+  font-size: 112.5%;
+}
+
+html[data-text="larger"] {
+  font-size: 125%;
+}
+
+html[data-motion="reduce"] *,
+html[data-motion="reduce"] *::before,
+html[data-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-motion="system"] *,
+  html[data-motion="system"] *::before,
+  html[data-motion="system"] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

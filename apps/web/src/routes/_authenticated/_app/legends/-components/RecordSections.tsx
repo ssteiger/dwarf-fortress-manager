@@ -1,5 +1,6 @@
 import type { JsonObject, LegendsPayload, LegendsRecord } from '@fortress/db-drizzle'
 import { Badge, Button, cn } from '@fortress/ui'
+import { useNavigate } from '@tanstack/react-router'
 import * as React from 'react'
 
 import {
@@ -14,9 +15,12 @@ import {
 } from '~/lib/legends/events'
 import {
   cleanName,
+  entityTypeLabel,
   humanizeToken,
   kindLabel,
+  kindPlural,
   raceColor,
+  racePlural,
   titleCase,
   words,
 } from '~/lib/legends/model'
@@ -27,7 +31,15 @@ import type {
   NameIndex,
   RelatedRecords,
 } from '~/lib/legends/server'
-import { EventLine, Facts, HitRows, NamedRef, RecordLink, Section } from './LegendsChrome'
+import {
+  EventLine,
+  Facts,
+  HitRows,
+  NamedRef,
+  RecordLink,
+  Section,
+  isUnrecorded,
+} from './LegendsChrome'
 import { WorldMap } from './WorldMap'
 
 export interface SectionProps {
@@ -39,7 +51,7 @@ export interface SectionProps {
   positions: HeldPosition[]
   worldId: number
   map: LegendsMapData | undefined
-  /** Chronicle for this record. Map kinds render it under the map; others render it first. */
+  /** Chronicle for this record. Map kinds render it under the map; others beside the facts. */
   timeline?: React.ReactNode
 }
 
@@ -91,7 +103,7 @@ export function describeRecord(kind: string, p: LegendsPayload, names: NameIndex
     case 'entity': {
       const race = str(plus.race)
       parts.push(
-        [words(str(plus.type)) || 'group', race ? `of ${words(race)}s` : '']
+        [entityTypeLabel(str(plus.type)) || 'group', race ? `of ${racePlural(race)}` : '']
           .filter(Boolean)
           .join(' '),
       )
@@ -173,7 +185,9 @@ function RefList({
 }) {
   const [all, setAll] = React.useState(false)
   const unique = [...new Set(ids)]
-  const shown = all ? unique : unique.slice(0, max)
+  const recorded = unique.filter((id) => !isUnrecorded(names, kind, id))
+  const missing = unique.length - recorded.length
+  const shown = all ? recorded : recorded.slice(0, max)
   if (!unique.length) return <span className="text-muted-foreground">none</span>
   return (
     <span className="leading-relaxed">
@@ -183,7 +197,7 @@ function RefList({
           <NamedRef kind={kind} id={id} names={names} worldId={worldId} />
         </span>
       ))}
-      {ids.length > shown.length ? (
+      {recorded.length > shown.length ? (
         <>
           {' '}
           <button
@@ -191,10 +205,24 @@ function RefList({
             className="text-sm text-primary hover:underline"
             onClick={() => setAll(true)}
           >
-            and {ids.length - shown.length} more
+            and {recorded.length - shown.length} more
           </button>
         </>
       ) : null}
+      {missing ? <UnrecordedNote count={missing} kind={kind} lead={shown.length > 0} /> : null}
+    </span>
+  )
+}
+
+/** "and 12 more not in this export", for references the export does not contain. */
+function UnrecordedNote({ count, kind, lead }: { count: number; kind: string; lead: boolean }) {
+  const noun = count === 1 ? kindLabel(kind).toLowerCase() : kindPlural(kind).toLowerCase()
+  return (
+    <span
+      className="text-sm text-muted-foreground"
+      title="The export mentions them, but does not record who they were"
+    >
+      {lead ? ` and ${count} unrecorded ${noun}` : `${count} unrecorded ${noun}`}
     </span>
   )
 }
@@ -215,10 +243,15 @@ function LinkGroup({
   max?: number
 }) {
   const [all, setAll] = React.useState(false)
-  const shown = all ? entries : entries.slice(0, max)
+  const recorded = entries.filter((entry) => !isUnrecorded(names, kind, entry.id))
+  const missing = entries.length - recorded.length
+  const shown = all ? recorded : recorded.slice(0, max)
   return (
     <div>
-      <div className="mb-1.5 text-sm capitalize text-muted-foreground">{label}</div>
+      <div className="mb-1.5 text-sm capitalize text-muted-foreground">
+        {label}
+        {entries.length > 1 ? <span className="ml-1.5 tabular-nums">{entries.length}</span> : null}
+      </div>
       <div className="flex flex-wrap gap-x-3 gap-y-1 leading-relaxed">
         {shown.map((entry, i) => (
           <span key={`${entry.id}-${i}`}>
@@ -228,15 +261,16 @@ function LinkGroup({
             ) : null}
           </span>
         ))}
-        {entries.length > shown.length ? (
+        {recorded.length > shown.length ? (
           <button
             type="button"
             className="text-sm text-primary hover:underline"
             onClick={() => setAll(true)}
           >
-            and {entries.length - shown.length} more
+            and {recorded.length - shown.length} more
           </button>
         ) : null}
+        {missing ? <UnrecordedNote count={missing} kind={kind} lead={shown.length > 0} /> : null}
       </div>
     </div>
   )
@@ -286,16 +320,25 @@ function MapAndFacts({ map, facts }: { map?: React.ReactNode; facts: React.React
 
 function MiniMap({
   map,
+  worldId,
   focus,
   highlightRegion,
   highlightSites,
 }: {
   map: LegendsMapData | undefined
+  worldId: number
   focus?: { x: number; y: number } | null
   highlightRegion?: number | null
   highlightSites?: ReadonlySet<number> | null
 }) {
+  const navigate = useNavigate()
   if (!map) return <div className="aspect-square w-full animate-pulse rounded-lg bg-muted" />
+  const open = (kind: string, id: number) =>
+    navigate({
+      to: '/legends/$kind/$id',
+      params: { kind, id: String(id) },
+      search: { world: worldId },
+    })
   return (
     <WorldMap
       data={map}
@@ -303,6 +346,8 @@ function MiniMap({
       highlightRegion={highlightRegion}
       highlightSites={highlightSites}
       showLegend={false}
+      onSelectSite={(site) => open('site', site.id)}
+      onSelectRegion={(region) => open('region', region.id)}
     />
   )
 }
@@ -420,7 +465,6 @@ export function FigureSections({
 
   return (
     <>
-      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="Who they are">
           <Facts
@@ -549,6 +593,7 @@ export function FigureSections({
       </div>
 
       <div className="flex flex-col gap-4 lg:col-span-2">
+        {timeline}
         {skills.length ? (
           <Section title="Skills" count={skills.length}>
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
@@ -806,7 +851,7 @@ export function SiteSections({
       <div className="lg:col-span-3">
         <Section title="Where it stands">
           <MapAndFacts
-            map={<MiniMap map={map} focus={at} />}
+            map={<MiniMap map={map} worldId={worldId} focus={at} />}
             facts={
               <Facts
                 items={[
@@ -1039,7 +1084,11 @@ export function EntitySections({
       <div className="lg:col-span-3">
         <Section title="What it is">
           <MapAndFacts
-            map={siteIds?.size ? <MiniMap map={map} highlightSites={siteIds} /> : null}
+            map={
+              siteIds?.size ? (
+                <MiniMap map={map} worldId={worldId} highlightSites={siteIds} />
+              ) : null
+            }
             facts={
               <Facts
                 items={[
@@ -1245,7 +1294,6 @@ export function ArtifactSections({
   const creator = num(firstPayload.hist_figure_id) ?? num(plusOf(firstPayload).creator_hfid)
   return (
     <>
-      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="The object">
           <Facts
@@ -1315,7 +1363,7 @@ export function ArtifactSections({
           />
         </Section>
       </div>
-      <div className="lg:col-span-2" />
+      <div className="flex flex-col gap-4 lg:col-span-2">{timeline}</div>
     </>
   )
 }
@@ -1354,7 +1402,6 @@ export function WrittenSections({
   }
   return (
     <>
-      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="The work">
           <Facts
@@ -1429,6 +1476,7 @@ export function WrittenSections({
             </ol>
           </Section>
         ) : null}
+        {timeline}
         {related.artifacts?.length ? (
           <Section
             title="Copies"
@@ -1546,13 +1594,17 @@ export function CollectionSections({
   const battles = children.filter((c) => c.type === 'battle')
   const conquests = children.filter((c) => c.type === 'site conquered')
   const otherChildren = children.filter((c) => c.type !== 'battle' && c.type !== 'site conquered')
+  const side = (id: number | null) =>
+    id !== null && id >= 0 ? (
+      <NamedRef kind="entity" id={id} names={names} worldId={worldId} />
+    ) : null
 
   return (
     <>
       <div className="lg:col-span-3">
         <Section title="The chapter">
           <MapAndFacts
-            map={at ? <MiniMap map={map} focus={at} /> : null}
+            map={at ? <MiniMap map={map} worldId={worldId} focus={at} /> : null}
             facts={
               <Facts
                 items={[
@@ -1567,27 +1619,11 @@ export function CollectionSections({
                   { label: 'Outcome', value: str(p.outcome) },
                   {
                     label: 'Aggressor',
-                    value: (
-                      <NamedRef
-                        kind="entity"
-                        id={num(p.aggressor_ent_id) ?? num(p.attacking_enid)}
-                        names={names}
-                        worldId={worldId}
-                        fallback=""
-                      />
-                    ),
+                    value: side(num(p.aggressor_ent_id) ?? num(p.attacking_enid)),
                   },
                   {
                     label: 'Defender',
-                    value: (
-                      <NamedRef
-                        kind="entity"
-                        id={num(p.defender_ent_id) ?? num(p.defending_enid)}
-                        names={names}
-                        worldId={worldId}
-                        fallback=""
-                      />
-                    ),
+                    value: side(num(p.defender_ent_id) ?? num(p.defending_enid)),
                   },
                   {
                     label: 'Target',
@@ -1739,7 +1775,7 @@ export function RegionSections({
       type: s.type,
       year: null,
       detail: civ
-        ? `held by ${civ.name ? titleCase(civ.name) : 'unknown'}${civ.race ? ` (${words(civ.race)}s)` : ''}`
+        ? `held by ${civ.name ? titleCase(civ.name) : 'unknown'}${civ.race ? ` (${racePlural(civ.race)})` : ''}`
         : 'unclaimed',
     }
   })
@@ -1748,7 +1784,7 @@ export function RegionSections({
       <div className="lg:col-span-3">
         <Section title="The land">
           <MapAndFacts
-            map={<MiniMap map={map} highlightRegion={record.id} />}
+            map={<MiniMap map={map} worldId={worldId} highlightRegion={record.id} />}
             facts={
               <Facts
                 items={[
@@ -1788,7 +1824,7 @@ export function RegionSections({
   )
 }
 
-export function PlaceSections({ payload: p, plus, map, timeline }: SectionProps) {
+export function PlaceSections({ payload: p, plus, map, worldId, timeline }: SectionProps) {
   const at = parseCoord(plus.coords)
   const end = parseCoord(plus.end_pos)
   const pathTiles = str(plus.path)?.split('|').filter(Boolean).length ?? 0
@@ -1797,7 +1833,7 @@ export function PlaceSections({ payload: p, plus, map, timeline }: SectionProps)
       <div className="lg:col-span-3">
         <Section title="The place">
           <MapAndFacts
-            map={at ? <MiniMap map={map} focus={at} /> : null}
+            map={at ? <MiniMap map={map} worldId={worldId} focus={at} /> : null}
             facts={
               <Facts
                 items={[
@@ -1854,7 +1890,6 @@ export function ProseSections({
     .map((k) => words(k.replace('biome_pool_', '')))
   return (
     <>
-      <TimelineRow timeline={timeline} />
       <div className="flex flex-col gap-4">
         <Section title="Details">
           <Facts
@@ -1923,6 +1958,7 @@ export function ProseSections({
             </div>
           </Section>
         ) : null}
+        {timeline}
       </div>
     </>
   )
