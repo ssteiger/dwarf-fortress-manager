@@ -11,6 +11,11 @@ import {
   AlertTitle,
   Badge,
   Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Switch,
   Table,
@@ -24,11 +29,12 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
-import { CircleAlertIcon, PlugZapIcon, TriangleAlertIcon } from 'lucide-react'
+import { CircleAlertIcon, PlugZapIcon, RefreshCwIcon, TriangleAlertIcon } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { useFortUnits, useTick } from '~/lib/fortress/queries'
+import { type DumpState, setDumpSchedule } from '~/lib/fortress/dump'
+import { DUMP_STATE_KEY, useDumpState, useFortUnits, useTick } from '~/lib/fortress/queries'
 import { setPreference, usePreferences } from '~/lib/preferences'
 import {
   type ConnectionStatus,
@@ -40,7 +46,10 @@ import { SettingRow, SettingsSection } from '../-components/SettingsSection'
 
 const QUERY_KEY = ['settings', 'connection']
 
-/** The worker reports every 30 s by default; twice that and a little more means it has stopped. */
+/**
+ * Without a heartbeat to go on (a worker from before it had one), the last
+ * dump is the only sign of life; at 30 s a dump, two minutes means it stopped.
+ */
 const QUIET_AFTER_MS = 2 * 60_000
 
 const ago = (at: string | null) =>
@@ -81,11 +90,13 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function StatusSection({ data }: { data: ConnectionStatus }) {
+function StatusSection({ data, dump }: { data: ConnectionStatus; dump: DumpState | undefined }) {
   useTick(5000)
   const status = STATUS[data.status ?? 'none']
-  const quiet =
-    data.reportedAt !== null && Date.now() - new Date(data.reportedAt).getTime() > QUIET_AFTER_MS
+  const lastSign = dump?.workerSeenAt ?? data.reportedAt
+  const quiet = dump?.workerSeenAt
+    ? !dump.workerRunning
+    : data.reportedAt !== null && Date.now() - new Date(data.reportedAt).getTime() > QUIET_AFTER_MS
   return (
     <SettingsSection
       title="Status"
@@ -95,7 +106,12 @@ function StatusSection({ data }: { data: ConnectionStatus }) {
         <span className={cn('mt-1.5 size-2.5 shrink-0 rounded-full', status.dot)} />
         <div>
           <div className="font-medium">{status.label}</div>
-          <p className="text-sm text-muted-foreground">{status.hint}</p>
+          <p className="text-sm text-muted-foreground">
+            {status.hint}
+            {dump && !dump.auto && data.status
+              ? ' Automatic reads are off, so this is how things stood at the last read.'
+              : null}
+          </p>
         </div>
       </div>
 
@@ -105,9 +121,8 @@ function StatusSection({ data }: { data: ConnectionStatus }) {
           <AlertTitle>The worker has gone quiet</AlertTitle>
           <AlertDescription>
             <p>
-              Its last report was {ago(data.reportedAt)}. What you see is from then. Start it again
-              with <code className="rounded bg-muted px-1 py-0.5 text-xs">bun run dev:worker</code>{' '}
-              (unless you set <code className="text-xs">DF_POLL_MS</code> longer than two minutes).
+              Its last sign of life was {ago(lastSign)}. What you see is from then. Start it again
+              with <code className="rounded bg-muted px-1 py-0.5 text-xs">bun run dev:worker</code>.
             </p>
           </AlertDescription>
         </Alert>
@@ -123,7 +138,7 @@ function StatusSection({ data }: { data: ConnectionStatus }) {
                 Run <code className="rounded bg-muted px-1 py-0.5 text-xs">bun run dev:worker</code>{' '}
                 from the project folder.
               </li>
-              <li>Load your fortress. This page updates within half a minute.</li>
+              <li>Load your fortress. This page updates with the next read.</li>
             </ol>
           </AlertDescription>
         </Alert>
@@ -175,6 +190,94 @@ function StatusSection({ data }: { data: ConnectionStatus }) {
           </Fact>
         ) : null}
       </dl>
+    </SettingsSection>
+  )
+}
+
+const DUMP_INTERVALS_MS = [15_000, 30_000, 60_000, 2 * 60_000, 5 * 60_000, 10 * 60_000, 30 * 60_000]
+
+function everyLabel(ms: number): string {
+  if (ms < 60_000) return `Every ${Math.round(ms / 1000)} seconds`
+  if (ms === 60_000) return 'Every minute'
+  const minutes = ms / 60_000
+  return `Every ${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} minutes`
+}
+
+function ReadingSection({ dump }: { dump: DumpState }) {
+  const client = useQueryClient()
+  const save = useMutation({
+    mutationFn: (next: { auto?: boolean; intervalMs?: number }) => setDumpSchedule({ data: next }),
+    onMutate: (next) => {
+      client.setQueryData<DumpState>(DUMP_STATE_KEY, (old) => (old ? { ...old, ...next } : old))
+    },
+    onError: (error) => toast.error(error.message),
+    onSettled: () => client.invalidateQueries({ queryKey: DUMP_STATE_KEY }),
+  })
+  // A frequency set through DF_POLL_MS may not be one of the choices; keep it on the list.
+  const intervals = DUMP_INTERVALS_MS.includes(dump.intervalMs)
+    ? DUMP_INTERVALS_MS
+    : [...DUMP_INTERVALS_MS, dump.intervalMs].sort((a, b) => a - b)
+  return (
+    <SettingsSection
+      title="Reading the game"
+      description={
+        <>
+          Dwarf Fortress stands still while the worker copies the fortress out
+          {dump.elapsedMs ? (
+            <>
+              : {(dump.elapsedMs / 1000).toFixed(1)} seconds the last time, longer when the map
+              comes along
+            </>
+          ) : null}
+          . Read less often if the pauses get in the way of playing.
+        </>
+      }
+    >
+      <SettingRow
+        id="auto-dump"
+        label="Read automatically"
+        description={
+          <>
+            Off, the game is only read when you press{' '}
+            <RefreshCwIcon className="inline size-3.5 align-[-0.125em]" aria-label="refresh" /> at
+            the top right. Commands you send from the app still run, and show up after the next
+            read.
+          </>
+        }
+      >
+        <Switch
+          id="auto-dump"
+          checked={dump.auto}
+          onCheckedChange={(on) => save.mutate({ auto: on })}
+        />
+      </SettingRow>
+      <SettingRow
+        id="dump-interval"
+        label="How often"
+        description="How long the game runs freely between the end of one read and the start of the next."
+      >
+        <Select
+          value={String(dump.intervalMs)}
+          onValueChange={(value) => save.mutate({ intervalMs: Number(value) })}
+          disabled={!dump.auto}
+        >
+          <SelectTrigger id="dump-interval" className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent align="end">
+            {intervals.map((ms) => (
+              <SelectItem key={ms} value={String(ms)}>
+                {everyLabel(ms)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </SettingRow>
+      {dump.workerSeenAt && !dump.workerRunning ? (
+        <p className="text-sm text-muted-foreground">
+          The worker is not running. It picks up these settings when it starts.
+        </p>
+      ) : null}
     </SettingsSection>
   )
 }
@@ -344,7 +447,7 @@ const WORKER_ENV: { name: string; fallback: string; what: string }[] = [
   {
     name: 'DF_POLL_MS',
     fallback: '30000 (30 s)',
-    what: 'How often dwarves, items, jobs and announcements are read.',
+    what: 'How often the game is read on the worker’s first run. After that, the choice under Reading the game wins.',
   },
   {
     name: 'DF_MAP_POLL_MS',
@@ -354,7 +457,7 @@ const WORKER_ENV: { name: string; fallback: string; what: string }[] = [
   {
     name: 'DF_COMMAND_POLL_MS',
     fallback: '2000 (2 s)',
-    what: 'How quickly queued commands are picked up.',
+    what: 'How quickly queued commands, refresh requests and changes above are picked up.',
   },
   {
     name: 'DF_IMPORT_LEGENDS',
@@ -370,11 +473,12 @@ function ConnectionSettingsPage() {
     queryFn: () => getConnectionStatus(),
     refetchInterval: 5_000,
   })
+  const dump = useDumpState()
 
   return (
     <>
       {query.data ? (
-        <StatusSection data={query.data} />
+        <StatusSection data={query.data} dump={dump.data} />
       ) : query.isError ? (
         <Alert variant="destructive">
           <CircleAlertIcon className="size-4" />
@@ -383,6 +487,18 @@ function ConnectionSettingsPage() {
         </Alert>
       ) : (
         <Skeleton className="h-72 rounded-xl" />
+      )}
+
+      {dump.data ? (
+        <ReadingSection dump={dump.data} />
+      ) : dump.isError ? (
+        <Alert variant="destructive">
+          <CircleAlertIcon className="size-4" />
+          <AlertTitle>Could not read when the worker reads the game</AlertTitle>
+          <AlertDescription>{dump.error.message}</AlertDescription>
+        </Alert>
+      ) : (
+        <Skeleton className="h-48 rounded-xl" />
       )}
 
       <SettingsSection

@@ -63,14 +63,17 @@ Import a world's exports and `/legends` becomes a reader for its history: a worl
 - **Search** in the header (⌘K / Ctrl+K) finds pages, dwarves and creatures from the last dump, items, buildings and zones, chronicle entries, and legends records by name. Results are grouped, show the game's sprites, and say when a group has more matches than fit.
 - **Alerts**: while the app is open in a tab it watches the fortress and speaks up about deaths, threats, strange moods, births, arrivals and more. Choose which in Settings.
 - **Walking dwarves**: your citizens potter along the bottom of the window. Knock them over with the cursor, or turn them off in Settings.
-- **Settings** `/settings`: look, text size and motion; alerts; whether guides run DFHack commands in one click or show them to copy; the worker's connection status and recent commands; legends worlds and the narrator.
+- **Refresh** at the top right reads the game now. Useful with automatic reads turned off.
+- **Settings** `/settings`: look, text size and motion; alerts; how often the game is read, or only on refresh; whether guides run DFHack commands in one click or show them to copy; the worker's connection status and recent commands; legends worlds and the narrator.
 - **Worker logs** `/activity-logs`: the worker's own log lines.
 
 ## How it talks to the game
 
 ### Reading
 
-On start the worker copies [fortress-snapshot.lua](apps/worker/src/dfhack/fortress-snapshot.lua) into the game's `dfhack-config/` folder. Every `DF_POLL_MS` it runs the script over DFHack's remote console; the script walks units, items, buildings, jobs and announcements and writes one JSON file, which the worker reads back into Postgres. The map is included every `DF_MAP_POLL_MS`. Each dump pauses the game while it runs: a couple of seconds for a young fort, longer as units and items pile up. The worker logs how long each one took.
+On start the worker copies [fortress-snapshot.lua](apps/worker/src/dfhack/fortress-snapshot.lua) into the game's `dfhack-config/` folder. It then runs the script over DFHack's remote console on the schedule chosen in **Settings → Game connection** (every 30 s by default, or only when asked); the script walks units, items, buildings, jobs and announcements and writes one JSON file, which the worker reads back into Postgres. The map is included at most every `DF_MAP_POLL_MS`. Each dump pauses the game while it runs: a couple of seconds for a young fort, longer as units and items pile up. The worker logs how long each one took, and Settings shows the last one.
+
+The refresh button at the top right of every page asks for a dump now, whatever the schedule. The schedule and the requests live in the single-row `fort_worker` table, which the worker checks every `DF_COMMAND_POLL_MS`, so changes apply without a restart.
 
 Units carry more than the columns suggest: `look` holds everything the game's layered graphics read (tissues, appearance modifiers, body parts, worn items), so the web app can draw each dwarf the way the game does, and `sheet` holds what the game's unit screens show (attributes, every skill with experience, needs, preferences, dreams, memories, relationships, gods, groups, wounds, work details).
 
@@ -166,6 +169,7 @@ fortress/
 | `fort_map` | worker | One row: the last map dump, run-length encoded per 16×16 block. |
 | `fort_events` | worker | Every announcement ever seen, append-only, keyed per save and site. |
 | `fort_commands` | web, then worker | The command queue described above. |
+| `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers and a heartbeat (worker). |
 | `fort_unit_notes` | web | Each player's role-play notes per fortress and unit. |
 | `legends_worlds`, `legends_imports`, `legends_records` | worker | Imported legends exports, one generic JSON record per element. |
 | `legends_notes` | web | Each player's legends journal. |
@@ -252,9 +256,9 @@ All in `apps/worker/.env` (see [apps/worker/.env.example](apps/worker/.env.examp
 | `DF_GAME_DIR` | CrossOver Steam bottle path | Folder containing `Dwarf Fortress.exe` and `dfhack-config/`. |
 | `DF_LEGENDS_DIR` | `DF_GAME_DIR` | Folder scanned for `*-legends.xml` and `*-legends_plus.xml`. |
 | `DFHACK_HOST` / `DFHACK_PORT` | `127.0.0.1` / `5000` | DFHack remote console. |
-| `DF_POLL_MS` | `30000` | Units, items, buildings, jobs and announcements. |
+| `DF_POLL_MS` | `30000` | Dump interval on the worker's first run. After that, Settings → Game connection decides. |
 | `DF_MAP_POLL_MS` | `300000` | The map takes longer to dump, so it runs less often. |
-| `DF_COMMAND_POLL_MS` | `2000` | How often to look for commands queued by the web app between dumps. |
+| `DF_COMMAND_POLL_MS` | `2000` | How often to look for queued commands, refresh requests and a changed schedule. |
 | `DF_IMPORT_LEGENDS` | `1` | Set to `0` to skip the legends import. |
 
 To import legends, export them from Legends mode in the game (DFHack's `exportlegends` adds the `legends_plus` file) into `DF_LEGENDS_DIR`; the worker picks up new files on start. Worlds show up in Settings → Legends.

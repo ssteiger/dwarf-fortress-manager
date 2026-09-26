@@ -1,5 +1,6 @@
 import {
 	bigint,
+	boolean,
 	index,
 	integer,
 	jsonb,
@@ -68,6 +69,25 @@ export const fort_map = pgTable("fort_map", {
 	z_count: integer().notNull(),
 	tiletypes: jsonb().$type<FortMapPayload["tiletypes"]>().notNull(),
 	blocks: jsonb().$type<FortMapPayload["blocks"]>().notNull(),
+});
+
+/**
+ * Single row (id = 1): how often the worker reads the game, chosen in
+ * Settings, and requests from the app to read it now. The worker answers the
+ * requests and leaves a heartbeat while it runs.
+ */
+export const fort_worker = pgTable("fort_worker", {
+	id: integer().primaryKey().notNull(),
+	/** Off: the game is only read when someone asks. */
+	auto_dump: boolean().notNull().default(true),
+	/** Time the game runs freely between the end of one dump and the next. */
+	dump_interval_ms: integer().notNull().default(30_000),
+	/** Set by the web app to ask for a dump now. */
+	dump_requested_at: timestamp({ withTimezone: true, mode: "string" }),
+	/** Set by the worker: the latest request its last dump answered. */
+	dump_answered_at: timestamp({ withTimezone: true, mode: "string" }),
+	/** The worker's heartbeat, every WORKER_HEARTBEAT_MS while it runs. */
+	seen_at: timestamp({ withTimezone: true, mode: "string" }),
 });
 
 /** Append-only chronicle of in-game announcements. */

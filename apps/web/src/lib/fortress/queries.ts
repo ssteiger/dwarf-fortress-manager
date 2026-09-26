@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
+import { getDumpState } from './dump'
 import {
   getFortConcerns,
   getFortItem,
@@ -12,6 +13,17 @@ import {
 /** Shared polling cadence for the fortress pages (reads Postgres, not the game). */
 export const FORT_REFRESH_MS = 5_000
 export const FORT_SLOW_REFRESH_MS = 20_000
+
+export const DUMP_STATE_KEY = ['fort', 'dump']
+
+/** When the worker reads the game; polled every second while a read is on its way. */
+export function useDumpState() {
+  return useQuery({
+    queryKey: DUMP_STATE_KEY,
+    queryFn: () => getDumpState(),
+    refetchInterval: (query) => (query.state.data?.pending ? 1_000 : FORT_SLOW_REFRESH_MS),
+  })
+}
 
 export function useFortOverview() {
   return useQuery({

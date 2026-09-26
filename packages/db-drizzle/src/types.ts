@@ -15,6 +15,7 @@ export type NewFortState = InferInsertModel<typeof schema.fort_state>;
 export type FortDump = InferSelectModel<typeof schema.fort_dump>;
 export type NewFortDump = InferInsertModel<typeof schema.fort_dump>;
 export type FortMap = InferSelectModel<typeof schema.fort_map>;
+export type FortWorker = InferSelectModel<typeof schema.fort_worker>;
 export type FortEvent = InferSelectModel<typeof schema.fort_events>;
 export type NewFortEvent = InferInsertModel<typeof schema.fort_events>;
 export type FortCommand = InferSelectModel<typeof schema.fort_commands>;

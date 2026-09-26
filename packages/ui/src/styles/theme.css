@@ -125,6 +125,19 @@
   --color-highlight: var(--highlight);
 }
 
+/*
+ * Sonner paints the description from its own theme, which stays near-white
+ * even when the toast background follows the parchment theme. Use the app
+ * colours and typeface instead.
+ */
+[data-sonner-toaster][data-sonner-theme] {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+[data-sonner-toaster][data-sonner-theme] [data-sonner-toast] [data-description] {
+  color: var(--muted-foreground);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

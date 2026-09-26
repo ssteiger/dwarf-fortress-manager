@@ -134,8 +134,8 @@ export const PAGES: PageEntry[] = [
   {
     to: '/settings/connection',
     title: 'Connection settings',
-    detail: 'The worker, DFHack and one-click commands',
-    keywords: 'dfhack worker commands actions game dump interval',
+    detail: 'How often the game is read, the worker, DFHack and one-click commands',
+    keywords: 'dfhack worker commands actions game dump interval frequency refresh freeze pause',
   },
   {
     to: '/settings/legends',

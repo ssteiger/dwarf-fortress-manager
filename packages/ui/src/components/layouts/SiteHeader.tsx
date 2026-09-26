@@ -15,9 +15,18 @@ export interface SiteHeaderProps {
   actions?: ReactNode
   /** Hide the default theme toggle when true. */
   hideThemeToggle?: boolean
+  /** After the theme toggle, at the very right. */
+  end?: ReactNode
 }
 
-export function SiteHeader({ title, children, center, actions, hideThemeToggle }: SiteHeaderProps) {
+export function SiteHeader({
+  title,
+  children,
+  center,
+  actions,
+  hideThemeToggle,
+  end,
+}: SiteHeaderProps) {
   return (
     <header className="group-has-data-[collapsible=icon]/sidebar-wrapper:h-12 relative flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear">
       <div className="flex w-full items-center gap-1 px-4 lg:gap-2 lg:px-6">
@@ -38,6 +47,7 @@ export function SiteHeader({ title, children, center, actions, hideThemeToggle }
         <div className="relative ml-auto flex items-center gap-2">
           {actions}
           {hideThemeToggle ? null : <ThemeToggle />}
+          {end}
         </div>
       </div>
     </header>

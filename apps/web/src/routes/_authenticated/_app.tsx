@@ -21,6 +21,7 @@ import { logoutFn } from '~/lib/auth/server'
 import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
 import { GlobalSearch } from '~/lib/components/GlobalSearch'
 import { FortWatcher } from '~/lib/fortress/FortWatcher'
+import { ReadGameButton } from '~/lib/fortress/ReadGameButton'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { getFortUnits } from '~/lib/fortress/server'
 import { usePreferences, usePreferencesSync } from '~/lib/preferences'
@@ -101,7 +102,11 @@ const Layout = () => {
 
   return (
     <AppLayout
-      headerProps={{ title: headerTitle(location.pathname), center: <GlobalSearch /> }}
+      headerProps={{
+        title: headerTitle(location.pathname),
+        center: <GlobalSearch />,
+        end: <ReadGameButton />,
+      }}
       sidebarProps={{
         brand: '☺ Dwarf Fortress Manager',
         brandHref: '/fortress',

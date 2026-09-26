@@ -24,11 +24,14 @@ export const config = {
   legendsDir: process.env.DF_LEGENDS_DIR || process.env.DF_GAME_DIR || DEFAULT_GAME_DIR,
   dfhackHost: process.env.DFHACK_HOST || '127.0.0.1',
   dfhackPort: intEnv('DFHACK_PORT', 5000),
-  /** How often to dump units, items, buildings, jobs, and announcements. */
+  /**
+   * How often to dump units, items, buildings, jobs, and announcements on the
+   * first run. It seeds fort_worker; from then on Settings decides.
+   */
   pollMs: intEnv('DF_POLL_MS', 30_000),
   /** How often to dump the map. Each map dump pauses the game for a few seconds. */
   mapPollMs: intEnv('DF_MAP_POLL_MS', 300_000),
-  /** How often to look for commands queued by the web app between dumps. */
+  /** How often to look for commands, dump requests and a changed schedule. */
   commandPollMs: intEnv('DF_COMMAND_POLL_MS', 2_000),
   /** Set to "0" to skip the legends import entirely. */
   importLegends: process.env.DF_IMPORT_LEGENDS !== '0',

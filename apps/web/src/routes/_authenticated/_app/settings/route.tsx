@@ -20,7 +20,7 @@ const SECTIONS: SettingsNavItem[] = [
   {
     href: '/settings/connection',
     title: 'Game connection',
-    hint: 'Worker, DFHack, commands',
+    hint: 'How often it reads, commands',
     icon: PlugIcon,
   },
   {

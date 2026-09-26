@@ -8,6 +8,9 @@
 
 export type FortStatus = "live" | "menu" | "offline";
 
+/** How often the worker marks `fort_worker.seen_at` while it runs. */
+export const WORKER_HEARTBEAT_MS = 10_000;
+
 export interface RowTable {
 	columns: string[];
 	rows: unknown[][];
