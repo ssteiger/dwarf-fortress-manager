@@ -23,12 +23,14 @@ async function requireUser() {
 
 export interface WorkerCommand {
   id: number
-  kind: 'set_nickname' | 'dfhack' | 'unit_action'
+  kind: 'set_nickname' | 'dfhack' | 'unit_action' | 'console'
   action: DfhackAction | UnitAction | null
   unitId: number | null
   nickname: string | null
   /** unit_action: the text it took, such as a title. */
   arg: string | null
+  /** console: the command as confirmed in the assistant. */
+  command: string | null
   status: 'pending' | 'processing' | 'done' | 'failed'
   error: string | null
   output: string | null
@@ -111,6 +113,7 @@ export const getConnectionStatus = createServerFn({ method: 'GET' }).handler(
         unitId: c.unit_id,
         nickname: c.nickname,
         arg: c.arg,
+        command: c.command,
         status: c.status,
         error: c.error,
         output: c.output,

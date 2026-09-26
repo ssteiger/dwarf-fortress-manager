@@ -1,7 +1,7 @@
 import { postgres_db, schema } from '@fortress/db-drizzle'
 import { and, asc, eq } from 'drizzle-orm'
 import type { Config } from '../config'
-import { runDfhackAction } from '../dfhack/actions'
+import { runConsoleCommand, runDfhackAction } from '../dfhack/actions'
 import { setUnitNickname } from '../dfhack/nickname'
 import { runUnitAction } from '../dfhack/unit-action'
 
@@ -17,8 +17,8 @@ export async function recoverInterruptedCommands(): Promise<void> {
 
 /**
  * Apply a bounded batch of queued commands: nicknames, whitelisted DFHack
- * actions and actions on one unit. Runs before each snapshot, and on its own
- * short cadence between.
+ * actions, actions on one unit, and console commands the player confirmed in
+ * the assistant. Runs on a short cadence; a dump follows when reads are on.
  */
 export async function processPendingCommands(config: Config): Promise<number> {
   const pending = await postgres_db
@@ -50,6 +50,8 @@ export async function processPendingCommands(config: Config): Promise<number> {
         output = await runDfhackAction(config, command.action)
       } else if (command.kind === 'unit_action') {
         await runUnitAction(config, command.action, command.unit_id, command.arg)
+      } else if (command.kind === 'console') {
+        output = await runConsoleCommand(config, command.command)
       } else {
         throw new Error(`unknown command kind "${command.kind}"`)
       }

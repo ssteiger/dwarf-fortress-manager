@@ -119,7 +119,9 @@ export const fort_commands = pgTable(
 	"fort_commands",
 	{
 		id: serial().primaryKey().notNull(),
-		kind: text().$type<"set_nickname" | "dfhack" | "unit_action">().notNull(),
+		kind: text()
+			.$type<"set_nickname" | "dfhack" | "unit_action" | "console">()
+			.notNull(),
 		/** set_nickname and unit_action: the unit. */
 		unit_id: integer(),
 		/** set_nickname: the new nickname. */
@@ -128,7 +130,9 @@ export const fort_commands = pgTable(
 		action: text().$type<DfhackAction | UnitAction>(),
 		/** unit_action: the text some actions take, such as a title. */
 		arg: text(),
-		/** dfhack: what the command printed. */
+		/** console: the exact command the player confirmed. */
+		command: text(),
+		/** dfhack and console: what the command printed. */
 		output: text(),
 		status: text()
 			.$type<"pending" | "processing" | "done" | "failed">()

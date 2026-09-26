@@ -17,6 +17,8 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
+import { AssistantBar } from '~/lib/assistant/AssistantBar'
+import { AssistantProvider } from '~/lib/assistant/AssistantProvider'
 import { logoutFn } from '~/lib/auth/server'
 import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
 import { GlobalSearch } from '~/lib/components/GlobalSearch'
@@ -101,37 +103,46 @@ const Layout = () => {
     : undefined
 
   return (
-    <AppLayout
-      headerProps={{
-        title: headerTitle(location.pathname),
-        center: <GlobalSearch />,
-        end: <ReadGameButton />,
-      }}
-      sidebarProps={{
-        brand: '☺ Dwarf Fortress Manager',
-        brandHref: '/fortress',
-        user: sidebarUser,
-        onLogout: () => logOutMutation.mutate(undefined),
-        navMain: NAV,
-        documents: [],
-        navSecondary: [
-          { title: 'Worker logs', url: '/activity-logs', icon: ClipboardListIcon },
-          { title: 'Settings', url: '/settings', icon: SettingsIcon },
-        ],
-        userMenuItems: [
-          {
-            label: 'Local DB',
-            icon: DatabaseIcon,
-            href: 'http://127.0.0.1:54423/project/default',
-            external: true,
-          },
-        ],
-      }}
-    >
-      <Outlet />
-      {edgeDwarves && <FortressEdgeDwarves />}
-      <FortWatcher />
-    </AppLayout>
+    <AssistantProvider>
+      <AppLayout
+        headerProps={{
+          title: headerTitle(location.pathname),
+          center: (
+            <div className="flex gap-2">
+              <div className="min-w-0 flex-1">
+                <GlobalSearch />
+              </div>
+              <AssistantBar />
+            </div>
+          ),
+          end: <ReadGameButton />,
+        }}
+        sidebarProps={{
+          brand: '☺ Dwarf Fortress Manager',
+          brandHref: '/fortress',
+          user: sidebarUser,
+          onLogout: () => logOutMutation.mutate(undefined),
+          navMain: NAV,
+          documents: [],
+          navSecondary: [
+            { title: 'Worker logs', url: '/activity-logs', icon: ClipboardListIcon },
+            { title: 'Settings', url: '/settings', icon: SettingsIcon },
+          ],
+          userMenuItems: [
+            {
+              label: 'Local DB',
+              icon: DatabaseIcon,
+              href: 'http://127.0.0.1:54423/project/default',
+              external: true,
+            },
+          ],
+        }}
+      >
+        <Outlet />
+        {edgeDwarves && <FortressEdgeDwarves />}
+        <FortWatcher />
+      </AppLayout>
+    </AssistantProvider>
   )
 }
 

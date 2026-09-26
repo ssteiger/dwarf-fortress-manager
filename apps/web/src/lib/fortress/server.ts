@@ -166,76 +166,72 @@ export interface FortConcerns {
   unburied: UnburiedBody[]
 }
 
-export const getFortConcerns = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<FortConcerns> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        units: schema.fort_dump.units,
-        items: schema.fort_dump.items,
-        buildings: schema.fort_dump.buildings,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
-    const empty: FortConcerns = {
-      capturedAt: row?.captured_at ?? null,
-      zones: {},
-      coffins: 0,
-      cups: 0,
-      unburied: [],
-    }
-    if (!row) return empty
+async function readFortConcerns(): Promise<FortConcerns> {
+  const rows = await postgres_db
+    .select({
+      captured_at: schema.fort_dump.captured_at,
+      units: schema.fort_dump.units,
+      items: schema.fort_dump.items,
+      buildings: schema.fort_dump.buildings,
+    })
+    .from(schema.fort_dump)
+    .where(eq(schema.fort_dump.id, SINGLETON_ID))
+    .limit(1)
+  const row = rows[0]
+  const empty: FortConcerns = {
+    capturedAt: row?.captured_at ?? null,
+    zones: {},
+    coffins: 0,
+    cups: 0,
+    unburied: [],
+  }
+  if (!row) return empty
 
-    const zones: Record<string, number> = {}
-    let coffins = 0
-    for (const b of decodeTable<FortBuilding>(row.buildings)) {
-      if (b.type === 'Civzone' && b.subtype) zones[b.subtype] = (zones[b.subtype] ?? 0) + 1
-      if (b.type === 'Coffin') coffins++
-    }
+  const zones: Record<string, number> = {}
+  let coffins = 0
+  for (const b of decodeTable<FortBuilding>(row.buildings)) {
+    if (b.type === 'Civzone' && b.subtype) zones[b.subtype] = (zones[b.subtype] ?? 0) + 1
+    if (b.type === 'Coffin') coffins++
+  }
 
-    // Our dead, by the name the game gives their corpse: "Urist McDwarf's skeleton".
-    const ownDead = new Map<string, FortUnit>()
-    for (const u of decodeTable<FortUnit>(row.units)) {
-      if (isLiving(u) || !u.name) continue
-      if (
-        u.flags.includes('citizen') ||
-        u.flags.includes('own_civ') ||
-        u.flags.includes('resident')
-      )
-        ownDead.set(u.name.toLowerCase(), u)
-    }
-    let cups = 0
-    const unburied: UnburiedBody[] = []
-    const seen = new Set<number>()
-    for (const item of decodeTable<FortItem>(row.items)) {
-      if (item.type === 'GOBLET' && item.x !== null && !item.flags.includes('trader'))
-        cups += item.stack || 1
-      if (item.type !== 'CORPSE' && item.type !== 'CORPSEPIECE') continue
-      if (item.holder_building_id !== null) continue
-      const owner = /^(.+?)'s /.exec(item.description)?.[1]?.toLowerCase()
-      const unit = owner ? ownDead.get(owner) : undefined
-      if (!unit || seen.has(unit.id)) continue
-      seen.add(unit.id)
-      unburied.push({
-        unitId: unit.id,
-        name: unit.name,
-        description: item.description,
-        x: item.x,
-        y: item.y,
-        z: item.z,
-      })
-    }
-    return {
-      capturedAt: row.captured_at ?? null,
-      zones,
-      coffins,
-      cups,
-      unburied,
-    }
-  },
-)
+  // Our dead, by the name the game gives their corpse: "Urist McDwarf's skeleton".
+  const ownDead = new Map<string, FortUnit>()
+  for (const u of decodeTable<FortUnit>(row.units)) {
+    if (isLiving(u) || !u.name) continue
+    if (u.flags.includes('citizen') || u.flags.includes('own_civ') || u.flags.includes('resident'))
+      ownDead.set(u.name.toLowerCase(), u)
+  }
+  let cups = 0
+  const unburied: UnburiedBody[] = []
+  const seen = new Set<number>()
+  for (const item of decodeTable<FortItem>(row.items)) {
+    if (item.type === 'GOBLET' && item.x !== null && !item.flags.includes('trader'))
+      cups += item.stack || 1
+    if (item.type !== 'CORPSE' && item.type !== 'CORPSEPIECE') continue
+    if (item.holder_building_id !== null) continue
+    const owner = /^(.+?)'s /.exec(item.description)?.[1]?.toLowerCase()
+    const unit = owner ? ownDead.get(owner) : undefined
+    if (!unit || seen.has(unit.id)) continue
+    seen.add(unit.id)
+    unburied.push({
+      unitId: unit.id,
+      name: unit.name,
+      description: item.description,
+      x: item.x,
+      y: item.y,
+      z: item.z,
+    })
+  }
+  return {
+    capturedAt: row.captured_at ?? null,
+    zones,
+    coffins,
+    cups,
+    unburied,
+  }
+}
+
+export const getFortConcerns = createServerFn({ method: 'GET' }).handler(() => readFortConcerns())
 
 const CLOTHING = new Set(['ARMOR', 'PANTS', 'SHOES', 'GLOVES', 'HELM'])
 const GEAR = new Set(['ARMOR', 'PANTS', 'SHOES', 'GLOVES', 'HELM', 'SHIELD'])
@@ -313,191 +309,185 @@ export interface FortSupplies {
   merchantGoods: { items: number; value: number }
 }
 
-export const getFortSupplies = createServerFn({ method: 'GET' }).handler(
-  async (): Promise<FortSupplies> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        items: schema.fort_dump.items,
-        buildings: schema.fort_dump.buildings,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
-    const out: FortSupplies = {
-      capturedAt: row?.captured_at ?? null,
-      forbidden: {},
-      looseRefuse: 0,
-      webs: 0,
-      cups: 0,
-      buckets: 0,
-      splints: 0,
-      crutches: 0,
-      soap: 0,
-      bins: 0,
-      bags: 0,
-      emptyBarrels: 0,
-      wheelbarrows: 0,
-      picks: 0,
-      axes: 0,
-      weapons: 0,
-      metalArmor: 0,
-      ores: [],
-      coalBoulders: 0,
-      fuelBars: 0,
-      bars: {},
-      roughGems: 0,
-      tradeGoods: 0,
-      wornClothes: 0,
-      loose: {},
-      enemyGear: { items: 0, metal: 0, value: 0 },
-      artifacts: { items: 0, loose: 0, value: 0 },
-      emptyPots: 0,
-      thread: 0,
-      bones: 0,
-      shells: 0,
-      mechanisms: 0,
-      rotting: 0,
-      merchantGoods: { items: 0, value: 0 },
-    }
-    if (!row) return out
+async function readFortSupplies(): Promise<FortSupplies> {
+  const rows = await postgres_db
+    .select({
+      captured_at: schema.fort_dump.captured_at,
+      items: schema.fort_dump.items,
+      buildings: schema.fort_dump.buildings,
+    })
+    .from(schema.fort_dump)
+    .where(eq(schema.fort_dump.id, SINGLETON_ID))
+    .limit(1)
+  const row = rows[0]
+  const out: FortSupplies = {
+    capturedAt: row?.captured_at ?? null,
+    forbidden: {},
+    looseRefuse: 0,
+    webs: 0,
+    cups: 0,
+    buckets: 0,
+    splints: 0,
+    crutches: 0,
+    soap: 0,
+    bins: 0,
+    bags: 0,
+    emptyBarrels: 0,
+    wheelbarrows: 0,
+    picks: 0,
+    axes: 0,
+    weapons: 0,
+    metalArmor: 0,
+    ores: [],
+    coalBoulders: 0,
+    fuelBars: 0,
+    bars: {},
+    roughGems: 0,
+    tradeGoods: 0,
+    wornClothes: 0,
+    loose: {},
+    enemyGear: { items: 0, metal: 0, value: 0 },
+    artifacts: { items: 0, loose: 0, value: 0 },
+    emptyPots: 0,
+    thread: 0,
+    bones: 0,
+    shells: 0,
+    mechanisms: 0,
+    rotting: 0,
+    merchantGoods: { items: 0, value: 0 },
+  }
+  if (!row) return out
 
-    const inPile = stockpileTest(decodeTable<FortBuilding>(row.buildings))
-    const items = decodeTable<FortItem>(row.items)
-    const holding = new Set<number>()
-    for (const item of items) if (item.container_id !== null) holding.add(item.container_id)
-    const ores = new Map<string, Map<string, number>>()
-    const count = (map: Record<string, number>, key: string, n = 1) => {
-      map[key] = (map[key] ?? 0) + n
-    }
+  const inPile = stockpileTest(decodeTable<FortBuilding>(row.buildings))
+  const items = decodeTable<FortItem>(row.items)
+  const holding = new Set<number>()
+  for (const item of items) if (item.container_id !== null) holding.add(item.container_id)
+  const ores = new Map<string, Map<string, number>>()
+  const count = (map: Record<string, number>, key: string, n = 1) => {
+    map[key] = (map[key] ?? 0) + n
+  }
 
-    for (const item of items) {
-      const f = item.flags
-      // Artifacts and books elsewhere in the world have no position.
-      if (item.x === null || f.includes('removed')) continue
-      if (f.includes('trader')) {
-        out.merchantGoods.items++
-        out.merchantGoods.value += item.value
-        continue
-      }
-      const onFloor = isLooseItem(item)
-      const free = !f.includes('forbid') && item.holder_unit_id === null
-      const n = item.stack || 1
-      if (f.includes('forbid') && item.type !== 'REMAINS') count(out.forbidden, item.type)
-      if (f.includes('rotten') && item.type !== 'REMAINS') out.rotting += n
-      if (
-        onFloor &&
-        free &&
-        !f.includes('spider_web') &&
-        !REFUSE_TYPES.has(item.type) &&
-        !inPile(item)
-      )
-        count(out.loose, item.type)
-      if (f.includes('foreign') && GEAR_TYPES.has(item.type) && item.holder_unit_id === null) {
-        out.enemyGear.items++
-        out.enemyGear.value += item.value
-        if (item.mat_class === 'METAL') out.enemyGear.metal++
-      }
-      if (
-        f.includes('artifact') &&
-        item.type !== 'BOOK' &&
-        item.subtype_id !== 'ITEM_TOOL_SCROLL'
-      ) {
-        out.artifacts.items++
-        out.artifacts.value += item.value
-        if (onFloor) out.artifacts.loose++
-      }
-      const material = item.material.toLowerCase()
-      switch (item.type) {
-        case 'CORPSE':
-        case 'CORPSEPIECE':
-        case 'REMAINS':
-          if (onFloor && !inPile(item)) out.looseRefuse++
-          if (item.type === 'CORPSEPIECE' && free && !f.includes('rotten')) {
-            const parts = item.corpse_flags ?? []
-            if (parts.includes('shell')) out.shells += n
-            else if (parts.includes('bone') || parts.includes('skull')) out.bones += n
-          }
-          break
-        case 'THREAD':
-          if (f.includes('spider_web')) out.webs += n
-          else if (free) out.thread += n
-          break
-        case 'TRAPPARTS':
-          if (free && !f.includes('in_building')) out.mechanisms += n
-          break
-        case 'BAG':
-          out.bags++
-          break
-        case 'GOBLET':
-          out.cups += item.stack || 1
-          break
-        case 'BUCKET':
-          out.buckets++
-          break
-        case 'SPLINT':
-          out.splints++
-          break
-        case 'CRUTCH':
-          out.crutches++
-          break
-        case 'BIN':
-          out.bins++
-          break
-        case 'BOX':
-          if (item.mat_class === 'CLOTH' || item.mat_class === 'LEATHER') out.bags++
-          break
-        case 'BARREL':
-          if (!holding.has(item.id)) out.emptyBarrels++
-          break
-        case 'TOOL':
-          if (item.subtype_id === 'ITEM_TOOL_WHEELBARROW') out.wheelbarrows++
-          else if (item.subtype_id === 'ITEM_TOOL_LARGE_POT' && !holding.has(item.id))
-            out.emptyPots++
-          break
-        case 'WEAPON':
-          if (!free) break
-          if (item.subtype_id === 'ITEM_WEAPON_PICK') out.picks++
-          else {
-            if (item.subtype_id?.startsWith('ITEM_WEAPON_AXE')) out.axes++
-            if (!f.includes('owned')) out.weapons++
-          }
-          break
-        case 'BOULDER': {
-          if (COAL_STONES.has(material)) out.coalBoulders += item.stack || 1
-          for (const metal of ORE_METALS[material] ?? []) {
-            const bySource = ores.get(metal) ?? new Map<string, number>()
-            bySource.set(material, (bySource.get(material) ?? 0) + (item.stack || 1))
-            ores.set(metal, bySource)
-          }
-          break
+  for (const item of items) {
+    const f = item.flags
+    // Artifacts and books elsewhere in the world have no position.
+    if (item.x === null || f.includes('removed')) continue
+    if (f.includes('trader')) {
+      out.merchantGoods.items++
+      out.merchantGoods.value += item.value
+      continue
+    }
+    const onFloor = isLooseItem(item)
+    const free = !f.includes('forbid') && item.holder_unit_id === null
+    const n = item.stack || 1
+    if (f.includes('forbid') && item.type !== 'REMAINS') count(out.forbidden, item.type)
+    if (f.includes('rotten') && item.type !== 'REMAINS') out.rotting += n
+    if (
+      onFloor &&
+      free &&
+      !f.includes('spider_web') &&
+      !REFUSE_TYPES.has(item.type) &&
+      !inPile(item)
+    )
+      count(out.loose, item.type)
+    if (f.includes('foreign') && GEAR_TYPES.has(item.type) && item.holder_unit_id === null) {
+      out.enemyGear.items++
+      out.enemyGear.value += item.value
+      if (item.mat_class === 'METAL') out.enemyGear.metal++
+    }
+    if (f.includes('artifact') && item.type !== 'BOOK' && item.subtype_id !== 'ITEM_TOOL_SCROLL') {
+      out.artifacts.items++
+      out.artifacts.value += item.value
+      if (onFloor) out.artifacts.loose++
+    }
+    const material = item.material.toLowerCase()
+    switch (item.type) {
+      case 'CORPSE':
+      case 'CORPSEPIECE':
+      case 'REMAINS':
+        if (onFloor && !inPile(item)) out.looseRefuse++
+        if (item.type === 'CORPSEPIECE' && free && !f.includes('rotten')) {
+          const parts = item.corpse_flags ?? []
+          if (parts.includes('shell')) out.shells += n
+          else if (parts.includes('bone') || parts.includes('skull')) out.bones += n
         }
-        case 'BAR':
-          if (/soap/.test(material)) out.soap += item.stack || 1
-          else if (/coke|charcoal/.test(material)) out.fuelBars += item.stack || 1
-          else if (item.mat_class === 'METAL') count(out.bars, material, item.stack || 1)
-          break
-        case 'ROUGH':
-          out.roughGems += item.stack || 1
-          break
+        break
+      case 'THREAD':
+        if (f.includes('spider_web')) out.webs += n
+        else if (free) out.thread += n
+        break
+      case 'TRAPPARTS':
+        if (free && !f.includes('in_building')) out.mechanisms += n
+        break
+      case 'BAG':
+        out.bags++
+        break
+      case 'GOBLET':
+        out.cups += item.stack || 1
+        break
+      case 'BUCKET':
+        out.buckets++
+        break
+      case 'SPLINT':
+        out.splints++
+        break
+      case 'CRUTCH':
+        out.crutches++
+        break
+      case 'BIN':
+        out.bins++
+        break
+      case 'BOX':
+        if (item.mat_class === 'CLOTH' || item.mat_class === 'LEATHER') out.bags++
+        break
+      case 'BARREL':
+        if (!holding.has(item.id)) out.emptyBarrels++
+        break
+      case 'TOOL':
+        if (item.subtype_id === 'ITEM_TOOL_WHEELBARROW') out.wheelbarrows++
+        else if (item.subtype_id === 'ITEM_TOOL_LARGE_POT' && !holding.has(item.id)) out.emptyPots++
+        break
+      case 'WEAPON':
+        if (!free) break
+        if (item.subtype_id === 'ITEM_WEAPON_PICK') out.picks++
+        else {
+          if (item.subtype_id?.startsWith('ITEM_WEAPON_AXE')) out.axes++
+          if (!f.includes('owned')) out.weapons++
+        }
+        break
+      case 'BOULDER': {
+        if (COAL_STONES.has(material)) out.coalBoulders += item.stack || 1
+        for (const metal of ORE_METALS[material] ?? []) {
+          const bySource = ores.get(metal) ?? new Map<string, number>()
+          bySource.set(material, (bySource.get(material) ?? 0) + (item.stack || 1))
+          ores.set(metal, bySource)
+        }
+        break
       }
-      if (GEAR.has(item.type) && item.mat_class === 'METAL' && free && !f.includes('owned'))
-        out.metalArmor++
-      if (TRADE_GOODS.has(item.type) && free) out.tradeGoods += item.stack || 1
-      if (CLOTHING.has(item.type) && item.holder_unit_id !== null && item.wear >= 2)
-        out.wornClothes++
+      case 'BAR':
+        if (/soap/.test(material)) out.soap += item.stack || 1
+        else if (/coke|charcoal/.test(material)) out.fuelBars += item.stack || 1
+        else if (item.mat_class === 'METAL') count(out.bars, material, item.stack || 1)
+        break
+      case 'ROUGH':
+        out.roughGems += item.stack || 1
+        break
     }
-    out.ores = [...ores.entries()]
-      .map(([metal, bySource]) => ({
-        metal,
-        boulders: [...bySource.values()].reduce((a, b) => a + b, 0),
-        sources: [...bySource.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name),
-      }))
-      .sort((a, b) => b.boulders - a.boulders)
-    return out
-  },
-)
+    if (GEAR.has(item.type) && item.mat_class === 'METAL' && free && !f.includes('owned'))
+      out.metalArmor++
+    if (TRADE_GOODS.has(item.type) && free) out.tradeGoods += item.stack || 1
+    if (CLOTHING.has(item.type) && item.holder_unit_id !== null && item.wear >= 2) out.wornClothes++
+  }
+  out.ores = [...ores.entries()]
+    .map(([metal, bySource]) => ({
+      metal,
+      boulders: [...bySource.values()].reduce((a, b) => a + b, 0),
+      sources: [...bySource.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name),
+    }))
+    .sort((a, b) => b.boulders - a.boulders)
+  return out
+}
+
+export const getFortSupplies = createServerFn({ method: 'GET' }).handler(() => readFortSupplies())
 
 export interface FortUnitQuery {
   id: number

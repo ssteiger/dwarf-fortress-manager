@@ -605,6 +605,75 @@ export function isDfhackAction(value: unknown): value is DfhackAction {
 	return typeof value === "string" && Object.hasOwn(DFHACK_ACTIONS, value);
 }
 
+/*
+ * Console commands: DFHack commands as typed, suggested by the assistant and
+ * confirmed by the player one at a time. Unlike DFHACK_ACTIONS there is no
+ * whitelist; the checks below only keep out what would end the session.
+ */
+
+export const MAX_CONSOLE_COMMAND = 2000;
+
+/** Commands that quit the game, saved or not; nothing worth confirming. */
+export const BLOCKED_CONSOLE_COMMANDS: readonly string[] = ["die"];
+
+/**
+ * Split a console line the way DFHack's own console does: on whitespace,
+ * keeping quoted stretches together and honouring backslash escapes, so
+ * `workorder "{\"job\":\"ConstructBed\"}"` arrives as two arguments.
+ */
+export function splitConsoleCommand(text: string): string[] {
+	const tokens: string[] = [];
+	let current = "";
+	let inToken = false;
+	let quote: '"' | "'" | null = null;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (ch === "\\" && i + 1 < text.length) {
+			current += text[++i];
+			inToken = true;
+			continue;
+		}
+		if (quote) {
+			if (ch === quote) quote = null;
+			else current += ch;
+			continue;
+		}
+		if (ch === '"' || ch === "'") {
+			quote = ch;
+			inToken = true;
+			continue;
+		}
+		if (/\s/.test(ch)) {
+			if (inToken) {
+				tokens.push(current);
+				current = "";
+				inToken = false;
+			}
+			continue;
+		}
+		current += ch;
+		inToken = true;
+	}
+	if (inToken) tokens.push(current);
+	return tokens;
+}
+
+/** The problem with a console command, or null when it may be queued. */
+export function checkConsoleCommand(text: unknown): string | null {
+	if (typeof text !== "string") return "The command must be text";
+	const trimmed = text.trim();
+	if (!trimmed) return "The command is empty";
+	if (trimmed.length > MAX_CONSOLE_COMMAND)
+		return `The command is longer than ${MAX_CONSOLE_COMMAND} characters`;
+	if (/[\r\n]/.test(trimmed)) return "One command per line";
+	const tokens = splitConsoleCommand(trimmed);
+	if (!tokens.length) return "The command is empty";
+	const name = tokens[0].toLowerCase();
+	if (BLOCKED_CONSOLE_COMMANDS.includes(name))
+		return `"${tokens[0]}" quits the game, so the app will not run it`;
+	return null;
+}
+
 /**
  * What the web app may do to a single unit. It sends the key, the unit id and,
  * for `title`, the text; unit-action.lua in the worker does the rest.

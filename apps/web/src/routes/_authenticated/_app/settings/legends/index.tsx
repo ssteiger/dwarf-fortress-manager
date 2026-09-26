@@ -156,8 +156,8 @@ function LegendsSettingsPage() {
             stays on the server.
           </p>
           <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
-            {`LEGENDS_NARRATOR_PROVIDER=openai   # or anthropic
-LEGENDS_NARRATOR_API_KEY=sk-...
+            {`LEGENDS_NARRATOR_PROVIDER=openai   # or anthropic, or cursor
+LEGENDS_NARRATOR_API_KEY=sk-...      # a cursor_... key for cursor
 LEGENDS_NARRATOR_MODEL=gpt-4o-mini  # optional
 # optional: a local OpenAI-compatible server (Ollama, LM Studio)
 LEGENDS_NARRATOR_BASE_URL=http://localhost:11434/v1`}

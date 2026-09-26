@@ -1,8 +1,18 @@
-import { DFHACK_ACTIONS, isDfhackAction } from '@fortress/db-drizzle'
+import {
+  DFHACK_ACTIONS,
+  checkConsoleCommand,
+  isDfhackAction,
+  splitConsoleCommand,
+} from '@fortress/db-drizzle'
 import type { Config } from '../config'
 import { runDfhackCommand } from './rpc'
 
 const MAX_OUTPUT = 4000
+
+function capOutput(lines: string[]): string {
+  const output = lines.join('').trim()
+  return output.length > MAX_OUTPUT ? `${output.slice(0, MAX_OUTPUT)}…` : output
+}
 
 /**
  * Run one whitelisted DFHack action and return what it printed. The action
@@ -17,6 +27,22 @@ export async function runDfhackAction(config: Config, action: string | null): Pr
     port: config.dfhackPort,
     timeoutMs: 60_000,
   })
-  const output = lines.join('').trim()
-  return output.length > MAX_OUTPUT ? `${output.slice(0, MAX_OUTPUT)}…` : output
+  return capOutput(lines)
+}
+
+/**
+ * Run a console command as the player confirmed it in the assistant. The same
+ * check the web app made runs again here, then the line is split the way
+ * DFHack's console would split it.
+ */
+export async function runConsoleCommand(config: Config, text: string | null): Promise<string> {
+  const problem = checkConsoleCommand(text)
+  if (problem || text === null) throw new Error(problem ?? 'No command')
+  const [command, ...args] = splitConsoleCommand(text.trim())
+  const lines = await runDfhackCommand(command, args, {
+    host: config.dfhackHost,
+    port: config.dfhackPort,
+    timeoutMs: 60_000,
+  })
+  return capOutput(lines)
 }

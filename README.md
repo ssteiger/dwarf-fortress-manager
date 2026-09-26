@@ -61,6 +61,7 @@ Import a world's exports and `/legends` becomes a reader for its history: a worl
 ### Everywhere
 
 - **Search** in the header (⌘K / Ctrl+K) finds pages, dwarves and creatures from the last dump, items, buildings and zones, chronicle entries, and legends records by name. Results are grouped, show the game's sprites, and say when a group has more matches than fit.
+- **Ask how to…** next to the search (⌘J / Ctrl+J) opens a sidebar where a language model answers questions about playing, with a summary of your fortress attached: population, stocks, workshops, the job queue and what the app itself flags. DFHack commands it suggests (`workorder ConstructBed 10`, `orders import library/basic`, ...) show up as cards you can copy, or run after reading and confirming them. Needs the model settings below.
 - **Alerts**: while the app is open in a tab it watches the fortress and speaks up about deaths, threats, strange moods, births, arrivals and more. Choose which in Settings.
 - **Walking dwarves**: your citizens potter along the bottom of the window. Knock them over with the cursor, or turn them off in Settings.
 - **Refresh** at the top right reads the game now. Useful with automatic reads turned off.
@@ -81,28 +82,31 @@ When no fortress is loaded the worker writes `status: menu`, and `offline` when 
 
 ### Writing
 
-The web app never sends a command, only a key into `fort_commands`:
+The web app queues commands in `fort_commands`. Apart from assistant commands, it only sends a key from a whitelist:
 
 | Kind | What it does | Defined in |
 | --- | --- | --- |
 | `set_nickname` | Sets a citizen's nickname through DFHack's nickname API. | [set-nickname.lua](apps/worker/src/dfhack/set-nickname.lua) |
 | `dfhack` | Runs one of `DFHACK_ACTIONS`: `unsuspend`, `enable tailor`, `orders import library/basic`, `combine all`, ... | [fortress-types.ts](packages/db-drizzle/src/fortress-types.ts) |
 | `unit_action` | Runs one of `UNIT_ACTIONS` on one unit: `reveal`, `title`, `calm`, `fillneeds`, `heal`. | [fortress-types.ts](packages/db-drizzle/src/fortress-types.ts), [unit-action.lua](apps/worker/src/dfhack/unit-action.lua) |
+| `console` | Runs a DFHack console line as written, from the assistant, after the player has read it in full and confirmed. No whitelist; only commands that quit the game (`die`) are refused, by the web app and again by the worker. | [fortress-types.ts](packages/db-drizzle/src/fortress-types.ts) (`checkConsoleCommand`), [actions.ts](apps/worker/src/dfhack/actions.ts) |
 
 The worker picks commands up every `DF_COMMAND_POLL_MS`, looks the key up in the whitelist, and the Lua side checks again (is the unit alive, one of ours, on the map) before it changes anything. After running commands it dumps straight away so the pages catch up. With **one-click commands** turned off in Settings, the pages show the exact DFHack command to copy into the console instead. Commands queued while the worker was off run as soon as it comes back; cancel them in Settings → Connection if you'd rather they didn't.
 
 ## Optional language model
 
-Set these in `apps/web/.env` to switch on the legends narrator, the nickname writer and a dwarf's voice:
+Set these in `apps/web/.env` to switch on the legends narrator, the nickname writer, a dwarf's voice and the assistant in the header:
 
 | Variable | Meaning |
 | --- | --- |
-| `LEGENDS_NARRATOR_PROVIDER` | `openai` or `anthropic`. |
-| `LEGENDS_NARRATOR_API_KEY` | The provider's API key. |
-| `LEGENDS_NARRATOR_MODEL` | Optional; defaults to a small, fast model for the provider. |
+| `LEGENDS_NARRATOR_PROVIDER` | `openai`, `anthropic` or `cursor`. |
+| `LEGENDS_NARRATOR_API_KEY` | The provider's API key. For `cursor`, a key from [Cursor Dashboard → Integrations](https://cursor.com/dashboard/integrations); `CURSOR_API_KEY` works too. |
+| `LEGENDS_NARRATOR_MODEL` | Optional; defaults to `gpt-4o-mini`, `claude-3-5-haiku-latest` or `composer-2.5`. The assistant's game advice is noticeably better with a larger one. |
 | `LEGENDS_NARRATOR_BASE_URL` | Optional API root, for an OpenAI-compatible local server such as Ollama (`http://127.0.0.1:11434/v1`) or LM Studio. |
 
-The model is only given statements the app already derives from the dump, the chronicle or the legends export, and is told to invent nothing beyond them. Without it every page keeps to its own deterministic prose and fact-based ideas.
+With `cursor`, each request runs a local Cursor agent through [`@cursor/sdk`](https://cursor.com/docs/sdk/typescript) with no tools, in an empty temporary folder, so it can only answer in text. It needs Node 22.13 or newer and is slower than a direct API call.
+
+The model is only given statements the app already derives from the dump, the chronicle or the legends export, and is told to invent nothing beyond them. Without it every page keeps to its own deterministic prose and fact-based ideas, and the assistant sidebar explains how to set it up.
 
 ## Sprites
 

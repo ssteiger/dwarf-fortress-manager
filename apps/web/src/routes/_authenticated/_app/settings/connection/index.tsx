@@ -283,6 +283,12 @@ function ReadingSection({ dump }: { dump: DumpState }) {
 }
 
 function commandLabel(c: WorkerCommand, names: Map<number, string>): React.ReactNode {
+  if (c.kind === 'console')
+    return (
+      <>
+        Console: <code className="font-mono text-xs break-all">{c.command}</code>
+      </>
+    )
   if (c.kind === 'dfhack') {
     const spec: DfhackActionSpec | undefined = isDfhackAction(c.action)
       ? DFHACK_ACTIONS[c.action]
@@ -363,7 +369,7 @@ function CommandsSection({ commands }: { commands: WorkerCommand[] }) {
   return (
     <SettingsSection
       title="Recent commands"
-      description="Nicknames and DFHack commands sent from the app, newest first."
+      description="Nicknames, DFHack commands and assistant commands sent from the app, newest first."
       action={
         waiting ? (
           <Button
@@ -503,7 +509,7 @@ function ConnectionSettingsPage() {
 
       <SettingsSection
         title="Commands from the app"
-        description="Some guides can fix things in the game for you. The worker only runs the commands below, never anything typed in."
+        description="Some guides can fix things in the game for you with the commands below. Beyond these, the worker only runs commands the assistant suggests, each one after you have read and confirmed it."
       >
         <SettingRow
           id="one-click"

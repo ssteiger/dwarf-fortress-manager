@@ -41,7 +41,7 @@ export function SiteHeader({
          */}
         {center ? (
           <div className="pointer-events-none absolute inset-x-0 hidden justify-center px-4 sm:flex">
-            <div className="pointer-events-auto w-full max-w-md">{center}</div>
+            <div className="pointer-events-auto w-full max-w-md lg:max-w-xl">{center}</div>
           </div>
         ) : null}
         <div className="relative ml-auto flex items-center gap-2">
