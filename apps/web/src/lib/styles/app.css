@@ -16,6 +16,19 @@
   --font-heading: var(--font-sans);
 }
 
+/*
+ * Tailwind's preflight gives buttons the default arrow; show the hand on
+ * anything clickable. Layered so a cursor-* utility on a component still wins.
+ */
+@layer base {
+  a[href],
+  summary,
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+
 /* shadcn/typeset preset for rendered markdown and long-form content. */
 .typeset-docs {
   --typeset-font-body: var(--font-sans);
