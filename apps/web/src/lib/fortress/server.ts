@@ -18,11 +18,13 @@ import { isLiving, mentionNeedles } from './format'
 import { type SortDirection, type SortValue, compareSortValues } from './sort'
 import {
   COAL_STONES,
+  FLUX_STONES,
   GEAR_TYPES,
   ITEM_VIEWS,
   type ItemView,
   ORE_METALS,
   REFUSE_TYPES,
+  isFuelBar,
   isItemView,
   isLooseItem,
   itemViews,
@@ -281,10 +283,14 @@ export interface FortSupplies {
   metalArmor: number
   ores: OreStock[]
   coalBoulders: number
+  /** Limestone, dolomite and the other stones steel needs. */
+  fluxBoulders: number
   /** Charcoal and coke. */
   fuelBars: number
   /** Metal bars by metal. */
   bars: Record<string, number>
+  /** Bars that are neither metal, fuel nor soap (potash, pearlash, ash), by material. */
+  otherBars: Record<string, number>
   roughGems: number
   tradeGoods: number
   /** Clothing worn by someone that is threadbare or tattered. */
@@ -340,8 +346,10 @@ async function readFortSupplies(): Promise<FortSupplies> {
     metalArmor: 0,
     ores: [],
     coalBoulders: 0,
+    fluxBoulders: 0,
     fuelBars: 0,
     bars: {},
+    otherBars: {},
     roughGems: 0,
     tradeGoods: 0,
     wornClothes: 0,
@@ -456,6 +464,7 @@ async function readFortSupplies(): Promise<FortSupplies> {
         break
       case 'BOULDER': {
         if (COAL_STONES.has(material)) out.coalBoulders += item.stack || 1
+        if (FLUX_STONES.has(material)) out.fluxBoulders += item.stack || 1
         for (const metal of ORE_METALS[material] ?? []) {
           const bySource = ores.get(metal) ?? new Map<string, number>()
           bySource.set(material, (bySource.get(material) ?? 0) + (item.stack || 1))
@@ -465,8 +474,9 @@ async function readFortSupplies(): Promise<FortSupplies> {
       }
       case 'BAR':
         if (/soap/.test(material)) out.soap += item.stack || 1
-        else if (/coke|charcoal/.test(material)) out.fuelBars += item.stack || 1
+        else if (isFuelBar(material)) out.fuelBars += item.stack || 1
         else if (item.mat_class === 'METAL') count(out.bars, material, item.stack || 1)
+        else count(out.otherBars, material, item.stack || 1)
         break
       case 'ROUGH':
         out.roughGems += item.stack || 1

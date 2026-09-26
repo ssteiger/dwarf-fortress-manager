@@ -731,7 +731,8 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
       cups !== null && cups < pop && `${pop - cups} mugs`,
       stock('cloth') < 10 && 'cloth',
       supplies && supplies.fuelBars < 10 && 'charcoal or coke',
-      stock('bars') < 10 && 'metal bars',
+      (supplies ? Object.values(supplies.bars).reduce((a, b) => a + b, 0) : stock('bars')) < 10 &&
+        'metal bars',
       supplies && supplies.emptyBarrels < 5 && 'barrels',
       supplies && supplies.bins < 5 && 'bins',
       stock('meals') < pop * 2 && 'meals',

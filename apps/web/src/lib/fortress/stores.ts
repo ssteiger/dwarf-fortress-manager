@@ -54,7 +54,12 @@ export const ORE_METALS: Record<string, string[]> = {
 }
 export const COAL_STONES = new Set(['bituminous coal', 'lignite'])
 /** Stones that make steel when smelted with iron and coke. */
-const FLUX_STONES = new Set(['calcite', 'chalk', 'dolomite', 'limestone', 'marble'])
+export const FLUX_STONES = new Set(['calcite', 'chalk', 'dolomite', 'limestone', 'marble'])
+
+/** Coke and charcoal bars: the game names both by their material, coal. */
+export function isFuelBar(material: string): boolean {
+  return /coal|coke/.test(material)
+}
 
 // ---------------------------------------------------------------------------
 // Views of the item list
@@ -461,7 +466,7 @@ export function itemHints(item: FortItem): ItemHint[] {
               title: 'Soap',
               text: 'Doctors clean wounds with it; keep a few bars in the hospital.',
             }
-          : /coke|charcoal/.test(material)
+          : isFuelBar(material)
             ? {
                 title: 'Fuel',
                 text: 'Burnt by smelters and forges: one bar per job unless you work with magma.',

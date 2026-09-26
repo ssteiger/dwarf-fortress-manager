@@ -16,10 +16,18 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import { complete, readModelConfig } from '~/lib/ai/model'
-import { type Advice, fortAdvice, jobQueue, workshopBoard } from '~/lib/fortress/advisor'
-import { formatGameTick } from '~/lib/fortress/format'
-import { gameTimeOf } from '~/lib/fortress/insights'
-import { getFortConcerns, getFortSupplies } from '~/lib/fortress/server'
+import {
+  type Advice,
+  compact,
+  fmt,
+  fortAdvice,
+  jobQueue,
+  plural,
+  workshopBoard,
+} from '~/lib/fortress/advisor'
+import { formatGameTick, skillRank } from '~/lib/fortress/format'
+import { firstName, gameTimeOf } from '~/lib/fortress/insights'
+import { type FortSupplies, getFortConcerns, getFortSupplies } from '~/lib/fortress/server'
 import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
 
 /*
@@ -81,24 +89,67 @@ function describeSummary(summary: FortSummary): string[] {
     `Others on the map: ${summary.visitors} visitors, ${summary.merchants} merchants, ${summary.hostiles} hostiles, ${summary.tame_animals} tame animals.`,
     `Jobs: ${summary.jobs_total} queued, ${summary.jobs_suspended} suspended.`,
     summary.stocks.length
-      ? `Stocks: ${summary.stocks.map((s) => `${s.label} ${s.count}`).join(', ')}.`
+      ? `Stocks: ${summary.stocks.map((s) => `${s.key === 'bars' ? 'Bars of every kind' : s.label} ${s.count}`).join(', ')}.`
       : '',
     ...summary.alerts.map((a) => `Alert (${a.severity}): ${a.title}. ${a.detail}`),
   ].filter(Boolean)
 }
 
+/** Largest first: "21 iron, 15 billon". */
+function byCount(counts: Record<string, number>): string {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, n]) => `${fmt(n)} ${name}`)
+    .join(', ')
+}
+
+function describeStores(s: FortSupplies): string[] {
+  const metal = Object.values(s.bars).reduce((a, b) => a + b, 0)
+  return compact([
+    metal ? `Metal bars (${fmt(metal)}): ${byCount(s.bars)}.` : 'Metal bars: none.',
+    `Fuel: ${plural(s.fuelBars, 'bar')} of coke or charcoal${s.coalBoulders ? `, and ${plural(s.coalBoulders, 'boulder')} of coal to make coke from` : ''}.`,
+    Object.keys(s.otherBars).length > 0 && `Other bars: ${byCount(s.otherBars)}.`,
+    s.ores.length
+      ? `Ore waiting to be smelted: ${s.ores.map((o) => `${o.metal} ${plural(o.boulders, 'boulder')} (${o.sources.join(', ')})`).join('; ')}.`
+      : 'Ore waiting to be smelted: none.',
+    `Flux stone (limestone, dolomite, calcite, chalk, marble): ${plural(s.fluxBoulders, 'boulder')}.`,
+    `Nobody holds: ${plural(s.picks, 'pick')}, ${plural(s.axes, 'axe')}, ${plural(s.weapons, 'unclaimed weapon')}, ${plural(s.metalArmor, 'unclaimed piece')} of metal armor.`,
+    s.enemyGear.items > 0 &&
+      `Enemy gear nobody wears: ${plural(s.enemyGear.items, 'piece')}, ${fmt(s.enemyGear.metal)} of them metal that could be melted down.`,
+    `Containers: ${plural(s.emptyBarrels, 'empty barrel')}, ${plural(s.emptyPots, 'empty large pot')}, ${plural(s.bins, 'bin')}, ${plural(s.bags, 'bag')}, ${plural(s.buckets, 'bucket')}, ${plural(s.wheelbarrows, 'wheelbarrow')}.`,
+    `Supplies: ${plural(s.cups, 'mug')}, ${plural(s.soap, 'bar')} of soap, ${plural(s.splints, 'splint')}, ${plural(s.crutches, 'crutch', 'crutches')}, ${fmt(s.thread)} thread, ${plural(s.mechanisms, 'loose mechanism')}, ${plural(s.roughGems, 'rough gem')}, ${plural(s.bones, 'bone')}, ${plural(s.shells, 'shell')}, ${fmt(s.tradeGoods)} crafts and other trade goods.`,
+    s.artifacts.items > 0 &&
+      `Artifacts: ${fmt(s.artifacts.items)}${s.artifacts.loose ? `, ${fmt(s.artifacts.loose)} lying on the floor` : ''}.`,
+    s.merchantGoods.items > 0 &&
+      `A caravan at the depot offers ${plural(s.merchantGoods.items, 'item')}.`,
+  ])
+}
+
+const SKILLED_SHOWN = 3
+
 function describeWorkshops(buildings: FortBuilding[], units: FortUnit[]): string[] {
   const rows = workshopBoard(buildings, units)
   const built = rows.filter((r) => r.count > 0)
   const missing = rows.filter((r) => r.count === 0 && r.info.essential)
-  return [
+  return compact([
     built.length
-      ? `Workshops: ${built.map((r) => `${r.info.label} x${r.count}${r.jobs ? ` (${r.jobs} jobs)` : ''}`).join(', ')}.`
+      ? 'Workshops and furnaces built (what they make; jobs; best hands among citizens):'
       : 'Workshops: none built.',
-    missing.length
-      ? `Essential workshops not built yet: ${missing.map((r) => r.info.label).join(', ')}.`
-      : '',
-  ].filter(Boolean)
+    ...built.map((r) => {
+      const hands = r.skilled
+        .slice(0, SKILLED_SHOWN)
+        .map(({ unit, rating }) => `${firstName(unit)} (${skillRank(rating)})`)
+      const parts = compact([
+        r.info.makes && `makes ${r.info.makes}`,
+        r.jobs ? plural(r.jobs, 'job') : 'no jobs',
+        r.info.skills.length > 0 &&
+          (hands.length ? hands.join(', ') : `no citizen has ${r.info.skillLabel} skill`),
+      ])
+      return `- ${r.info.label}${r.count > 1 ? ` x${r.count}` : ''}: ${parts.join('; ')}.`
+    }),
+    missing.length > 0 &&
+      `Essential workshops not built yet: ${missing.map((r) => r.info.label).join(', ')}.`,
+  ])
 }
 
 function describeJobs(jobs: FortJob[], units: FortUnit[]): string[] {
@@ -194,6 +245,7 @@ async function fortressBrief(): Promise<FortressBrief> {
         ? `The game is on a menu with no fortress loaded; below is the last fortress the app saw, ${age} ago.`
         : `The game was not reachable at the last try; below is the last fortress the app saw, ${age} ago.`,
     ...(summary ? describeSummary(summary) : []),
+    ...describeStores(supplies),
     ...describeWorkshops(buildings, units),
     ...describeJobs(jobs, units),
     ...describeAdvice(
@@ -277,6 +329,8 @@ const SYSTEM_PROMPT = [
   'When a DFHack command would do the job, give it: every command on its own line inside a fenced code block marked dfhack, with the exact syntax, no prompt characters and no comments inside the block. The player sees each line as a button, reads the command in full and runs it only after confirming. Say in the prose what each command does and whether it changes the game.',
   `Prefer tools you are sure of: workorder <JobType> <amount> queues a manager work order (for example workorder ConstructBed 10); orders import library/basic (also library/furnace, library/smelting, library/glassstock, library/rockstock, library/military) adds standing orders; enable tailor, enable autofarm, enable seedwatch, enable suspendmanager, enable autobutcher; unsuspend; combine all; burial; ban-cooking all. Job types that exist: ${KNOWN_JOB_TYPES.join(', ')}. If you are unsure of a name or a command's options, suggest workorder -l job_type or help <command> first; their output shows in the app.`,
   'Work orders need an appointed manager and a workshop that can do the job; say so when it matters.',
+  "There is no weaponsmith's or armorsmith's workshop: the metalsmith's forge (or a magma forge) makes metal weapons, armor, ammo, anvils and tools, worked by dwarves with the weaponsmithing, armorsmithing or metalcrafting skill.",
+  'Steel takes two jobs at a smelter: "make pig iron bars" from an iron bar, a flux stone and a bar of coke or charcoal, then "make steel bars" from a pig iron bar, an iron bar, a flux stone and a bar of coke or charcoal, which gives two steel bars. Outside a magma smelter each job also burns a bar of fuel.',
   'Never suggest die or any command that quits the game or deletes files. Call a command a cheat when it does something the game never would on its own.',
   'Formatting: short paragraphs, numbered or bulleted lists, **bold** and `code` only. No headings, no tables.',
 ].join(' ')
