@@ -509,7 +509,7 @@ function ConnectionSettingsPage() {
 
       <SettingsSection
         title="Commands from the app"
-        description="Some guides can fix things in the game for you with the commands below. Beyond these, the worker only runs commands the assistant suggests, each one after you have read and confirmed it."
+        description="Some guides can fix things in the game for you with the commands below. Beyond these, the worker only runs commands the assistant suggests, each one after you have read and confirmed it, and only from a short list it knows to be safe."
       >
         <SettingRow
           id="one-click"

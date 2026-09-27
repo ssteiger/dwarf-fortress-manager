@@ -1,4 +1,4 @@
-import { checkConsoleCommand, MAX_CONSOLE_COMMAND } from '@fortress/db-drizzle/fortress-types'
+import { MAX_CONSOLE_COMMAND, checkConsoleCommand } from '@fortress/db-drizzle/fortress-types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -147,8 +147,9 @@ export function ConsoleCommandCard({
           <AlertDialogHeader>
             <AlertDialogTitle>Run this in DFHack?</AlertDialogTitle>
             <AlertDialogDescription>
-              The app runs exactly this line in DFHack's console. Change it if you need to. It
-              cannot check what the command does to your game, so read it first.
+              The app runs exactly this line in DFHack's console. Change it if you need to. It only
+              runs commands it knows, but it cannot foresee everything one does to your game, so
+              read it first.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Textarea

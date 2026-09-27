@@ -668,14 +668,14 @@ export function isDfhackAction(value: unknown): value is DfhackAction {
 
 /*
  * Console commands: DFHack commands as typed, suggested by the assistant and
- * confirmed by the player one at a time. Unlike DFHACK_ACTIONS there is no
- * whitelist; the checks below only keep out what would end the session.
+ * confirmed by the player one at a time. The app runs only the commands in
+ * CONSOLE_COMMANDS, each with its arguments checked, because a command that
+ * looks harmless can still break a save: a bare `workorder MakeArmor 5`
+ * queues armor without saying which, and the game crashes once a dwarf starts
+ * the job. Anything else the player can copy into DFHack's console instead.
  */
 
 export const MAX_CONSOLE_COMMAND = 2000;
-
-/** Commands that quit the game, saved or not; nothing worth confirming. */
-export const BLOCKED_CONSOLE_COMMANDS: readonly string[] = ["die"];
 
 /**
  * Split a console line the way DFHack's own console does: on whitespace,
@@ -719,6 +719,197 @@ export function splitConsoleCommand(text: string): string[] {
 	return tokens;
 }
 
+/**
+ * Job types a bare `workorder <JobType> <amount>` may queue. The bare form
+ * cannot say which item or material to use, so these are the jobs where the
+ * workshop picks it: the ones DFHack's own order library and docs queue that
+ * way, plus furniture and containers.
+ */
+export const WORKORDER_JOB_TYPES = [
+	"PrepareMeal",
+	"MillPlants",
+	"ProcessPlants",
+	"ProcessPlantsBarrel",
+	"MilkCreature",
+	"ShearCreature",
+	"SpinThread",
+	"WeaveCloth",
+	"DyeCloth",
+	"MakeBarrel",
+	"MakeBucket",
+	"MakeFlask",
+	"MakeGoblet",
+	"MakeBackpack",
+	"MakeQuiver",
+	"MakeCage",
+	"MakeTotem",
+	"MakeWindow",
+	"MakeRawGlass",
+	"MakePipeSection",
+	"MakeCharcoal",
+	"MakeAsh",
+	"MakeLye",
+	"MakePotashFromAsh",
+	"MeltMetalObject",
+	"ConstructBed",
+	"ConstructTable",
+	"ConstructThrone",
+	"ConstructDoor",
+	"ConstructCabinet",
+	"ConstructChest",
+	"ConstructCoffin",
+	"ConstructBin",
+	"ConstructBag",
+	"ConstructBlocks",
+	"ConstructMechanisms",
+	"ConstructArmorStand",
+	"ConstructWeaponRack",
+	"ConstructStatue",
+	"ConstructSlab",
+	"ConstructFloodgate",
+	"ConstructGrate",
+	"ConstructHatchCover",
+	"ConstructSplint",
+	"ConstructCrutch",
+	"CollectSand",
+] as const;
+
+/** Job types whose orders must name the exact item (ITEM_ARMOR_BREASTPLATE) and its material. */
+export const WORKORDER_NEEDS_ITEM = [
+	"MakeAmmo",
+	"MakeArmor",
+	"MakeGloves",
+	"MakeHelm",
+	"MakePants",
+	"MakeShield",
+	"MakeShoes",
+	"MakeTool",
+	"MakeTrapComponent",
+	"MakeWeapon",
+] as const;
+
+/** Job types whose orders must name the material: the ore to smelt, the metal to draw. */
+const WORKORDER_NEEDS_MATERIAL = ["SmeltOre", "ExtractMetalStrands"];
+
+export const ORDER_LIBRARIES = [
+	"basic",
+	"furnace",
+	"smelting",
+	"glassstock",
+	"rockstock",
+	"military",
+] as const;
+
+/** Plugins the app may switch on or off: DFHack's everyday automation. */
+export const TOGGLEABLE_PLUGINS = [
+	"autobutcher",
+	"autochop",
+	"autoclothing",
+	"autofarm",
+	"autonestbox",
+	"autoslab",
+	"dwarfvet",
+	"logistics",
+	"nestboxes",
+	"preserve-rooms",
+	"preserve-tombs",
+	"seedwatch",
+	"suspendmanager",
+	"tailor",
+] as const;
+
+const includes = (list: readonly string[], value: unknown): value is string =>
+	typeof value === "string" && list.includes(value);
+
+const LIBRARY_HINT =
+	"the game's Work orders screen, or orders import library/military (weapons, armor), library/smelting (ores, alloys, steel) or library/basic (drink, food)";
+
+function checkWorkorderJson(text: string): string | null {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return "The work order is not valid JSON";
+	}
+	for (const order of Array.isArray(parsed) ? parsed : [parsed]) {
+		if (!order || typeof order !== "object") return "Each work order must be a JSON object";
+		const { job, item_subtype, material, material_category, amount_total } = order as Record<
+			string,
+			unknown
+		>;
+		if (amount_total !== undefined && typeof amount_total !== "number")
+			return "amount_total must be a number";
+		if (includes(WORKORDER_JOB_TYPES, job)) continue;
+		const named = typeof material === "string" || Boolean(material_category);
+		if (includes(WORKORDER_NEEDS_ITEM, job)) {
+			if (typeof item_subtype === "string" && named) continue;
+			return `A ${job} order must name the item_subtype and the material, or the game crashes when a dwarf starts it. Use ${LIBRARY_HINT} instead.`;
+		}
+		if (includes(WORKORDER_NEEDS_MATERIAL, job)) {
+			if (typeof material === "string") continue;
+			return `A ${job} order must name the material. Use ${LIBRARY_HINT} instead.`;
+		}
+		return `The app does not queue ${typeof job === "string" ? job : "this job"} orders. Use ${LIBRARY_HINT} instead.`;
+	}
+	return null;
+}
+
+function checkWorkorder(args: string[]): string | null {
+	const [first, ...rest] = args;
+	if (first === undefined || ["-l", "--listtypes", "-h", "--help"].includes(first)) return null;
+	if (first.startsWith("-")) return `The app does not run workorder ${first}`;
+	if (first.startsWith("{") || first.startsWith("[")) return checkWorkorderJson(args.join(" "));
+	if (includes(WORKORDER_NEEDS_ITEM, first))
+		return `"workorder ${first}" cannot say which item to make, and the game crashes on such orders. Use ${LIBRARY_HINT} instead.`;
+	if (!includes(WORKORDER_JOB_TYPES, first))
+		return `The app does not queue ${first} on its own. Use ${LIBRARY_HINT} instead.`;
+	if (rest.length > 1 || (rest.length === 1 && !/^\d{1,5}$/.test(rest[0])))
+		return "Write it as workorder <JobType> <amount>";
+	return null;
+}
+
+function checkOrders(args: string[]): string | null {
+	const [sub, target, ...rest] = args;
+	if (includes(["list", "sort", "recheck"], sub) && target === undefined) return null;
+	const library = target?.match(/^library\/(.+)$/)?.[1];
+	if (sub === "import" && !rest.length && includes(ORDER_LIBRARIES, library)) return null;
+	return `The app runs orders list, sort, recheck and import library/${ORDER_LIBRARIES.join(", library/")} only`;
+}
+
+/** With no plugin named, enable and disable only list what is on. */
+function checkToggle(args: string[]): string | null {
+	if (args.every((a) => includes(TOGGLEABLE_PLUGINS, a))) return null;
+	return `The app switches only these on and off: ${TOGGLEABLE_PLUGINS.join(", ")}`;
+}
+
+const anyArgs = () => null;
+
+/** The commands the app runs from the assistant, each with the check for its arguments. */
+const CONSOLE_COMMANDS: Record<string, (args: string[]) => string | null> = {
+	help: anyArgs,
+	ls: anyArgs,
+	tags: anyArgs,
+	workorder: checkWorkorder,
+	orders: checkOrders,
+	enable: checkToggle,
+	disable: checkToggle,
+	autobutcher: anyArgs,
+	autochop: anyArgs,
+	autoclothing: anyArgs,
+	autofarm: anyArgs,
+	seedwatch: anyArgs,
+	suspendmanager: anyArgs,
+	tailor: anyArgs,
+	unsuspend: anyArgs,
+	combine: anyArgs,
+	burial: anyArgs,
+	"ban-cooking": anyArgs,
+	cleanowned: anyArgs,
+};
+
+/** Names of the commands the app runs, for the assistant's instructions. */
+export const CONSOLE_COMMAND_NAMES = Object.keys(CONSOLE_COMMANDS);
+
 /** The problem with a console command, or null when it may be queued. */
 export function checkConsoleCommand(text: unknown): string | null {
 	if (typeof text !== "string") return "The command must be text";
@@ -727,12 +918,12 @@ export function checkConsoleCommand(text: unknown): string | null {
 	if (trimmed.length > MAX_CONSOLE_COMMAND)
 		return `The command is longer than ${MAX_CONSOLE_COMMAND} characters`;
 	if (/[\r\n]/.test(trimmed)) return "One command per line";
-	const tokens = splitConsoleCommand(trimmed);
-	if (!tokens.length) return "The command is empty";
-	const name = tokens[0].toLowerCase();
-	if (BLOCKED_CONSOLE_COMMANDS.includes(name))
-		return `"${tokens[0]}" quits the game, so the app will not run it`;
-	return null;
+	const [name, ...args] = splitConsoleCommand(trimmed);
+	if (!name) return "The command is empty";
+	const check = Object.hasOwn(CONSOLE_COMMANDS, name) ? CONSOLE_COMMANDS[name] : undefined;
+	if (!check)
+		return `The app does not run ${name}. Copy it into DFHack's console yourself if you are sure it is safe.`;
+	return check(args);
 }
 
 /**
