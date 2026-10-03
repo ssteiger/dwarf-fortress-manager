@@ -241,8 +241,14 @@ function RouteComponent() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Proof of concept"
-        title="Nickname dwarves"
+        title={
+          <span className="flex flex-wrap items-center gap-3">
+            Nickname dwarves
+            <Badge variant="outline" className="text-sm font-normal">
+              Proof of concept
+            </Badge>
+          </span>
+        }
         description="Nicknames that could only belong to one dwarf, built on what sets each citizen apart from the rest of the fortress. The worker applies queued names to the running game through DFHack on its next poll."
         updatedAt={data?.capturedAt}
         isFetching={isFetching || ideasQuery.isFetching}

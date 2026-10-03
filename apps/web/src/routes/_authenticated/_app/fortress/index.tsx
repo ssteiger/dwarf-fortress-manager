@@ -50,7 +50,7 @@ import {
   useFortUnits,
 } from '~/lib/fortress/queries'
 import { getFortWork } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatCard, StatusBanner } from './-components/FortChrome'
+import { EmptyState, PageHeader, StatusBanner } from './-components/FortChrome'
 import { GuideProvider, useOpenGuide } from './-components/Guide'
 import {
   ActivityBoard,
@@ -156,7 +156,6 @@ function OverviewBody() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Fortress"
         title={state?.fort_name ?? 'No fortress yet'}
         description={
           world ? (
@@ -189,20 +188,20 @@ function OverviewBody() {
             />
           ) : null}
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-            <StatCard
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-4">
+            <Reading
               title="Citizens"
               value={population}
               Icon={UsersIcon}
               hint={`${summary.adults} adults · ${summary.children} children · ${summary.babies} babies · ${summary.tame_animals} tame animals`}
             />
-            <StatCard
+            <Reading
               title="At work"
               value={`${summary.working} / ${summary.working + summary.idle}`}
               Icon={SwordsIcon}
               hint={`${summary.idle} idle · ${summary.military} in squads · ${formatNumber(summary.jobs_total)} jobs queued (${summary.jobs_suspended} suspended)`}
             />
-            <StatCard
+            <Reading
               title="Created wealth"
               value={summary.wealth ? formatValue(summary.wealth.total) : '—'}
               Icon={CoinsIcon}
@@ -213,7 +212,7 @@ function OverviewBody() {
                   : undefined
               }
             />
-            <StatCard
+            <Reading
               title="Dangers on the map"
               value={hostiles.length || summary.hostiles}
               Icon={ShieldAlertIcon}
@@ -312,6 +311,36 @@ function OverviewBody() {
           here.
         </EmptyState>
       )}
+    </div>
+  )
+}
+
+/** One cell of the overview's reading strip: label, big number, the detail beneath it. */
+function Reading({
+  title,
+  value,
+  hint,
+  Icon,
+  accentClassName,
+}: {
+  title: string
+  value: React.ReactNode
+  hint?: React.ReactNode
+  Icon: React.ComponentType<{ className?: string }>
+  accentClassName?: string
+}) {
+  return (
+    <div className="bg-card p-4 text-card-foreground">
+      <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+        <Icon className={cn('size-3.5 shrink-0', accentClassName)} />
+        {title}
+      </div>
+      <div className="mt-1 font-heading text-[1.75rem] leading-tight font-semibold tabular-nums">
+        {value}
+      </div>
+      {hint ? (
+        <div className="mt-1.5 text-sm leading-snug text-muted-foreground">{hint}</div>
+      ) : null}
     </div>
   )
 }

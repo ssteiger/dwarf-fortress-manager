@@ -169,18 +169,16 @@ export function AnnouncementText({ parts, onOpen }: { parts: TextPart[]; onOpen?
 // ---------------------------------------------------------------------------
 // Notices
 
-const SEVERITY_STYLE: Record<Severity, { box: string; icon: string; Icon: typeof InfoIcon }> = {
+const SEVERITY_STYLE: Record<Severity, { disc: string; Icon: typeof InfoIcon }> = {
   danger: {
-    box: 'border-red-500/40 bg-red-500/10',
-    icon: 'text-red-600 dark:text-red-400',
+    disc: 'bg-red-500/15 text-red-600 dark:text-red-400',
     Icon: ShieldAlertIcon,
   },
   warning: {
-    box: 'border-amber-500/40 bg-amber-500/5',
-    icon: 'text-amber-600 dark:text-amber-400',
+    disc: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
     Icon: TriangleAlertIcon,
   },
-  info: { box: 'border-border', icon: 'text-sky-600 dark:text-sky-400', Icon: InfoIcon },
+  info: { disc: 'bg-sky-500/10 text-sky-700 dark:text-sky-400', Icon: InfoIcon },
 }
 
 const NOTICE_LINES = 4
@@ -201,11 +199,25 @@ export function NoticeCard({
   const lines = notice.lines ?? []
   const shownLines = allLines ? lines : lines.slice(0, NOTICE_LINES)
   return (
-    <li className={cn('flex gap-3 rounded-lg border p-3', style.box)}>
-      <Icon className={cn('mt-0.5 size-4 shrink-0', style.icon)} />
+    <li className="flex gap-3 py-3 first:pt-0 last:pb-0">
+      <span
+        className={cn(
+          '-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full',
+          style.disc,
+        )}
+      >
+        <Icon className="size-3.5" />
+      </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div>
-          <div className="font-medium leading-snug">{notice.title}</div>
+          <div
+            className={cn(
+              'leading-snug',
+              notice.severity === 'danger' ? 'font-semibold' : 'font-medium',
+            )}
+          >
+            {notice.title}
+          </div>
           {notice.detail ? (
             <p className="mt-0.5 text-sm text-muted-foreground">{notice.detail}</p>
           ) : null}
@@ -296,36 +308,39 @@ export function NoticeList({
       </p>
     )
   return (
-    <div className="flex flex-col gap-2">
-      {major.length ? (
-        <ul className="flex flex-col gap-2">
-          {major.map((notice) => (
-            <NoticeCard key={notice.key} notice={notice} onOpen={onOpen} onGuide={onGuide} />
-          ))}
-        </ul>
-      ) : null}
+    <ul className="flex flex-col divide-y">
+      {major.map((notice) => (
+        <NoticeCard key={notice.key} notice={notice} onOpen={onOpen} onGuide={onGuide} />
+      ))}
       {minor.length ? (
         showMinor || !major.length ? (
-          <ul className="flex flex-col gap-2">
-            {minor.map((notice) => (
-              <NoticeCard key={notice.key} notice={notice} onOpen={onOpen} onGuide={onGuide} />
-            ))}
-          </ul>
+          minor.map((notice) => (
+            <NoticeCard key={notice.key} notice={notice} onOpen={onOpen} onGuide={onGuide} />
+          ))
         ) : (
-          <button
-            type="button"
-            onClick={() => setShowMinor(true)}
-            className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <InfoIcon className="size-4 shrink-0 text-sky-600 dark:text-sky-400" />
-            <span className="min-w-0 flex-1 truncate">
-              {minor.length} smaller thing{minor.length === 1 ? '' : 's'}:{' '}
-              {minor.map((n) => n.title).join(' · ')}
-            </span>
-          </button>
+          <li className="pt-3">
+            <button
+              type="button"
+              onClick={() => setShowMinor(true)}
+              className="flex w-full items-center gap-3 text-left text-sm text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span
+                className={cn(
+                  'flex size-7 shrink-0 items-center justify-center rounded-full',
+                  SEVERITY_STYLE.info.disc,
+                )}
+              >
+                <InfoIcon className="size-3.5" />
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {minor.length} smaller thing{minor.length === 1 ? '' : 's'}:{' '}
+                {minor.map((n) => n.title).join(' · ')}
+              </span>
+            </button>
+          </li>
         )
       ) : null}
-    </div>
+    </ul>
   )
 }
 

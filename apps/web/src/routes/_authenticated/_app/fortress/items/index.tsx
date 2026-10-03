@@ -225,7 +225,6 @@ function ItemsBody() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Fortress"
         title="Stores and items"
         description="What the fortress keeps, what it is running short of, and what to do about it in the game. Every item on the map is listed below."
         updatedAt={supplies.data?.capturedAt}

@@ -350,7 +350,6 @@ function DwarvesPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Fortress"
         title="Dwarves and creatures"
         description="Who lives here, what they are doing, and how they feel. Click anyone for their skills, needs, thoughts and story."
         updatedAt={data?.capturedAt}

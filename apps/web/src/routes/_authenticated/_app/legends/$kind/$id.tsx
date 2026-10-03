@@ -194,13 +194,11 @@ function RecordPage() {
           />
         ) : null}
         <div className="min-w-0 flex-1 basis-64">
-          <p className="text-sm text-muted-foreground">{kindLabel(kind)}</p>
-          <h1 className="mt-1 text-3xl font-semibold">{title}</h1>
-          {subtitle ? (
-            <p className="mt-2 max-w-3xl text-base text-muted-foreground">
-              {subtitle}
-            </p>
-          ) : null}
+          <h1 className="text-3xl font-semibold">{title}</h1>
+          <p className="mt-2 max-w-3xl text-base text-muted-foreground">
+            {kindLabel(kind)}
+            {subtitle ? ` · ${subtitle}` : null}
+          </p>
           {statusChips.length ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {statusChips.map((chip) => (

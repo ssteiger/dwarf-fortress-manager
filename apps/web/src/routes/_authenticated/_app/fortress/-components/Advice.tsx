@@ -46,24 +46,27 @@ export const AREA_ICON: Record<AdviceArea, typeof ShieldIcon> = {
 
 const STATUS_STYLE: Record<
   AdviceStatus,
-  { Icon: typeof ShieldIcon; icon: string; box: string; label: string }
+  { Icon: typeof ShieldIcon; icon: string; box: string; disc: string; label: string }
 > = {
   problem: {
     Icon: CircleAlertIcon,
     icon: 'text-red-600 dark:text-red-400',
     box: 'border-red-500/40 bg-red-500/5',
+    disc: 'bg-red-500/15 text-red-600 dark:text-red-400',
     label: 'Problem',
   },
   attention: {
     Icon: TriangleAlertIcon,
     icon: 'text-amber-600 dark:text-amber-400',
     box: 'border-amber-500/40 bg-amber-500/5',
+    disc: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
     label: 'Needs attention',
   },
   good: {
     Icon: CircleCheckIcon,
     icon: 'text-emerald-600 dark:text-emerald-400',
     box: 'border-border',
+    disc: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
     label: 'Fine',
   },
 }
@@ -94,16 +97,30 @@ export function AdviceCard({ advice }: { advice: Advice }) {
   const style = STATUS_STYLE[advice.status]
   const AreaIcon = AREA_ICON[advice.area]
   return (
-    <li className={cn('rounded-lg border transition-colors hover:bg-accent/30', style.box)}>
+    <li className="py-3 first:pt-0 last:pb-0">
       <button
         type="button"
         onClick={() => open(adviceGuide(advice))}
-        className="flex w-full items-start gap-3 p-3 text-left"
+        className="group flex w-full items-start gap-3 text-left"
       >
-        <StatusIcon status={advice.status} className="mt-0.5" />
+        <span
+          className={cn(
+            '-mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full',
+            style.disc,
+          )}
+        >
+          <style.Icon className="size-3.5" aria-label={style.label} />
+        </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="font-medium">{advice.title}</span>
+            <span
+              className={cn(
+                'underline-offset-4 group-hover:underline',
+                advice.status === 'problem' ? 'font-semibold' : 'font-medium',
+              )}
+            >
+              {advice.title}
+            </span>
             <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
               <AreaIcon className="size-3" />
               {AREAS[advice.area].label}
@@ -118,10 +135,10 @@ export function AdviceCard({ advice }: { advice: Advice }) {
             <OneClickHint count={advice.actions?.length ?? 0} />
           </span>
         </span>
-        <ChevronRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground" />
+        <ChevronRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
       </button>
       {advice.units?.length ? (
-        <div className="px-3 pb-3 pl-10">
+        <div className="pt-2 pl-10">
           <UnitChips units={advice.units} max={6} />
         </div>
       ) : null}
@@ -143,7 +160,7 @@ export function NextSteps({ advice, max = 8 }: { advice: Advice[]; max?: number 
     )
   return (
     <div className="flex flex-col gap-2">
-      <ul className="flex flex-col gap-2">
+      <ul className="flex flex-col divide-y">
         {shown.map((a) => (
           <AdviceCard key={a.key} advice={a} />
         ))}
@@ -251,7 +268,7 @@ export function SituationList({ situations }: { situations: Situation[] }) {
   return (
     <div className="flex flex-col gap-4">
       {active.length ? (
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col divide-y">
           {active.map((s) => (
             <SituationRow key={s.key} situation={s} />
           ))}
@@ -279,15 +296,13 @@ function SituationRow({ situation }: { situation: Situation }) {
   const open = useOpenGuide()
   const active = Boolean(situation.now)
   return (
-    <li
-      className={cn(active ? 'rounded-lg border border-amber-500/40 bg-amber-500/5' : 'border-b')}
-    >
+    <li className={active ? undefined : 'border-b'}>
       <button
         type="button"
         onClick={() => open(situationGuide(situation))}
         className={cn(
           'group flex w-full items-start gap-3 text-left hover:bg-accent/30',
-          active ? 'rounded-lg p-3' : 'py-2',
+          active ? 'py-3' : 'py-2',
         )}
       >
         <span className="min-w-0 flex-1">

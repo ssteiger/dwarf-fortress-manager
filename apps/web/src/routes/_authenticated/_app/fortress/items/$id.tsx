@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { ItemSprite } from '~/lib/df-assets/components'
-import { humanize } from '~/lib/fortress/format'
 import { useFortItem, useFortOverview } from '~/lib/fortress/queries'
 import { FortBreadcrumbs, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
@@ -25,7 +24,6 @@ function ItemPage() {
       />
 
       <PageHeader
-        eyebrow={item ? humanize(item.type) : 'Item'}
         title={
           <span className="flex flex-wrap items-center gap-3">
             {item ? (

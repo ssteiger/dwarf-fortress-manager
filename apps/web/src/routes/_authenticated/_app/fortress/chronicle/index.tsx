@@ -97,7 +97,6 @@ function ChroniclePage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Fortress"
         title="Chronicle"
         description="Every announcement the game has made since the worker started, newest first. Announcements undone by loading an earlier save are left out."
         updatedAt={dataUpdatedAt}

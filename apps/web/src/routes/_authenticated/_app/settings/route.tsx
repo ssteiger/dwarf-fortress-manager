@@ -41,7 +41,6 @@ function SettingsLayout() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Settings"
         title="Set up your manager"
         description="How the app looks, what it tells you about, and how it talks to your game."
       />

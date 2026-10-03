@@ -23,7 +23,6 @@ import { useTick } from '~/lib/fortress/queries'
 
 /** Title row shared by every fortress page. */
 export function PageHeader({
-  eyebrow,
   title,
   description,
   updatedAt,
@@ -31,7 +30,6 @@ export function PageHeader({
   onRefresh,
   actions,
 }: {
-  eyebrow: string
   title: React.ReactNode
   description?: React.ReactNode
   updatedAt?: string | number | null
@@ -46,11 +44,8 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-3xl">
-        <div className="text-sm font-medium text-primary">{eyebrow}</div>
-        <h1 className="mt-1 text-3xl font-semibold">{title}</h1>
-        {description ? (
-          <p className="mt-2 text-base text-muted-foreground">{description}</p>
-        ) : null}
+        <h1 className="text-3xl font-semibold">{title}</h1>
+        {description ? <p className="mt-2 text-base text-muted-foreground">{description}</p> : null}
       </div>
       <div className="flex items-center gap-3 text-sm text-muted-foreground">
         {updatedLabel ? <span className="hidden sm:inline">Captured {updatedLabel}</span> : null}

@@ -34,7 +34,8 @@ export function NavMain({
                 <Link to={item.url} className="w-full">
                   <SidebarMenuButton
                     tooltip={item.title}
-                    className={isActive ? 'bg-accent text-accent-foreground' : ''}
+                    isActive={isActive}
+                    className="data-[active=true]:[&>svg]:text-brand"
                   >
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>

@@ -54,7 +54,6 @@ function MapPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        eyebrow="Fortress"
         title="Map"
         description="One z-level at a time, drawn from the last map dump. Scroll or pinch to zoom, drag to pan, double-click to zoom in, and use < and > to change level like in the game. Unrevealed rock stays dark unless you choose to see it."
         updatedAt={data?.capturedAt}

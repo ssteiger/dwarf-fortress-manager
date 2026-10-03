@@ -2,6 +2,9 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/inter/wght-italic.css";
 @import "@fontsource-variable/geist-mono";
+@import "@fontsource/zilla-slab/500.css";
+@import "@fontsource/zilla-slab/600.css";
+@import "@fontsource/zilla-slab/700.css";
 
 @import "tailwindcss" source("../../");
 @import "@fortress/ui/styles/theme.css";
@@ -13,7 +16,8 @@
   /* Proportional text for the interface; mono only for code and coordinates. */
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --font-heading: var(--font-sans);
+  /* Titles and big readouts. Zilla Slab has tabular figures, so numbers hold still as they change. */
+  --font-heading: "Zilla Slab", ui-serif, Georgia, serif;
 }
 
 /*
@@ -26,6 +30,16 @@
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
+  }
+
+  h1,
+  h2,
+  [data-slot="card-title"] {
+    font-family: var(--font-heading);
+  }
+
+  :is(h1, h2, [data-slot="card-title"]) :is([data-slot="badge"], button, input, select) {
+    font-family: var(--font-sans);
   }
 }
 
@@ -47,6 +61,19 @@
 ::selection {
   background: var(--highlight);
   color: var(--foreground);
+}
+
+/* The parts the browser draws itself: scrollbars, native controls, the caret, underlines. */
+:root {
+  color-scheme: light;
+  accent-color: var(--brand);
+  caret-color: var(--brand);
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 40%, transparent) transparent;
+  text-underline-offset: 0.2em;
+}
+
+.dark {
+  color-scheme: dark;
 }
 
 code,
@@ -77,6 +104,7 @@ pre {
   white-space: normal;
   overflow-wrap: break-word;
   vertical-align: top;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Settings → General. Everything is sized in rem, so the root size scales the whole app. */

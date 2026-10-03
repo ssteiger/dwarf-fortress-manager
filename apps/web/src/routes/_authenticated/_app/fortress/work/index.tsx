@@ -212,7 +212,6 @@ function WorkPage() {
     <GuideProvider>
       <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <PageHeader
-          eyebrow="Fortress"
           title="Work and advice"
           description="What the fortress needs to thrive, what to do about it in the game, and who is doing what."
           updatedAt={data?.capturedAt}

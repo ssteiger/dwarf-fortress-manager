@@ -14,7 +14,7 @@ import {
   useKnownHistFigures,
 } from './-components/UnitLinks'
 
-const GROUP_EYEBROW = {
+const GROUP_LABEL = {
   citizen: 'Citizen',
   resident: 'Resident',
   visitor: 'Visitor',
@@ -46,6 +46,7 @@ function DwarfPage() {
   const group = unit ? unitGroup(unit) : 'other'
   const subtitle = unit
     ? [
+        GROUP_LABEL[group],
         unit.name_english && unit.name_english !== unit.name ? unit.name_english : null,
         unit.caste,
         sexLabel(unit.sex),
@@ -68,7 +69,6 @@ function DwarfPage() {
       />
 
       <PageHeader
-        eyebrow={GROUP_EYEBROW[group]}
         title={
           <span className="flex flex-wrap items-center gap-3">
             {unit ? (

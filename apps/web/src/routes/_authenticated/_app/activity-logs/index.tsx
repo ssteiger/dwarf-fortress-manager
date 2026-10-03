@@ -267,11 +267,7 @@ const LogsPage = () => {
         {/* Hero */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="flex items-center gap-2 text-primary">
-              <ScrollTextIcon className="size-4" />
-              <span className="text-sm font-medium">System</span>
-            </div>
-            <h1 className="mt-1 text-3xl font-semibold">Activity logs</h1>
+            <h1 className="text-3xl font-semibold">Activity logs</h1>
             <p className="mt-2 max-w-3xl text-base text-muted-foreground">
               Most recent 1,000 entries from{' '}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">public.logs</code>, refreshed
