@@ -38,7 +38,7 @@ export function useFortOverview() {
   })
 }
 
-/** Every unit in the last dump; shared by the overview, the roster and the edge dwarves. */
+/** Every unit in the last dump; shared by the overview, the grid and the edge dwarves. */
 export function useFortUnits() {
   return useQuery({
     queryKey: ['fort', 'units'],

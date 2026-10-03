@@ -89,11 +89,11 @@ const GROUP_LABELS: Record<Group, string> = {
   all: 'Everyone',
 }
 
-type View = 'roster' | 'table'
+type View = 'grid' | 'table'
 const VIEW_KEY = 'fort-dwarves-view'
 
 function useView(): [View, (view: View) => void] {
-  const [view, setView] = React.useState<View>('roster')
+  const [view, setView] = React.useState<View>('grid')
   React.useEffect(() => {
     if (localStorage.getItem(VIEW_KEY) === 'table') setView('table')
   }, [])
@@ -418,9 +418,9 @@ function DwarvesPage() {
             </label>
             <Tabs value={view} onValueChange={(v) => setView(v as View)}>
               <TabsList>
-                <TabsTrigger value="roster" className="gap-1.5">
+                <TabsTrigger value="grid" className="gap-1.5">
                   <LayoutGridIcon className="size-3.5" />
-                  Roster
+                  Grid
                 </TabsTrigger>
                 <TabsTrigger value="table" className="gap-1.5">
                   <TableIcon className="size-3.5" />
@@ -437,8 +437,8 @@ function DwarvesPage() {
               {units.length === 0 ? 'No dump has been taken yet.' : 'No unit matches this filter.'}
             </EmptyState>
           </div>
-        ) : view === 'roster' ? (
-          <Roster units={rows} now={now} onOpen={setSelected} />
+        ) : view === 'grid' ? (
+          <Grid units={rows} now={now} onOpen={setSelected} />
         ) : (
           <DataTable
             data={rows}
@@ -573,7 +573,7 @@ function LatelyText({ unit, now }: { unit: FortUnit; now: GameTime | null }) {
 }
 
 /** Everyone as a card: portrait, what they are doing, what is on their mind, what they need. */
-function Roster({
+function Grid({
   units,
   now,
   onOpen,
@@ -609,7 +609,7 @@ function Roster({
         onChange={(e) => setQ(e.target.value)}
         placeholder="Search by name, profession, job or squad…"
         className="max-w-sm"
-        aria-label="Search the roster"
+        aria-label="Search the grid"
       />
       {entries.length ? (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">

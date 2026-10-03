@@ -1,10 +1,10 @@
-/* Self-hosted Inter from Google Fonts (variable, 100–900; subsets load on demand). */
-@import "@fontsource-variable/inter";
-@import "@fontsource-variable/inter/wght-italic.css";
+/*
+ * Self-hosted Inter from Google Fonts (variable, 100–900; subsets load on demand).
+ * The optical-size axis gives titles Inter's display cut and body text its text cut.
+ */
+@import "@fontsource-variable/inter/opsz.css";
+@import "@fontsource-variable/inter/opsz-italic.css";
 @import "@fontsource-variable/geist-mono";
-@import "@fontsource/zilla-slab/500.css";
-@import "@fontsource/zilla-slab/600.css";
-@import "@fontsource/zilla-slab/700.css";
 
 @import "tailwindcss" source("../../");
 @import "@fortress/ui/styles/theme.css";
@@ -16,8 +16,17 @@
   /* Proportional text for the interface; mono only for code and coordinates. */
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
-  /* Titles and big readouts. Zilla Slab has tabular figures, so numbers hold still as they change. */
-  --font-heading: "Zilla Slab", ui-serif, Georgia, serif;
+  --font-heading: var(--font-sans);
+
+  /* A dense scale: 15px for reading, 13px for interface text and secondary lines. */
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.5;
+  --text-base: 0.9375rem;
+  --text-base--line-height: 1.6;
+
+  /* Inter is variable, so medium and semibold sit between the usual steps. */
+  --font-weight-medium: 510;
+  --font-weight-semibold: 590;
 }
 
 /*
@@ -32,14 +41,14 @@
     cursor: pointer;
   }
 
+  /* Titles sit a little tighter than body text; a tracking-* utility still wins. */
   h1,
-  h2,
-  [data-slot="card-title"] {
-    font-family: var(--font-heading);
+  h2 {
+    letter-spacing: -0.022em;
   }
 
-  :is(h1, h2, [data-slot="card-title"]) :is([data-slot="badge"], button, input, select) {
-    font-family: var(--font-sans);
+  [data-slot="card-title"] {
+    letter-spacing: -0.011em;
   }
 }
 
@@ -48,9 +57,14 @@
   --typeset-font-body: var(--font-sans);
   --typeset-font-heading: var(--font-heading);
   --typeset-font-mono: var(--font-mono);
-  --typeset-size: 16px;
-  --typeset-leading: 1.65;
+  --typeset-size: 0.9375rem;
+  --typeset-leading: 1.6;
   --typeset-flow: 1.15em;
+}
+
+.typeset :where(h1, h2, h3, h4, h5, h6) {
+  font-weight: 510;
+  letter-spacing: -0.012em;
 }
 
 /*
@@ -88,13 +102,13 @@ pre {
 }
 
 [data-slot="table"] {
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }
 
 [data-slot="table"] th {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  font-size: 0.75rem;
+  font-weight: 510;
   letter-spacing: 0;
   text-transform: none;
   color: var(--muted-foreground);

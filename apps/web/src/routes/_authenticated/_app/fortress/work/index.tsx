@@ -327,7 +327,7 @@ function WorkPage() {
         )}
 
         <div>
-          <h2 className="mb-3 text-lg font-semibold">Every job and building</h2>
+          <h2 className="mb-3 text-lg font-medium">Every job and building</h2>
           <Tabs defaultValue="jobs">
             <TabsList>
               <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>

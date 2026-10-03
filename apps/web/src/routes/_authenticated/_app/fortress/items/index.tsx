@@ -366,7 +366,7 @@ function ItemList() {
   return (
     <section id="items-list" className="flex scroll-mt-4 flex-col gap-4">
       <div>
-        <h2 className="text-lg font-semibold">Every item</h2>
+        <h2 className="text-lg font-medium">Every item</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           {data
             ? `${formatNumber(data.views.fortress)} items in the fortress${data.views.elsewhere ? `, and ${formatNumber(data.views.elsewhere)} artifacts and books the game knows of elsewhere` : ''}. Click one to see what to do with it.`

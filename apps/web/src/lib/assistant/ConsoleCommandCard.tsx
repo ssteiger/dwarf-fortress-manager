@@ -89,20 +89,20 @@ export function ConsoleCommandCard({
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border bg-background p-2.5">
-      <div className="flex items-start gap-2">
+    <div className="overflow-hidden rounded-lg border bg-muted/30">
+      <div className="flex items-start gap-2 px-3 py-2.5">
         <TerminalIcon className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-        <code className="min-w-0 flex-1 font-mono text-xs break-all whitespace-pre-wrap">
+        <code className="min-w-0 flex-1 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {command}
         </code>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 border-t bg-card/60 px-2 py-1.5">
         {problem ? (
-          <span className="text-xs text-destructive">{problem}</span>
+          <span className="px-1 text-xs text-destructive">{problem}</span>
         ) : oneClickActions ? (
           <Button
             size="sm"
-            className="h-7 gap-1.5"
+            className="gap-1.5"
             onClick={() => {
               setDraft(command)
               setConfirming(true)
@@ -119,7 +119,12 @@ export function ConsoleCommandCard({
             {finished ? 'Run again' : 'Run in DFHack'}
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" className="h-7 gap-1.5" onClick={copy}>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="gap-1.5 text-muted-foreground hover:text-foreground"
+          onClick={copy}
+        >
           <CopyIcon className="size-3.5" />
           Copy
         </Button>
@@ -128,15 +133,19 @@ export function ConsoleCommandCard({
             One-click commands are off in Settings.
           </span>
         ) : null}
-        <RunStatus run={run.data ?? null} />
+        <span className="ml-auto pr-1">
+          <RunStatus run={run.data ?? null} />
+        </span>
       </div>
-      {run.data?.error ? <p className="text-xs text-destructive">{run.data.error}</p> : null}
+      {run.data?.error ? (
+        <p className="border-t px-3 py-2 text-xs text-destructive">{run.data.error}</p>
+      ) : null}
       {run.data?.output?.trim() ? (
-        <details className="text-xs">
+        <details className="border-t px-3 py-2 text-xs">
           <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
             What DFHack said
           </summary>
-          <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 whitespace-pre-wrap">
+          <pre className="mt-2 max-h-48 overflow-auto rounded-md border bg-background p-2 font-mono whitespace-pre-wrap">
             {run.data.output.trim()}
           </pre>
         </details>

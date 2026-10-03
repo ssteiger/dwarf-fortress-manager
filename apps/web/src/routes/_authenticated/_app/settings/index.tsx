@@ -20,15 +20,15 @@ import {
 } from './-components/SettingsSection'
 
 const THEMES: Choice<ThemeChoice>[] = [
-  { value: 'dark', label: 'Stone', hint: 'Dark, like the game', icon: MoonIcon },
-  { value: 'light', label: 'Parchment', hint: 'Light, for bright rooms', icon: SunIcon },
+  { value: 'dark', label: 'Dark', hint: 'For dim rooms', icon: MoonIcon },
+  { value: 'light', label: 'Light', hint: 'For bright rooms', icon: SunIcon },
   { value: 'system', label: 'Follow the system', hint: 'Switches with your OS', icon: MonitorIcon },
 ]
 
 const TEXT_SIZES: Choice<TextSize>[] = [
-  { value: 'normal', label: 'Normal', hint: 'As designed' },
-  { value: 'large', label: 'Large', hint: 'A step up, everywhere' },
-  { value: 'larger', label: 'Larger', hint: 'For reading across the room' },
+  { value: 'normal', label: 'Normal', hint: 'The standard size' },
+  { value: 'large', label: 'Large', hint: 'Everything an eighth bigger' },
+  { value: 'larger', label: 'Larger', hint: 'Everything a quarter bigger' },
 ]
 
 function useSystemReducedMotion() {
@@ -75,13 +75,9 @@ function GeneralSettingsPage() {
           onChange={(v) => setPreference('textSize', v)}
         />
         <div className="rounded-lg border bg-muted/30 p-4">
-          <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-            Preview
-          </div>
-          <p className="mt-1 font-medium">Urist McMiner has struck native gold!</p>
-          <p className="text-sm text-muted-foreground">
-            Late Granite, 125 · The miners cheer as the vein glitters in the lamplight.
-          </p>
+          <div className="text-xs text-muted-foreground">Preview</div>
+          <p className="mt-2 font-medium">You have struck native gold!</p>
+          <p className="text-sm text-muted-foreground">21 Slate 1433 · Struck mineral</p>
         </div>
       </SettingsSection>
 
@@ -99,7 +95,7 @@ function GeneralSettingsPage() {
         <SettingRow
           id="edge-dwarves"
           label="Citizens walking along the bottom"
-          description="A dozen of your fortress's dwarves stroll along the bottom edge of every page. They stay away while motion is kept still."
+          description="A dozen of your citizens stroll along the bottom of every page. Brush one with the cursor to knock it over. They stay hidden while animations are off."
         >
           <Switch
             id="edge-dwarves"

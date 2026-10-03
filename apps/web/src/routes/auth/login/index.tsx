@@ -38,7 +38,7 @@ const LoginPage = () => {
       >
         <DwarfRow className="mb-8 lg:hidden" />
         <div className="mb-8 space-y-2">
-          <h1 className="text-2xl font-semibold">Sign in</h1>
+          <h1 className="text-2xl font-medium">Sign in</h1>
           <p className="text-muted-foreground text-sm">
             Welcome back. Enter your email and we&rsquo;ll send you a code.
           </p>

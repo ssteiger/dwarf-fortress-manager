@@ -50,7 +50,7 @@ export const PAGES: PageEntry[] = [
     to: '/fortress/dwarves',
     title: 'Dwarves',
     detail: 'Every citizen, animal and visitor',
-    keywords: 'units roster people citizens skills stress squad nobles health',
+    keywords: 'units grid people citizens skills stress squad nobles health',
   },
   {
     to: '/fortress/items',

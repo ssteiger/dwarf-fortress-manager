@@ -14,7 +14,27 @@ import {
 } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { HammerIcon, ScrollTextIcon, SearchIcon } from 'lucide-react'
+import {
+  BellIcon,
+  BookOpenIcon,
+  ClipboardListIcon,
+  GlobeIcon,
+  HammerIcon,
+  HourglassIcon,
+  LibraryIcon,
+  type LucideIcon,
+  MapIcon,
+  MountainIcon,
+  NotebookPenIcon,
+  PackageIcon,
+  PlugIcon,
+  ScrollTextIcon,
+  SearchIcon,
+  SettingsIcon,
+  SparklesIcon,
+  UserIcon,
+  UsersIcon,
+} from 'lucide-react'
 import * as React from 'react'
 
 import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
@@ -46,6 +66,29 @@ function useDebounced<T>(value: T, ms: number): T {
 
 const unitName = (unit: DwarfHit['unit']) => unit.nickname || unit.name || unit.readable
 
+/** The icon each page wears in the sidebar, the legends tabs or the settings list. */
+const PAGE_ICON: Record<AppPath, LucideIcon> = {
+  '/fortress': MountainIcon,
+  '/fortress/dwarves': UsersIcon,
+  '/fortress/items': PackageIcon,
+  '/fortress/work': HammerIcon,
+  '/fortress/map': MapIcon,
+  '/fortress/chronicle': ScrollTextIcon,
+  '/legends': BookOpenIcon,
+  '/legends/world': GlobeIcon,
+  '/legends/history': HourglassIcon,
+  '/legends/stories': SparklesIcon,
+  '/legends/archive': LibraryIcon,
+  '/legends/journal': NotebookPenIcon,
+  '/nickname-dwarves': LibraryIcon,
+  '/activity-logs': ClipboardListIcon,
+  '/settings': SettingsIcon,
+  '/settings/account': UserIcon,
+  '/settings/connection': PlugIcon,
+  '/settings/legends': BookOpenIcon,
+  '/settings/notifications': BellIcon,
+}
+
 /** Pages whose title, purpose or keywords answer the query; all of them when it is empty. */
 function matchingPages(q: string) {
   if (!q) return PAGES.slice(0, 8)
@@ -76,7 +119,7 @@ function Row({
       <span className="flex size-6 shrink-0 items-center justify-center">{icon}</span>
       <span className="min-w-0 flex-1 truncate">
         {title}
-        {detail ? <span className="ml-2 text-xs text-muted-foreground">{detail}</span> : null}
+        {detail ? <span className="ml-2 text-muted-foreground">{detail}</span> : null}
       </span>
       {trailing}
     </>
@@ -86,9 +129,17 @@ function Row({
 function MoreNote({ count, what }: { count: number; what: string }) {
   if (!count) return null
   return (
-    <span className="px-2 pb-1.5 text-xs text-muted-foreground">
+    <span className="block py-1 pl-11 text-xs text-muted-foreground">
       and {count.toLocaleString()} more {what}
     </span>
+  )
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex h-5 min-w-5 items-center justify-center rounded border bg-muted px-1 font-sans text-[11px] font-medium text-muted-foreground">
+      {children}
+    </kbd>
   )
 }
 
@@ -173,7 +224,7 @@ export function GlobalSearch() {
       >
         <SearchIcon className="size-4 shrink-0" />
         <span className="flex-1 truncate text-left">Search the fortress…</span>
-        <kbd className="rounded border bg-muted px-1.5 font-mono text-[10px] leading-4">⌘K</kbd>
+        <Kbd>⌘K</Kbd>
       </button>
 
       <Dialog
@@ -183,7 +234,10 @@ export function GlobalSearch() {
           if (!next) setQ('')
         }}
       >
-        <DialogContent className="overflow-hidden p-0 sm:max-w-2xl">
+        <DialogContent
+          showCloseButton={false}
+          className="top-[12vh] translate-y-0 gap-0 overflow-hidden p-0 sm:max-w-[40rem]"
+        >
           <DialogHeader className="sr-only">
             <DialogTitle>Search</DialogTitle>
             <DialogDescription>
@@ -192,33 +246,39 @@ export function GlobalSearch() {
           </DialogHeader>
           <Command
             shouldFilter={false}
-            className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-2"
+            className="bg-transparent **:data-[slot=command-input-wrapper]:h-14 **:data-[slot=command-input-wrapper]:gap-3 **:data-[slot=command-input-wrapper]:px-4 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group]]:px-2 [&_[cmdk-group]]:py-0 [&_[cmdk-input]]:h-14 [&_[cmdk-input]]:text-[0.9375rem] [&_[cmdk-item]]:h-9 [&_[cmdk-item]]:gap-3 [&_[cmdk-item]]:rounded-md [&_[cmdk-item]]:px-2"
           >
             <CommandInput
-              placeholder="A dwarf, an item, a place, a page…"
+              placeholder="Search for a dwarf, an item, a place or a page…"
               value={q}
               onValueChange={setQ}
               aria-label="Search the app"
             />
-            <CommandList className="max-h-[70vh]">
-              {nothing ? <CommandEmpty>Nothing by that name.</CommandEmpty> : null}
+            <CommandList className="max-h-[min(60vh,34rem)] pb-2">
+              {nothing ? (
+                <CommandEmpty className="py-10 text-muted-foreground">
+                  Nothing by that name.
+                </CommandEmpty>
+              ) : null}
 
               {pages.length ? (
                 <CommandGroup heading="Pages">
-                  {pages.map((page) => (
-                    <CommandItem
-                      key={page.to}
-                      value={`page-${page.to}`}
-                      onSelect={() => goPage(page.to)}
-                      className="gap-2"
-                    >
-                      <Row
-                        icon={<SearchIcon className="size-4 text-muted-foreground" />}
-                        title={page.title}
-                        detail={page.detail}
-                      />
-                    </CommandItem>
-                  ))}
+                  {pages.map((page) => {
+                    const PageIcon = PAGE_ICON[page.to]
+                    return (
+                      <CommandItem
+                        key={page.to}
+                        value={`page-${page.to}`}
+                        onSelect={() => goPage(page.to)}
+                      >
+                        <Row
+                          icon={<PageIcon className="size-4 text-muted-foreground" />}
+                          title={page.title}
+                          detail={page.detail}
+                        />
+                      </CommandItem>
+                    )
+                  })}
                 </CommandGroup>
               ) : null}
 
@@ -229,7 +289,6 @@ export function GlobalSearch() {
                       key={`dwarf-${hit.unit.id}`}
                       value={`dwarf-${hit.unit.id}`}
                       onSelect={() => goDwarf(hit)}
-                      className="gap-2"
                     >
                       <Row
                         icon={<CreatureSprite unit={hit.unit} size={24} />}
@@ -249,7 +308,6 @@ export function GlobalSearch() {
                       key={`item-${hit.item.id}`}
                       value={`item-${hit.item.id}`}
                       onSelect={() => goItem(hit)}
-                      className="gap-2"
                     >
                       <Row
                         icon={<ItemSprite item={hit.item} size={24} />}
@@ -274,7 +332,6 @@ export function GlobalSearch() {
                       key={`place-${hit.id}`}
                       value={`place-${hit.id}`}
                       onSelect={() => goPage('/fortress/work')}
-                      className="gap-2"
                     >
                       <Row
                         icon={<HammerIcon className="size-4 text-muted-foreground" />}
@@ -294,7 +351,6 @@ export function GlobalSearch() {
                       key={`event-${hit.id}`}
                       value={`event-${hit.id}`}
                       onSelect={goChronicle}
-                      className="gap-2"
                     >
                       <Row
                         icon={<ScrollTextIcon className="size-4 text-muted-foreground" />}
@@ -310,7 +366,7 @@ export function GlobalSearch() {
                     </CommandItem>
                   ))}
                   {results.more.events ? (
-                    <CommandItem value="all-events" onSelect={goChronicle} className="gap-2">
+                    <CommandItem value="all-events" onSelect={goChronicle}>
                       <Row
                         icon={<SearchIcon className="size-4 text-muted-foreground" />}
                         title={`All ${results.more.events.toLocaleString()} further announcements`}
@@ -327,7 +383,6 @@ export function GlobalSearch() {
                       key={`legends-${hit.kind}-${hit.id}`}
                       value={`legends-${hit.kind}-${hit.id}`}
                       onSelect={() => goLegends(hit)}
-                      className="gap-2"
                     >
                       <Row
                         icon={<LegendsSprite subject={hit} size={24} />}

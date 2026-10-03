@@ -1,3 +1,4 @@
+import { cn } from '@fortress/ui'
 import * as React from 'react'
 
 import type { TimelineBin } from '~/lib/legends/server'
@@ -112,32 +113,29 @@ export function HistoryChart({
               x2={width - 8}
               y1={yFor(maxTotal * f)}
               y2={yFor(maxTotal * f)}
-              stroke="currentColor"
-              strokeOpacity={0.12}
+              className="stroke-border"
+              strokeDasharray={f === 1 ? undefined : '2 3'}
             />
             <text
               x={padLeft - 6}
               y={yFor(maxTotal * f) + 3}
               textAnchor="end"
-              fontSize={10}
-              fill="currentColor"
-              fillOpacity={0.6}
+              fontSize={9}
+              className="fill-muted-foreground tabular-nums"
             >
               {Math.round(maxTotal * f).toLocaleString()}
             </text>
           </g>
         ))}
+        <line x1={padLeft} x2={width - 8} y1={yFor(0)} y2={yFor(0)} className="stroke-border" />
         {shown ? (
           <rect
             x={xFor(shown.from)}
             y={padTop - 2}
             width={Math.max(2, xFor(Math.min(shown.to + 1, last)) - xFor(shown.from))}
             height={plotH + 4}
-            fill="#fbbf24"
-            fillOpacity={0.18}
-            stroke="#f59e0b"
-            strokeOpacity={0.8}
-            rx={2}
+            className="fill-brand/10 stroke-brand/70"
+            rx={3}
           />
         ) : null}
         {bins.map((bin, i) => {
@@ -156,28 +154,32 @@ export function HistoryChart({
                 y={yFor(bin.total)}
                 width={barW}
                 height={plotH - (yFor(bin.total) - padTop)}
-                fill="#0ea5e9"
-                fillOpacity={0.35}
-                rx={1}
+                className={isActive ? 'fill-foreground/25' : 'fill-foreground/12'}
+                rx={1.5}
               />
               <rect
                 x={x}
                 y={yFor(bin.battles + bin.deaths)}
                 width={barW}
                 height={yFor(0) - yFor(bin.battles + bin.deaths)}
-                fill="#78716c"
-                rx={1}
+                className="fill-muted-foreground/70"
+                rx={1.5}
               />
               <rect
                 x={x}
                 y={yFor(bin.battles)}
                 width={barW}
                 height={yFor(0) - yFor(bin.battles)}
-                fill="#dc2626"
-                rx={1}
+                className="fill-chart-5"
+                rx={1.5}
               />
               {i % labelEvery === 0 ? (
-                <text x={x} y={height - 8} fontSize={10} fill="currentColor" fillOpacity={0.7}>
+                <text
+                  x={x}
+                  y={height - 8}
+                  fontSize={9}
+                  className="fill-muted-foreground tabular-nums"
+                >
                   {bin.start}
                 </text>
               ) : null}
@@ -202,15 +204,18 @@ export function HistoryChart({
                   x2={xFor(Math.max(era.startYear, first))}
                   y1={4}
                   y2={height - padBottom}
-                  stroke="#f59e0b"
-                  strokeDasharray="3 3"
+                  className="stroke-muted-foreground/60"
+                  strokeDasharray="2 3"
                 />
                 <text
                   x={xFor(Math.max(era.startYear, first)) + 4}
                   y={12}
-                  fontSize={10}
-                  fill="#b45309"
-                  className={onSelect ? 'hover:underline' : undefined}
+                  fontSize={9}
+                  fontWeight={510}
+                  className={cn(
+                    'fill-muted-foreground',
+                    onSelect && 'transition-colors hover:fill-foreground',
+                  )}
                 >
                   {era.name}
                 </text>
@@ -218,15 +223,15 @@ export function HistoryChart({
             ) : null,
           )}
       </svg>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-3 rounded-sm bg-sky-500/40" /> Everything recorded
+          <span className="inline-block size-2 rounded-full bg-foreground/20" /> Everything recorded
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-3 rounded-sm bg-stone-500" /> Deaths
+          <span className="inline-block size-2 rounded-full bg-muted-foreground/70" /> Deaths
         </span>
         <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-3 rounded-sm bg-red-600" /> War & battle
+          <span className="inline-block size-2 rounded-full bg-chart-5" /> War & battle
         </span>
         <span className="ml-auto tabular-nums">
           {current

@@ -69,14 +69,21 @@ function Inline({ text }: { text: string }) {
       {pieces.map((piece, i) => {
         // Pieces of one line never reorder.
         if (piece.startsWith('**') && piece.endsWith('**') && piece.length > 4)
-          // biome-ignore lint/suspicious/noArrayIndexKey: see above
-          return <strong key={i}>{piece.slice(2, -2)}</strong>
+          return (
+            <strong
+              // biome-ignore lint/suspicious/noArrayIndexKey: see above
+              key={i}
+              className="font-semibold"
+            >
+              {piece.slice(2, -2)}
+            </strong>
+          )
         if (piece.startsWith('`') && piece.endsWith('`') && piece.length > 2)
           return (
             <code
               // biome-ignore lint/suspicious/noArrayIndexKey: see above
               key={i}
-              className="rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]"
+              className="rounded border bg-muted/60 px-1 py-px font-mono text-[0.85em]"
             >
               {piece.slice(1, -1)}
             </code>
@@ -89,7 +96,7 @@ function Inline({ text }: { text: string }) {
 
 export function ReplyText({ text }: { text: string }): React.ReactNode {
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       {blocks(text).map((block, i) => {
         // Blocks of one reply never reorder.
         if (block.kind === 'p')
@@ -112,13 +119,17 @@ export function ReplyText({ text }: { text: string }): React.ReactNode {
           </li>
         ))
         return block.kind === 'ol' ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: see above
-          <ol key={i} start={block.start} className="flex list-decimal flex-col gap-1 pl-5">
+          <ol
+            // biome-ignore lint/suspicious/noArrayIndexKey: see above
+            key={i}
+            start={block.start}
+            className="flex list-decimal flex-col gap-1.5 pl-5 marker:text-muted-foreground"
+          >
             {items}
           </ol>
         ) : (
           // biome-ignore lint/suspicious/noArrayIndexKey: see above
-          <ul key={i} className="flex list-disc flex-col gap-1 pl-5">
+          <ul key={i} className="flex list-disc flex-col gap-1.5 pl-5 marker:text-muted-foreground">
             {items}
           </ul>
         )

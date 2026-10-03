@@ -9,7 +9,13 @@ import {
   Textarea,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
-import { Loader2Icon, SendIcon, SparklesIcon } from 'lucide-react'
+import {
+  ArrowUpIcon,
+  CornerDownRightIcon,
+  Loader2Icon,
+  SparklesIcon,
+  SquarePenIcon,
+} from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -34,6 +40,7 @@ export function AssistantPanel() {
     staleTime: Number.POSITIVE_INFINITY,
   })
   const [draft, setDraft] = React.useState('')
+  const input = React.useRef<HTMLTextAreaElement>(null)
   const bottom = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -52,121 +59,162 @@ export function AssistantPanel() {
 
   const enabled = status.data?.enabled ?? false
 
+  // The box is disabled until the model status arrives, so focus it once it can take focus.
+  React.useEffect(() => {
+    if (open && enabled) input.current?.focus()
+  }, [open, enabled])
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent side="right" className="w-full gap-0 p-0 sm:max-w-lg">
-        <SheetHeader className="border-b pr-12">
-          <div className="flex items-center justify-between gap-2">
-            <SheetTitle className="flex items-center gap-2">
-              <SparklesIcon className="size-4 text-muted-foreground" />
-              Ask how to…
-            </SheetTitle>
-            {turns.length ? (
-              <Button variant="ghost" size="sm" className="h-7" onClick={reset} disabled={asking}>
-                New conversation
-              </Button>
-            ) : null}
-          </div>
-          <SheetDescription>
+      <SheetContent
+        side="right"
+        className="w-full gap-0 p-0 sm:max-w-lg"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault()
+          input.current?.focus()
+        }}
+      >
+        <SheetHeader className="h-12 shrink-0 flex-row items-center gap-2 border-b py-0 pr-12 pl-4">
+          <SheetTitle className="flex items-center gap-2 text-sm">
+            <SparklesIcon className="size-4 text-muted-foreground" />
+            Ask how to…
+          </SheetTitle>
+          <SheetDescription className="sr-only">
             A language model answers with your fortress in mind. Commands it suggests run only after
             you read and confirm them.
-            {status.data?.model ? (
-              <span className="text-xs"> Model: {status.data.model}.</span>
-            ) : null}
           </SheetDescription>
+          {turns.length ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-auto text-muted-foreground hover:text-foreground"
+              onClick={reset}
+              disabled={asking}
+            >
+              <SquarePenIcon className="size-3.5" />
+              New conversation
+            </Button>
+          ) : null}
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto px-4 py-5">
           {status.isPending ? (
             <Skeleton className="h-24 rounded-lg" />
           ) : !enabled ? (
             <NotConfigured />
           ) : turns.length || asking ? (
-            <ol className="flex flex-col gap-3 text-sm">
+            <ol className="flex flex-col gap-5 text-sm leading-relaxed">
               {turns.map((turn) => (
                 <Turn key={turn.id} turn={turn} />
               ))}
               {asking ? (
-                <li className="inline-flex items-center gap-2 self-start rounded-lg border bg-muted/40 px-3 py-2 text-muted-foreground">
+                <li className="flex items-center gap-2 text-muted-foreground">
                   <Loader2Icon className="size-3.5 animate-spin" />
                   Looking at your fortress…
                 </li>
               ) : null}
             </ol>
           ) : (
-            <div className="flex flex-col gap-3">
-              <p className="text-sm text-muted-foreground">
-                Ask how to do something in the game, or what to do about something in your fortress.
-                For example:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {EXAMPLES.map((example) => (
-                  <Button
-                    key={example}
-                    variant="outline"
-                    size="sm"
-                    className="h-auto py-1.5 font-normal"
-                    onClick={() => send(example)}
-                  >
-                    {example}
-                  </Button>
-                ))}
-              </div>
-            </div>
+            <Intro onPick={send} />
           )}
           <div ref={bottom} />
         </div>
 
         <form
-          className="flex items-end gap-2 border-t p-3"
+          className="shrink-0 p-3 pt-0"
           onSubmit={(event) => {
             event.preventDefault()
             send(draft)
           }}
         >
-          <Textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault()
-                send(draft)
-              }
-            }}
-            placeholder={turns.length ? 'Ask something else…' : 'How do I…'}
-            maxLength={1000}
-            rows={2}
-            className="max-h-40 min-h-10 resize-none"
-            disabled={!enabled}
-            aria-label="Question for the assistant"
-          />
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!enabled || asking || !draft.trim()}
-            aria-label="Ask"
-          >
-            {asking ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <SendIcon className="size-4" />
-            )}
-          </Button>
+          <div className="rounded-xl border bg-card transition-[border-color,box-shadow] focus-within:border-ring/60 focus-within:ring-[3px] focus-within:ring-ring/20">
+            <Textarea
+              ref={input}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  event.preventDefault()
+                  send(draft)
+                }
+              }}
+              placeholder={turns.length ? 'Ask something else…' : 'How do I…'}
+              maxLength={1000}
+              rows={2}
+              className="max-h-40 min-h-11 resize-none border-0 bg-transparent px-3 pt-2.5 pb-1 text-sm focus-visible:ring-0 dark:bg-transparent"
+              disabled={!enabled}
+              aria-label="Question for the assistant"
+            />
+            <div className="flex items-center gap-2 pr-2 pb-2 pl-3">
+              <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                {status.data?.model ?? ''}
+              </span>
+              <span className="hidden text-xs text-muted-foreground sm:inline">
+                ↵ to send, ⇧↵ for a new line
+              </span>
+              <Button
+                type="submit"
+                size="icon"
+                className="size-7 rounded-lg"
+                disabled={!enabled || asking || !draft.trim()}
+                aria-label="Ask"
+              >
+                {asking ? (
+                  <Loader2Icon className="size-3.5 animate-spin" />
+                ) : (
+                  <ArrowUpIcon className="size-4" />
+                )}
+              </Button>
+            </div>
+          </div>
         </form>
       </SheetContent>
     </Sheet>
   )
 }
 
+function Intro({ onPick }: { onPick: (question: string) => void }) {
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-2 text-sm">
+        <span className="flex size-8 items-center justify-center rounded-lg border bg-muted/50">
+          <SparklesIcon className="size-4 text-muted-foreground" />
+        </span>
+        <p className="mt-1">
+          Ask how to do something in the game, or what to do about something in your fortress.
+        </p>
+        <p className="text-muted-foreground">
+          A language model answers with your fortress in mind. Commands it suggests run only after
+          you read and confirm them.
+        </p>
+      </div>
+      <div className="flex flex-col">
+        <p className="px-2 pb-1 text-xs text-muted-foreground">For example</p>
+        {EXAMPLES.map((example) => (
+          <button
+            key={example}
+            type="button"
+            onClick={() => onPick(example)}
+            className="group flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+          >
+            <CornerDownRightIcon className="size-3.5 shrink-0 text-muted-foreground group-hover:text-foreground" />
+            {example}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Turn({ turn }: { turn: ChatTurn }) {
   if (turn.role === 'player')
     return (
-      <li className="max-w-[85%] self-end rounded-lg bg-primary/15 px-3 py-2 whitespace-pre-line">
+      <li className="max-w-[85%] self-end rounded-xl bg-secondary px-3 py-2 whitespace-pre-line">
         {turn.text}
       </li>
     )
   return (
-    <li className="flex flex-col gap-2 self-stretch rounded-lg border bg-muted/30 p-3">
+    <li className="flex flex-col gap-3 self-stretch">
       {turn.parts.map((part, i) => {
         // Parts of one reply never reorder, so their position is a stable key.
         const key = i
@@ -176,7 +224,7 @@ function Turn({ turn }: { turn: ChatTurn }) {
         return (
           <pre
             key={key}
-            className="overflow-x-auto rounded-md bg-muted p-2 font-mono text-xs whitespace-pre"
+            className="overflow-x-auto rounded-lg border bg-muted/40 p-3 font-mono text-xs whitespace-pre"
           >
             {part.text}
           </pre>
@@ -200,14 +248,17 @@ function NotConfigured() {
     <div className="flex flex-col gap-3 text-sm">
       <p className="font-medium">No language model is set up yet.</p>
       <p className="text-muted-foreground">
-        Add these to <code className="rounded bg-muted px-1 py-0.5 text-xs">apps/web/.env</code> and
-        restart the web app. The same setting turns on the legends narrator and a dwarf's voice.
+        Add these to{' '}
+        <code className="rounded border bg-muted/60 px-1 py-px font-mono text-xs">
+          apps/web/.env
+        </code>{' '}
+        and restart the web app. The same setting turns on the legends narrator and a dwarf's voice.
       </p>
-      <dl className="flex flex-col gap-2">
+      <dl className="flex flex-col divide-y rounded-lg border">
         {variables.map(([name, what]) => (
-          <div key={name} className="flex flex-col gap-0.5">
+          <div key={name} className="flex flex-col gap-0.5 px-3 py-2">
             <dt>
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">{name}</code>
+              <code className="font-mono text-xs">{name}</code>
             </dt>
             <dd className="text-muted-foreground">{what}</dd>
           </div>

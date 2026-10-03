@@ -88,7 +88,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton asChild className="data-[slot=sidebar-menu-button]:!p-1.5">
               <Link to={brandHref}>
-                <span className="font-heading text-lg font-semibold">{brand}</span>
+                <span className="text-base font-semibold">{brand}</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

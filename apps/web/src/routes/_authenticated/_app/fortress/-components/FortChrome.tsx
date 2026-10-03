@@ -44,7 +44,7 @@ export function PageHeader({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
       <div className="max-w-3xl">
-        <h1 className="text-3xl font-semibold">{title}</h1>
+        <h1 className="text-2xl font-medium">{title}</h1>
         {description ? <p className="mt-2 text-base text-muted-foreground">{description}</p> : null}
       </div>
       <div className="flex items-center gap-3 text-sm text-muted-foreground">

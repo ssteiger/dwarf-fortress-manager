@@ -267,7 +267,7 @@ const LogsPage = () => {
         {/* Hero */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold">Activity logs</h1>
+            <h1 className="text-2xl font-medium">Activity logs</h1>
             <p className="mt-2 max-w-3xl text-base text-muted-foreground">
               Most recent 1,000 entries from{' '}
               <code className="rounded bg-muted px-1 py-0.5 text-xs">public.logs</code>, refreshed

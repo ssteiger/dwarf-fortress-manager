@@ -14,7 +14,7 @@ export function AssistantBar() {
     >
       <SparklesIcon className="size-4 shrink-0" />
       <span className="hidden whitespace-nowrap lg:inline">Ask how to…</span>
-      <kbd className="hidden rounded border bg-muted px-1.5 font-mono text-[10px] leading-4 md:inline">
+      <kbd className="hidden h-5 min-w-5 items-center justify-center rounded border bg-muted px-1 font-sans text-[11px] font-medium md:inline-flex">
         ⌘J
       </kbd>
     </button>

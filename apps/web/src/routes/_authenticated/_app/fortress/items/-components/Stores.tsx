@@ -147,13 +147,18 @@ export function WealthBreakdown({ wealth }: { wealth: FortSummary['wealth'] }) {
   const max = Math.max(1, ...parts.map((p) => p.value))
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-2xl font-semibold tabular-nums">{formatValue(wealth.total)}</div>
-      <dl className="flex flex-col gap-1.5 text-sm">
+      <div className="text-2xl font-medium tracking-tight tabular-nums">
+        {formatValue(wealth.total)}
+      </div>
+      <dl className="flex flex-col gap-2 text-sm">
         {parts.map((part) => (
-          <div key={part.key} className="grid grid-cols-[8.5rem_1fr_auto] items-center gap-2">
+          <div key={part.key} className="grid grid-cols-[8.5rem_1fr_4rem] items-center gap-3">
             <dt className="text-muted-foreground">{part.label}</dt>
-            <span className="flex h-2 overflow-hidden rounded-full bg-muted">
-              <span className="bg-primary/70" style={{ width: `${(part.value / max) * 100}%` }} />
+            <span className="flex h-1.5 overflow-hidden rounded-full bg-muted">
+              <span
+                className="rounded-full bg-primary/70"
+                style={{ width: `${(part.value / max) * 100}%` }}
+              />
             </span>
             <dd className="text-right tabular-nums">{formatNumber(part.value)}</dd>
           </div>

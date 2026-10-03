@@ -308,7 +308,7 @@ export function DataTable<TData>({
     <div className="w-full">
       <div className="flex flex-wrap items-center gap-2 px-4 py-3">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search…"
             value={globalFilter}
@@ -359,7 +359,7 @@ export function DataTable<TData>({
       </div>
       <div className="overflow-hidden">
         <Table>
-          <TableHeader className="sticky top-0 z-10 bg-muted">
+          <TableHeader className="sticky top-0 z-10 bg-card">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -402,7 +402,8 @@ export function DataTable<TData>({
                         type="button"
                         onClick={header.column.getToggleSortingHandler()}
                         className={cn(
-                          'inline-flex h-8 w-full items-center gap-1.5 rounded-md px-1 text-left text-sm font-medium hover:bg-accent hover:text-accent-foreground',
+                          'group/sort inline-flex h-7 w-full items-center gap-1 text-left text-xs font-medium transition-colors hover:text-foreground',
+                          sortState && 'text-foreground',
                           alignRight && 'justify-end',
                         )}
                         aria-label={`Sort by ${String(header.column.columnDef.header)}`}
@@ -410,8 +411,8 @@ export function DataTable<TData>({
                         {rendered}
                         <SortIcon
                           className={cn(
-                            'h-3.5 w-3.5 shrink-0',
-                            sortState ? 'opacity-100' : 'opacity-40',
+                            'size-3 shrink-0 transition-opacity',
+                            sortState ? 'opacity-100' : 'opacity-0 group-hover/sort:opacity-60',
                           )}
                         />
                       </button>
@@ -424,8 +425,11 @@ export function DataTable<TData>({
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={allColumns.length} className="h-24 text-center">
-                  Loading...
+                <TableCell
+                  colSpan={allColumns.length}
+                  className="h-24 text-center text-muted-foreground"
+                >
+                  Loading…
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
@@ -434,7 +438,6 @@ export function DataTable<TData>({
                   key={`row-${row.id}`}
                   data-state={row.getIsSelected() && 'selected'}
                   className={cn(
-                    'hover:bg-muted/40',
                     (CellViewerContent || onRowClick) && 'cursor-pointer',
                     rowClassName?.(row.original),
                   )}
@@ -471,12 +474,12 @@ export function DataTable<TData>({
               <TableRow>
                 <TableCell colSpan={allColumns.length} className="h-24 text-center">
                   {emptyState ? (
-                    <div className="flex flex-col items-center justify-center space-y-1">
-                      <p className="text-lg font-medium">{emptyState.title}</p>
-                      <p className="text-sm text-muted-foreground">{emptyState.subtitle}</p>
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <p className="font-medium">{emptyState.title}</p>
+                      <p className="text-muted-foreground">{emptyState.subtitle}</p>
                     </div>
                   ) : (
-                    'No results.'
+                    <span className="text-muted-foreground">Nothing matches.</span>
                   )}
                 </TableCell>
               </TableRow>
@@ -485,15 +488,15 @@ export function DataTable<TData>({
         </Table>
       </div>
       {paginate ? (
-        <div className="flex items-center justify-between py-4 space-x-2">
-          <div className="flex-1 text-sm text-muted-foreground">
+        <div className="flex items-center justify-between gap-2 border-t px-4 py-2 text-sm text-muted-foreground">
+          <div className="flex-1 tabular-nums">
             {showSelectColumn
               ? `${table.getFilteredSelectedRowModel().rows.length} of ${table.getFilteredRowModel().rows.length} row(s) selected.`
               : `${(rowCount ?? table.getFilteredRowModel().rows.length).toLocaleString()} rows`}
           </div>
-          <div className="flex w-full items-center gap-8 lg:w-fit">
+          <div className="flex w-full items-center gap-6 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">
-              <Label htmlFor="rows-per-page" className="text-sm font-medium">
+              <Label htmlFor="rows-per-page" className="text-sm font-normal text-muted-foreground">
                 Rows per page
               </Label>
               <Select
@@ -502,7 +505,7 @@ export function DataTable<TData>({
                   table.setPageSize(Number(value))
                 }}
               >
-                <SelectTrigger className="w-20" id="rows-per-page">
+                <SelectTrigger size="sm" className="w-20" id="rows-per-page">
                   <SelectValue placeholder={table.getState().pagination.pageSize} />
                 </SelectTrigger>
                 <SelectContent side="top">
@@ -514,13 +517,13 @@ export function DataTable<TData>({
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex w-fit items-center justify-center text-sm font-medium">
+            <div className="flex w-fit items-center justify-center tabular-nums">
               Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
             </div>
             <div className="ml-auto flex items-center gap-2 lg:ml-0">
               <Button
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
+                className="hidden size-7 p-0 lg:flex"
                 onClick={() => table.setPageIndex(0)}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -529,7 +532,7 @@ export function DataTable<TData>({
               </Button>
               <Button
                 variant="outline"
-                className="h-8 w-8 p-0"
+                className="size-7 p-0"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -538,7 +541,7 @@ export function DataTable<TData>({
               </Button>
               <Button
                 variant="outline"
-                className="h-8 w-8 p-0"
+                className="size-7 p-0"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
@@ -547,7 +550,7 @@ export function DataTable<TData>({
               </Button>
               <Button
                 variant="outline"
-                className="hidden h-8 w-8 p-0 lg:flex"
+                className="hidden size-7 p-0 lg:flex"
                 onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                 disabled={!table.getCanNextPage()}
               >

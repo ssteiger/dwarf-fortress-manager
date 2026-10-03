@@ -28,7 +28,7 @@ function SheetOverlay({
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50',
+        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/15 dark:bg-black/45',
         className,
       )}
       {...props}
@@ -50,7 +50,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500',
+          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 outline-none shadow-[0_0_48px_-12px_rgb(0_0_0/0.25)] transition ease-out data-[state=closed]:duration-200 data-[state=open]:duration-300 dark:shadow-[0_0_48px_-8px_rgb(0_0_0/0.6)]',
           side === 'right' &&
             'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm',
           side === 'left' &&
@@ -64,7 +64,7 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">
+        <SheetPrimitive.Close className="focus-visible:ring-ring/50 text-muted-foreground hover:bg-accent hover:text-foreground absolute top-2.5 right-2.5 flex size-7 items-center justify-center rounded-md transition-colors focus-visible:ring-[3px] focus-visible:outline-hidden disabled:pointer-events-none">
           <XIcon className="size-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>
@@ -97,7 +97,7 @@ function SheetTitle({ className, ...props }: React.ComponentProps<typeof SheetPr
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn('text-foreground font-semibold', className)}
+      className={cn('text-foreground font-medium', className)}
       {...props}
     />
   )

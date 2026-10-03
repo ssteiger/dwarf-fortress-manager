@@ -335,7 +335,7 @@ function Reading({
         <Icon className={cn('size-3.5 shrink-0', accentClassName)} />
         {title}
       </div>
-      <div className="mt-1 font-heading text-[1.75rem] leading-tight font-semibold tabular-nums">
+      <div className="mt-1 text-2xl leading-tight font-medium tracking-tight tabular-nums">
         {value}
       </div>
       {hint ? (
@@ -549,13 +549,14 @@ function MoodBar({ counts }: { counts: number[] }) {
     return <p className="text-sm text-muted-foreground">No citizens to be happy or sad.</p>
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
+      <div className="flex h-2 w-full gap-0.5">
         {counts.map((count, i) =>
           count > 0 ? (
             <div
               key={STRESS_LABELS[i]}
               title={`${count} ${STRESS_LABELS[i]}`}
-              style={{ width: `${(count / total) * 100}%`, backgroundColor: STRESS_BAR_COLORS[i] }}
+              className="h-full min-w-1 rounded-full"
+              style={{ flex: `${count} 1 0%`, backgroundColor: STRESS_BAR_COLORS[i] }}
             />
           ) : null,
         )}
@@ -563,9 +564,9 @@ function MoodBar({ counts }: { counts: number[] }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
         {counts.map((count, i) =>
           count > 0 ? (
-            <span key={STRESS_LABELS[i]} className="flex items-center gap-1.5">
+            <span key={STRESS_LABELS[i]} className="flex items-center gap-1.5 tabular-nums">
               <span
-                className="inline-block size-2.5 rounded-full"
+                className="inline-block size-2 rounded-full"
                 style={{ backgroundColor: STRESS_BAR_COLORS[i] }}
               />
               {count} {STRESS_LABELS[i]}
