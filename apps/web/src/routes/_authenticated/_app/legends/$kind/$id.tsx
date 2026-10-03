@@ -195,9 +195,9 @@ function RecordPage() {
         ) : null}
         <div className="min-w-0 flex-1 basis-64">
           <p className="text-sm text-muted-foreground">{kindLabel(kind)}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="mt-1 text-3xl font-semibold">{title}</h1>
           {subtitle ? (
-            <p className="mt-2 max-w-3xl text-base leading-relaxed text-muted-foreground">
+            <p className="mt-2 max-w-3xl text-base text-muted-foreground">
               {subtitle}
             </p>
           ) : null}

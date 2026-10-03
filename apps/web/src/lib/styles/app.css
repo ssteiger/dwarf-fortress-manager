@@ -1,6 +1,6 @@
-/* Self-hosted Atkinson Hyperlegible Next from Google Fonts (variable, 200–800; latin subsets load on demand). */
-@import "@fontsource-variable/atkinson-hyperlegible-next";
-@import "@fontsource-variable/atkinson-hyperlegible-next/wght-italic.css";
+/* Self-hosted Inter from Google Fonts (variable, 100–900; subsets load on demand). */
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/inter/wght-italic.css";
 @import "@fontsource-variable/geist-mono";
 
 @import "tailwindcss" source("../../");
@@ -11,7 +11,7 @@
 
 @theme {
   /* Proportional text for the interface; mono only for code and coordinates. */
-  --font-sans: "Atkinson Hyperlegible Next Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-heading: var(--font-sans);
 }

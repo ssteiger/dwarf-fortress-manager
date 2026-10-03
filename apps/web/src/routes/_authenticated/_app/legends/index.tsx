@@ -189,7 +189,7 @@ function AtAGlance({
 function GlanceFigure({ value, label }: { value: number | null | undefined; label: string }) {
   return (
     <>
-      <div className="text-2xl font-semibold tabular-nums tracking-tight">
+      <div className="text-2xl font-semibold tabular-nums">
         {value === null || value === undefined ? '—' : formatNumber(value)}
       </div>
       <div className="text-sm text-muted-foreground">{label}</div>
@@ -259,7 +259,7 @@ function WaysIn({
               </span>
               <span className="flex min-w-0 flex-col gap-1">
                 <span className="font-medium">{way.title}</span>
-                <span className="text-sm leading-relaxed text-muted-foreground">{way.body}</span>
+                <span className="text-sm text-muted-foreground">{way.body}</span>
                 <span className="mt-1 inline-flex items-center gap-1 text-sm text-primary">
                   {way.cta}
                   <ArrowRightIcon className="size-3.5 transition-transform group-hover:translate-x-0.5" />
@@ -302,7 +302,7 @@ function YourFortress({
   if (!matchesLive) {
     return (
       <Section title="Your fortress">
-        <p className="text-sm leading-relaxed text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           <span className="text-foreground">{fortName}</span> stands in{' '}
           <span className="text-foreground">
             {live.worldName ? titleCase(live.worldName) : 'another world'}

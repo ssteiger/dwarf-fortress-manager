@@ -168,7 +168,7 @@ function ChronicleBody({
   const moments = showAll ? digest.moments : digest.moments.slice(0, compact ? 12 : 25)
   return (
     <div className={cn('flex flex-col gap-6', stale && 'opacity-60 transition-opacity')}>
-      <p className="max-w-[70ch] text-base leading-relaxed">{summarizeSpan(digest)}</p>
+      <p className="max-w-[70ch] text-base">{summarizeSpan(digest)}</p>
 
       <div
         className={cn('grid gap-6', compact ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_280px]')}

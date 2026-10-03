@@ -155,7 +155,7 @@ function LegendsSettingsPage() {
             Add these to <code className="text-xs">apps/web/.env</code> and restart the app. The key
             stays on the server.
           </p>
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs leading-relaxed">
+          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
             {`LEGENDS_NARRATOR_PROVIDER=openai   # or anthropic, or cursor
 LEGENDS_NARRATOR_API_KEY=sk-...      # a cursor_... key for cursor
 LEGENDS_NARRATOR_MODEL=gpt-4o-mini  # optional

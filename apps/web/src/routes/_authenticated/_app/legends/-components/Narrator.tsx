@@ -167,7 +167,7 @@ function NarrationDialog({
           ) : run.isError ? (
             <p className="text-sm text-destructive">{(run.error as Error).message}</p>
           ) : result ? (
-            <div className="flex flex-col gap-3 text-base leading-relaxed">
+            <div className="flex flex-col gap-3 text-base">
               {result.text.split(/\n{2,}/).map((para, i) => (
                 <p key={`${i}-${para.slice(0, 12)}`}>{para}</p>
               ))}

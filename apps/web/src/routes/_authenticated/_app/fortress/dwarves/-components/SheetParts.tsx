@@ -146,7 +146,7 @@ export function SheetLine({ label, children }: { label: string; children: React.
   return (
     <div className="grid gap-0.5 sm:grid-cols-[8rem_1fr] sm:gap-3">
       <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
-      <dd className="text-sm leading-relaxed">{children}</dd>
+      <dd className="text-sm">{children}</dd>
     </div>
   )
 }

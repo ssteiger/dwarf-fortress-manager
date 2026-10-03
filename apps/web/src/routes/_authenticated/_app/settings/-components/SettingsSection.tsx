@@ -54,7 +54,7 @@ export function SettingRow({
           {label}
         </Label>
         {description ? (
-          <p className="text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
         ) : null}
       </div>
       <div className="shrink-0 pt-0.5">{children}</div>

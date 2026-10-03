@@ -38,7 +38,7 @@ const RegisterPage = () => {
       >
         <DwarfRow className="mb-8 lg:hidden" />
         <div className="mb-8 space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">Create account</h1>
+          <h1 className="text-2xl font-semibold">Create account</h1>
           <p className="text-muted-foreground text-sm">
             Found your fortress manager. It only takes an email.
           </p>

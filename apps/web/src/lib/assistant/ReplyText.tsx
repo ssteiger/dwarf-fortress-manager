@@ -89,7 +89,7 @@ function Inline({ text }: { text: string }) {
 
 export function ReplyText({ text }: { text: string }): React.ReactNode {
   return (
-    <div className="flex flex-col gap-2 leading-relaxed">
+    <div className="flex flex-col gap-2">
       {blocks(text).map((block, i) => {
         // Blocks of one reply never reorder.
         if (block.kind === 'p')

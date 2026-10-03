@@ -96,7 +96,7 @@ export function StoryCard({
         </div>
         <p
           className={cn(
-            'mt-1 leading-relaxed text-muted-foreground',
+            'mt-1 text-muted-foreground',
             featured ? 'text-base' : 'text-sm',
           )}
         >

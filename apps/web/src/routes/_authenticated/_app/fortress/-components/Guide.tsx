@@ -308,7 +308,7 @@ function StepChecklist({ guideKey, steps }: { guideKey: string; steps: string[] 
                   onCheckedChange={() => toggle(i)}
                   className="mt-0.5"
                 />
-                <span className="flex gap-2 text-sm leading-relaxed">
+                <span className="flex gap-2 text-sm">
                   <span className="shrink-0 tabular-nums text-muted-foreground">{i + 1}.</span>
                   <span className={cn(checked && 'line-through decoration-muted-foreground/60')}>
                     {step}
@@ -337,7 +337,7 @@ export function GuideBody({
   const { oneClickActions } = usePreferences()
   return (
     <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-5')}>
-      {guide.why ? <p className="text-sm leading-relaxed">{guide.why}</p> : null}
+      {guide.why ? <p className="text-sm">{guide.why}</p> : null}
       {guide.signs ? (
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">How you can tell: </span>

@@ -216,7 +216,7 @@ function NoteRow({
           onRemove={() => remove.mutate(note.id)}
         />
       ) : note.note.trim() ? (
-        <p className={cn('whitespace-pre-wrap text-sm leading-relaxed')}>{note.note}</p>
+        <p className={cn('whitespace-pre-wrap text-sm')}>{note.note}</p>
       ) : (
         <p className="text-sm text-muted-foreground">No note yet.</p>
       )}

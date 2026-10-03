@@ -117,7 +117,7 @@ export function RawFacts({
   if (entries.length === 0)
     return <p className="text-sm text-muted-foreground">Nothing more is recorded.</p>
   return (
-    <dl className="grid gap-x-4 gap-y-3 text-sm leading-relaxed">
+    <dl className="grid gap-x-4 gap-y-3 text-sm">
       {entries.map(([key, value]) => (
         <div
           key={key}

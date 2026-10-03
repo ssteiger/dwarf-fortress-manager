@@ -221,7 +221,7 @@ export function DwarfDetails({
     <div className="flex flex-col gap-4">
       <Card className="gap-3 py-4">
         <CardContent className="flex flex-col gap-3 px-4">
-          <p className="text-base leading-relaxed">{unitStory(unit, now)}</p>
+          <p className="text-base">{unitStory(unit, now)}</p>
           {concerns.length ? (
             <ul className="flex flex-col gap-2">
               {concerns.map((c) => (

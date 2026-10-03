@@ -252,7 +252,7 @@ function LinkGroup({
         {label}
         {entries.length > 1 ? <span className="ml-1.5 tabular-nums">{entries.length}</span> : null}
       </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 leading-relaxed">
+      <div className="flex flex-wrap gap-x-3 gap-y-1">
         {shown.map((entry, i) => (
           <span key={`${entry.id}-${i}`}>
             <NamedRef kind={kind} id={entry.id} names={names} worldId={worldId} />
@@ -927,7 +927,7 @@ export function SiteSections({
                     </div>
                     <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
                       {list.map((s) => (
-                        <li key={s.id} className="text-sm leading-relaxed">
+                        <li key={s.id} className="text-sm">
                           <span className="font-medium">
                             {s.name ? titleCase(cleanName(s.name)) : `Unnamed ${type}`}
                           </span>
@@ -1164,7 +1164,7 @@ export function EntitySections({
                 const id = num(pos.id)
                 const held = id !== null ? (holders.get(id) ?? []) : []
                 return (
-                  <li key={id ?? str(pos.name)} className="text-sm leading-relaxed">
+                  <li key={id ?? str(pos.name)} className="text-sm">
                     <span className="font-medium capitalize">{str(pos.name) ?? 'office'}</span>
                     {str(pos.name_male) &&
                     str(pos.name_female) &&
@@ -1259,7 +1259,7 @@ export function EntitySections({
                 return (
                   <li
                     key={num(occasion.id) ?? str(occasion.name)}
-                    className="text-sm leading-relaxed"
+                    className="text-sm"
                   >
                     <span className="font-medium">{str(occasion.name) ?? 'A festival'}</span>
                     {parts.length ? (
@@ -1950,7 +1950,7 @@ export function ProseSections({
       <div className="flex flex-col gap-4 lg:col-span-2">
         {paragraphs.length ? (
           <Section title="As it is described">
-            <div className="flex max-w-[70ch] flex-col gap-3 text-base leading-relaxed">
+            <div className="flex max-w-[70ch] flex-col gap-3 text-base">
               {paragraphs.map((para, i) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs are positional
                 <p key={i}>{para}</p>

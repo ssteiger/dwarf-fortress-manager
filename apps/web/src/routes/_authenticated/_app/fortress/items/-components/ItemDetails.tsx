@@ -366,7 +366,7 @@ function ItemHints({ hints }: { hints: ItemHint[] }) {
         {hints.map((hint) => {
           const Icon = hint.problem ? TriangleAlertIcon : LightbulbIcon
           return (
-            <li key={hint.title} className="flex gap-2.5 text-sm leading-relaxed">
+            <li key={hint.title} className="flex gap-2.5 text-sm">
               <Icon
                 className={cn(
                   'mt-0.5 size-4 shrink-0',

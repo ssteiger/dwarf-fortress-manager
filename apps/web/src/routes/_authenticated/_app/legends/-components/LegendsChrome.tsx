@@ -613,7 +613,7 @@ export function EventLine({
         />
         <span
           className={cn(
-            'min-w-0 flex-1 leading-relaxed',
+            'min-w-0 flex-1',
             !described.known && 'text-muted-foreground',
           )}
         >

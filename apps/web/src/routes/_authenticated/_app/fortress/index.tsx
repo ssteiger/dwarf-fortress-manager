@@ -7,9 +7,12 @@ import { formatDistanceToNow } from 'date-fns'
 import {
   BeerIcon,
   CoinsIcon,
+  HeartIcon,
   HistoryIcon,
+  ScrollTextIcon,
   ShieldAlertIcon,
   SwordsIcon,
+  TriangleAlertIcon,
   UsersIcon,
 } from 'lucide-react'
 import * as React from 'react'
@@ -233,7 +236,10 @@ function OverviewBody() {
             <div className="flex min-w-0 flex-col gap-4">
               <Card className="gap-4">
                 <CardHeader>
-                  <CardTitle className="text-base">Needs your attention</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TriangleAlertIcon className="size-4 text-primary" />
+                    Needs your attention
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     What the dump says could go wrong, and what you can do about it.{' '}
                     <Link
@@ -251,7 +257,10 @@ function OverviewBody() {
 
               <Card className="gap-4">
                 <CardHeader>
-                  <CardTitle className="text-base">How the fortress feels</CardTitle>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <HeartIcon className="size-4 text-primary" />
+                    How the fortress feels
+                  </CardTitle>
                   <p className="text-sm text-muted-foreground">
                     What went through your citizens’ heads this past month. Click a line to see who.
                   </p>
@@ -386,7 +395,10 @@ function StoryCard({
     <Card className="gap-4">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div>
-          <CardTitle className="text-base">The story so far</CardTitle>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ScrollTextIcon className="size-4 text-primary" />
+            The story so far
+          </CardTitle>
           <p className="mt-1.5 text-sm text-muted-foreground">
             Deaths, births, moods, arrivals and finds, by season. Names open the dwarf.
           </p>

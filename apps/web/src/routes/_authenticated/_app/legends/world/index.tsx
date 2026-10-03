@@ -324,7 +324,7 @@ function WorldBody({
             />
             {digest.data && !playing ? (
               <div className={cn('flex flex-col gap-3', digest.isPlaceholderData && 'opacity-60')}>
-                <p className="text-sm leading-relaxed">{summarizeSpan(digest.data)}</p>
+                <p className="text-sm">{summarizeSpan(digest.data)}</p>
                 {digest.data.moments.length ? (
                   <ol className="divide-y text-sm">
                     {digest.data.moments.slice(0, 8).map((event) => (

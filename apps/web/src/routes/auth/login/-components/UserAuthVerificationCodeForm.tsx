@@ -68,7 +68,7 @@ export function UserAuthVerificationCodeForm({ email, onBack }: UserAuthVerifica
     <div className="grid gap-6">
       <div className="grid gap-2">
         <div className="grid gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Verification Code</h1>
+          <h1 className="text-2xl font-semibold">Verification Code</h1>
           <p className="text-sm text-muted-foreground">
             Please enter the verification code sent to {email}
           </p>

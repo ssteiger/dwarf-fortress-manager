@@ -164,7 +164,7 @@ function MapPage() {
                 </Badge>
                 <Badge variant="outline">{data.buildings.length} buildings</Badge>
               </div>
-              <div className="min-h-[3rem] text-sm leading-relaxed text-muted-foreground">
+              <div className="min-h-[3rem] text-sm text-muted-foreground">
                 {hover ? (
                   <>
                     <span className="font-mono">

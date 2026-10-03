@@ -151,7 +151,7 @@ export function RolePlayTab({
         {hooks.length ? (
           <ul className="flex flex-col gap-2 text-sm">
             {hooks.map((hook) => (
-              <li key={hook.key} className="rounded-lg border px-3 py-2 leading-relaxed">
+              <li key={hook.key} className="rounded-lg border px-3 py-2">
                 {hook.text}
               </li>
             ))}
@@ -343,7 +343,7 @@ function VoiceSection({
                     // biome-ignore lint/suspicious/noArrayIndexKey: see above
                     key={i}
                     className={cn(
-                      'max-w-[90%] rounded-lg px-3 py-2 leading-relaxed whitespace-pre-line',
+                      'max-w-[90%] rounded-lg px-3 py-2 whitespace-pre-line',
                       turn.role === 'player'
                         ? 'self-end bg-primary/15'
                         : 'self-start border bg-muted/40',
@@ -409,7 +409,7 @@ function VoiceSection({
         ) : (
           <div className="flex flex-col gap-3">
             {result ? (
-              <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-base leading-relaxed">
+              <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-base">
                 {result.text.split(/\n{2,}/).map((para, i) => (
                   <p
                     // Paragraphs of one reply never reorder.

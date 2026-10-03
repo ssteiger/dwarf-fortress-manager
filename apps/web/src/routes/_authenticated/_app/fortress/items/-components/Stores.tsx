@@ -159,7 +159,7 @@ export function WealthBreakdown({ wealth }: { wealth: FortSummary['wealth'] }) {
           </div>
         ))}
       </dl>
-      <p className="text-xs leading-relaxed text-muted-foreground">
+      <p className="text-xs text-muted-foreground">
         Traded: {formatValue(wealth.imported)} in, {formatValue(wealth.exported)} out. Wealth draws
         migrants, nobles and caravans, and sooner or later thieves and sieges. Smoothed and engraved
         rooms, fine furniture and artifacts on display count the most.
