@@ -1,4 +1,4 @@
-import type { FortUnit } from '@fortress/db-drizzle'
+import type { FortJob, FortUnit } from '@fortress/db-drizzle'
 // Client-safe subpath: the package entry also creates the Postgres client,
 // which must never reach the browser bundle.
 import { DF_MONTHS, STRESS_LABELS } from '@fortress/db-drizzle/fortress-types'
@@ -13,6 +13,11 @@ export function formatGameTick(year: number | null, tick: number | null): string
   const month = Math.floor(tick / TICKS_PER_MONTH)
   const day = Math.floor((tick % TICKS_PER_MONTH) / TICKS_PER_DAY) + 1
   return `${day} ${DF_MONTHS[month] ?? '?'} ${year}`
+}
+
+/** "2/3 iron bars · 0/1 charcoal or coke bar": what a job asked for and has been brought. */
+export function jobNeedsText(job: Pick<FortJob, 'needs'>): string {
+  return (job.needs ?? []).map(([label, need, have]) => `${have}/${need} ${label}`).join(' · ')
 }
 
 export function stressLabel(category: number): string {

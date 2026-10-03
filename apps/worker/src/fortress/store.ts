@@ -51,27 +51,23 @@ export async function storeLiveDump(
       },
     })
 
+  const tables = {
+    units: payload.units,
+    items: payload.items,
+    buildings: payload.buildings,
+    jobs: payload.jobs,
+    announcements: payload.announcements,
+    orders: payload.orders ?? null,
+    squads: payload.squads ?? null,
+    artifacts: payload.artifacts ?? null,
+    figures: payload.figures ?? null,
+  }
   await postgres_db
     .insert(schema.fort_dump)
-    .values({
-      id: SINGLETON_ID,
-      captured_at: now,
-      units: payload.units,
-      items: payload.items,
-      buildings: payload.buildings,
-      jobs: payload.jobs,
-      announcements: payload.announcements,
-    })
+    .values({ id: SINGLETON_ID, captured_at: now, ...tables })
     .onConflictDoUpdate({
       target: schema.fort_dump.id,
-      set: {
-        captured_at: now,
-        units: payload.units,
-        items: payload.items,
-        buildings: payload.buildings,
-        jobs: payload.jobs,
-        announcements: payload.announcements,
-      },
+      set: { captured_at: now, ...tables },
     })
 
   const newEvents = await appendEvents(payload)
@@ -116,6 +112,7 @@ export async function storeMap(payload: FortDumpPayload): Promise<void> {
       z_count: map.z_count,
       tiletypes: map.tiletypes,
       blocks: map.blocks,
+      minerals: map.minerals ?? null,
     })
     .onConflictDoUpdate({
       target: schema.fort_map.id,
@@ -126,6 +123,7 @@ export async function storeMap(payload: FortDumpPayload): Promise<void> {
         z_count: map.z_count,
         tiletypes: map.tiletypes,
         blocks: map.blocks,
+        minerals: map.minerals ?? null,
       },
     })
 }

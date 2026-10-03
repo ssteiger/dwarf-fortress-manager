@@ -29,7 +29,8 @@ import { logger } from './utils/logger'
  *     whitelisted DFHack actions, actions on one unit) and reads the dump
  *     schedule chosen in Settings (fort_worker).
  *  3. Asks the running game (through DFHack) for a full dump of units, items,
- *     buildings, jobs and announcements, and writes it to Postgres: when the
+ *     buildings, jobs, work orders, squads, artifacts and announcements, and
+ *     writes it to Postgres: when the
  *     app asks for one, and, with automatic dumps on, once the chosen interval
  *     has passed since the last dump ended or right after running commands.
  *     The map comes along at most every DF_MAP_POLL_MS.

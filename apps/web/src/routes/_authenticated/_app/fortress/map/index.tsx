@@ -12,6 +12,7 @@ import {
   decodeLevel,
   digDesignation,
   isHidden,
+  mineralColor,
   tileStyle,
 } from '~/lib/fortress/tiles'
 import { MapHint, MapMinimap, MapZoomControls } from '~/lib/map/MapControls'
@@ -50,6 +51,10 @@ function MapPage() {
 
   const citizens = data?.units.filter((u) => u.kind === 'citizen').length ?? 0
   const hostiles = data?.units.filter((u) => u.kind === 'hostile').length ?? 0
+  const grid = React.useMemo(
+    () => (data ? decodeLevel(data.blocks, data.xCount, data.yCount) : null),
+    [data],
+  )
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
@@ -62,17 +67,18 @@ function MapPage() {
       />
       <StatusBanner state={overview.data?.state} />
 
-      {!data ? (
+      {!data || !grid ? (
         <EmptyState title="No map yet">
           The map is dumped on its own schedule (every few minutes). Give the worker a moment.
         </EmptyState>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_260px]">
+        <div className="grid items-start gap-4 lg:grid-cols-[1fr_260px]">
           <Card className="overflow-hidden p-0">
             {/* Remount (and refit) if the embark size ever changes. */}
             <MapCanvas
               key={`${data.xCount}x${data.yCount}`}
               data={data}
+              grid={grid}
               reveal={reveal}
               showBuildings={showBuildings}
               onHover={setHover}
@@ -177,6 +183,7 @@ function MapPage() {
               </div>
               <Legend />
             </Card>
+            <MineralList data={data} grid={grid} reveal={reveal} />
           </div>
         </div>
       )}
@@ -189,7 +196,7 @@ function Legend() {
     ['#7c7c84', 'stone wall'],
     ['#3f3f46', 'stone floor'],
     ['#6b4f2a', 'soil'],
-    ['#b45309', 'ore / mineral'],
+    ['#b45309', 'ore and gem veins'],
     ['#cbd5e1', 'constructed wall'],
     ['#94a3b8', 'constructed floor'],
     ['#4d7c0f', 'grass'],
@@ -218,12 +225,85 @@ function Legend() {
   )
 }
 
+const MINERAL_KIND_RANK = { ore: 0, gem: 1, mineral: 2 } as const
+const MINERALS_SHOWN = 14
+
+/** The ores and gems still in the rock on this level, by how many tiles of each there are. */
+function MineralList({
+  data,
+  grid,
+  reveal,
+}: {
+  data: FortMapLevel
+  grid: LevelGrid
+  reveal: boolean
+}) {
+  const rows = React.useMemo(() => {
+    const counts = new Map<number, number>()
+    for (let i = 0; i < grid.veins.length; i++) {
+      const vein = grid.veins[i]
+      if (vein < 0 || (!reveal && isHidden(grid.flags[i]))) continue
+      if (data.tiletypes[String(grid.tiles[i])]?.shape !== 'WALL') continue
+      counts.set(vein, (counts.get(vein) ?? 0) + 1)
+    }
+    return [...counts]
+      .flatMap(([index, tiles]) => {
+        const mineral = data.minerals[String(index)]
+        return mineral ? [{ mineral, tiles }] : []
+      })
+      .sort(
+        (a, b) =>
+          MINERAL_KIND_RANK[a.mineral.kind] - MINERAL_KIND_RANK[b.mineral.kind] ||
+          b.tiles - a.tiles,
+      )
+  }, [data.minerals, data.tiletypes, grid, reveal])
+  if (!Object.keys(data.minerals).length) return null
+  return (
+    <Card className="flex flex-col gap-2 p-4 text-sm">
+      <div className="text-sm font-medium text-muted-foreground">Ores and gems on this level</div>
+      {rows.length ? (
+        <ul className="flex flex-col gap-1.5">
+          {rows.slice(0, MINERALS_SHOWN).map(({ mineral, tiles }) => (
+            <li key={mineral.id} className="flex items-baseline justify-between gap-2">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span
+                  className="inline-block size-3 shrink-0 self-center rounded-sm border border-white/10"
+                  style={{ backgroundColor: mineralColor(mineral, true) }}
+                />
+                <span className="truncate">
+                  {mineral.name}
+                  {mineral.kind === 'ore' ? (
+                    <span className="text-muted-foreground"> · {mineral.metals.join(', ')}</span>
+                  ) : mineral.kind === 'gem' ? (
+                    <span className="text-muted-foreground"> · gem</span>
+                  ) : null}
+                </span>
+              </span>
+              <span className="shrink-0 text-muted-foreground tabular-nums">{tiles}</span>
+            </li>
+          ))}
+          {rows.length > MINERALS_SHOWN ? (
+            <li className="text-muted-foreground">and {rows.length - MINERALS_SHOWN} more</li>
+          ) : null}
+        </ul>
+      ) : (
+        <p className="text-muted-foreground">
+          {reveal
+            ? 'No veins left in the rock here.'
+            : 'No veins in sight here. Dig further, or show unrevealed tiles.'}
+        </p>
+      )}
+    </Card>
+  )
+}
+
 const MAX_SCALE = 64
 
 /** Paint the level once at one pixel per tile; the viewport scales this image. */
 function paintBase(
   grid: LevelGrid,
   tiletypes: FortMapLevel['tiletypes'],
+  minerals: FortMapLevel['minerals'],
   reveal: boolean,
 ): HTMLCanvasElement | null {
   if (typeof document === 'undefined') return null
@@ -246,7 +326,10 @@ function paintBase(
     const tt = grid.tiles[i]
     if (tt < 0) continue // outside the map: leave transparent
     const f = grid.flags[i]
-    const color = !reveal && isHidden(f) ? '#15171c' : tileStyle(tiletypes[String(tt)], f).color
+    const color =
+      !reveal && isHidden(f)
+        ? '#15171c'
+        : tileStyle(tiletypes[String(tt)], f, minerals[String(grid.veins[i])]).color
     const [r, g, b] = rgb(color)
     const o = i * 4
     px[o] = r
@@ -269,12 +352,14 @@ function parseColor(color: string): [number, number, number] {
 
 function MapCanvas({
   data,
+  grid,
   reveal,
   showBuildings,
   onHover,
   onStepLevel,
 }: {
   data: FortMapLevel
+  grid: LevelGrid
   reveal: boolean
   showBuildings: boolean
   onHover: (info: { x: number; y: number; label: string } | null) => void
@@ -286,13 +371,9 @@ function MapCanvas({
     null,
   )
 
-  const grid = React.useMemo(
-    () => decodeLevel(data.blocks, data.xCount, data.yCount),
-    [data.blocks, data.xCount, data.yCount],
-  )
   const base = React.useMemo(
-    () => paintBase(grid, data.tiletypes, reveal),
-    [grid, data.tiletypes, reveal],
+    () => paintBase(grid, data.tiletypes, data.minerals, reveal),
+    [grid, data.tiletypes, data.minerals, reveal],
   )
   const designated = React.useMemo(() => {
     const out: number[] = []
@@ -440,7 +521,10 @@ function MapCanvas({
     const parts: string[] = []
     if (tt < 0) parts.push('outside the map')
     else if (!reveal && isHidden(f)) parts.push('unrevealed')
-    else parts.push(tileStyle(data.tiletypes[String(tt)], f).label)
+    else
+      parts.push(
+        tileStyle(data.tiletypes[String(tt)], f, data.minerals[String(grid.veins[i])]).label,
+      )
     const dig = digDesignation(f)
     if (dig > 0) parts.push(`designated: ${DIG_LABELS[dig]}`)
     if (building) parts.push(building.name || building.type)

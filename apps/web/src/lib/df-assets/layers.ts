@@ -129,6 +129,13 @@ export function selectLayerSet(
 
 const SHAPINGS = new Set(['NEATLY_COMBED', 'BRAIDED', 'DOUBLE_BRAIDS', 'PONY_TAILS'])
 
+/** The game's tissue_style_type names where the graphics raws spell the shaping differently. */
+const RAW_SHAPING: Record<string, string> = { PONY_TAIL: 'PONY_TAILS' }
+
+function shaping(tissue: UnitTissue): string | null {
+  return tissue.style ? (RAW_SHAPING[tissue.style] ?? tissue.style) : null
+}
+
 /**
  * Stand-in for units dumped before `look` existed: healthy, nothing worn,
  * average build, short unstyled hair, first face variant, and one colour per
@@ -173,6 +180,8 @@ interface EvalContext {
   tissueKey: string | null
   /** Set by CONDITION_ITEM_WORN for ITEM_QUALITY / material tags after it. */
   item: UnitWornItem | null
+  /** The layer has a CONDITION_ITEM_WORN; it then needs `item`. */
+  itemAsked: boolean
   /** Set by CONDITION_BP / LG_CONDITION_BP for BP_* tags after it. */
   parts: [string, string, 0 | 1][] | null
   /** Set by TISSUE_SWAP when the hair is curly enough. */
@@ -240,6 +249,11 @@ function holds(cond: string[], ctx: EvalContext): boolean {
     case 'CONDITION_HAUL_COUNT_MAX':
       return (look?.haul_count ?? 0) <= Number(args[0])
     case 'CONDITION_PROFESSION_CATEGORY': {
+      // Only clothing asks, and the game answers only while it colours
+      // clothes by profession: DISPLAY_CLOTHING_WITH_DYES_IN_FORT_MODE:NO.
+      // Dumps that predate the setting are drawn by dye, as the shipped
+      // d_init_default sets it.
+      if (look && look.profession_colors !== true) return false
       const category = look ? look.profession_category : 'STANDARD'
       return category !== null && args.includes(category)
     }
@@ -277,10 +291,16 @@ function holds(cond: string[], ctx: EvalContext): boolean {
     }
     case 'TISSUE_MAY_HAVE_SHAPING':
       if (plain) return false
-      return !!ctx.tissues?.some((t) => !!t.style && args.includes(t.style))
+      return !!ctx.tissues?.some((t) => {
+        const style = shaping(t)
+        return !!style && args.includes(style)
+      })
     case 'TISSUE_NOT_SHAPED':
       if (plain) return true
-      return !!ctx.tissues?.some((t) => !t.style || !SHAPINGS.has(t.style))
+      return !!ctx.tissues?.some((t) => {
+        const style = shaping(t)
+        return !style || !SHAPINGS.has(style)
+      })
     case 'TISSUE_MIN_DENSITY': {
       const dense = plain ? PLAIN_MODIFIER : maxOf(ctx.tissues?.map((t) => t.dense) ?? [])
       return dense !== null && dense >= Number(args[0])
@@ -302,12 +322,14 @@ function holds(cond: string[], ctx: EvalContext): boolean {
 
     // --- items -------------------------------------------------------------
     case 'CONDITION_ITEM_WORN': {
-      // [BY_CATEGORY:CAT:TYPE:SUBTYPE...] or [BY_TOKEN:TOKEN:TYPE:SUBTYPE...]
+      // [BY_CATEGORY:CAT:TYPE:SUBTYPE...] or [BY_TOKEN:TOKEN:TYPE:SUBTYPE...].
+      // Several on one layer are alternatives (a waist skirt for a dress or
+      // a skirt, a hood for a cloak or a hood); `evaluate` checks one held.
       if (!look) return false
+      ctx.itemAsked = true
+      if (ctx.item) return true
       const [mode, key, type, ...subtypes] = args
-      const item = findWorn(look, mode, key, type, subtypes)
-      if (!item) return false
-      ctx.item = item
+      ctx.item = findWorn(look, mode, key, type, subtypes)
       return true
     }
     case 'SHUT_OFF_IF_ITEM_PRESENT': {
@@ -365,7 +387,7 @@ function holds(cond: string[], ctx: EvalContext): boolean {
 
 function evaluate(conditions: string[][], ctx: EvalContext): boolean {
   for (const cond of conditions) if (!holds(cond, ctx)) return false
-  return true
+  return !ctx.itemAsked || ctx.item !== null
 }
 
 // ---------------------------------------------------------------------------
@@ -400,7 +422,14 @@ function resolveLayer(
   base: EvalContext,
   index: DfAssetIndex,
 ): ResolvedLayer | null {
-  const ctx: EvalContext = { ...base, tissues: null, tissueKey: null, item: null, swap: null }
+  const ctx: EvalContext = {
+    ...base,
+    tissues: null,
+    tissueKey: null,
+    item: null,
+    itemAsked: false,
+    swap: null,
+  }
   if (!evaluate(layer.conditions, ctx)) return null
   const sprite = ctx.swap ?? layer
   return {
@@ -434,6 +463,7 @@ export function resolveLayers(
     tissues: null,
     tissueKey: null,
     item: null,
+    itemAsked: false,
     parts: null,
     swap: null,
   }

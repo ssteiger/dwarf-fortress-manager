@@ -14,11 +14,12 @@
 -- While it runs, <out_path>.progress holds the step it is on (world, units,
 -- items, buildings, jobs, announcements, writing, map). Console text only
 -- reaches the worker once the script has finished; the file can be read while
--- the game is still paused.
+-- the game is still paused. Manager orders and squads are read in the jobs
+-- step, artifacts and the figures items name in the items step.
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 8
+local DUMP_VERSION = 10
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -205,7 +206,7 @@ local UNIT_COLUMNS = arr{
     'squad_id', 'squad', 'wounds', 'blood', 'blood_max', 'hunger', 'thirst',
     'sleepiness', 'mood', 'flags', 'skills', 'inventory', 'positions',
     'hist_figure_id', 'civ_id', 'race_id', 'caste_id', 'look',
-    'traits', 'values', 'thoughts', 'sheet',
+    'traits', 'values', 'thoughts', 'sheet', 'strange_mood',
 }
 
 local UNIT_FLAG_CHECKS = {
@@ -527,6 +528,8 @@ local function unit_tissues(u, caste)
                 local style = try(function() return u.appearance.tissue_style[i] end)
                 e.length = (length ~= nil and length >= 0) and length or nil
                 e.style = (style ~= nil and style >= 0) and enum_name(df.tissue_style_type, style) or nil
+                -- The graphics raws spell it the plural way.
+                if e.style == 'PONY_TAIL' then e.style = 'PONY_TAILS' end
             end
         end
     end
@@ -620,6 +623,10 @@ local function item_dye_color(item)
     local imps = try(function() return item.improvements end)
     if not imps then return nil end
     for _, imp in ipairs(imps) do
+        -- Since dye mixing and tinting (51.x) the cloth, thread or
+        -- coloration improvement records the colour the dyes came out as.
+        local mixed = color_token(try(function() return imp.dye_profile.color_index end))
+        if mixed then return mixed end
         local mat_type = try(function() return imp.dye.mat_type end)
         local mat_index = try(function() return imp.dye.mat_index end)
         if mat_type ~= nil and mat_type >= 0 then
@@ -759,6 +766,12 @@ local function generated_look(craw, caste)
     }
 end
 
+-- The game colours clothing by profession only while the dye display
+-- (DISPLAY_CLOTHING_WITH_DYES_IN_FORT_MODE) is off.
+local PROFESSION_COLORS = try(function()
+    return not df.global.d_init.display.flags.FORT_SHOW_CLOTHING_DYES
+end)
+
 local function unit_look_inner(u, craw)
     local caste = try(function() return craw.caste[u.caste] end)
     if not caste then return nil end
@@ -769,6 +782,7 @@ local function unit_look_inner(u, craw)
     local bp_mods, body_mods = unit_modifiers(u, caste)
     return {
         profession_category = profession_category(u),
+        profession_colors = PROFESSION_COLORS,
         syn_classes = syn_classes(u),
         haul_count = haul,
         body_size = try(function() return u.body.size_info.size_cur end) or 0,
@@ -1238,6 +1252,249 @@ local function unit_sheet(u, craw)
     return {error = tostring(res)}
 end
 
+-- ---------------------------------------------------------------------------
+-- Job requirements: what a job asks for (job.job_items.elements) and what has
+-- been brought for it (job.items, matched by job_item_idx), in the words the
+-- game's own screens use. Manager order conditions share the same fields.
+-- ---------------------------------------------------------------------------
+
+local JOB_ITEM_NOUNS = {
+    BOULDER = {'boulder', 'boulders'}, BLOCKS = {'block', 'blocks'}, WOOD = {'log', 'logs'},
+    BAR = {'bar', 'bars'}, SMALLGEM = {'cut gem', 'cut gems'}, ROUGH = {'rough gem', 'rough gems'},
+    SKIN_TANNED = {'leather', 'leather'}, CLOTH = {'cloth', 'cloth'}, THREAD = {'thread', 'thread'},
+    REMAINS = {'remains', 'remains'}, CORPSE = {'corpse', 'corpses'},
+    CORPSEPIECE = {'body part', 'body parts'}, PLANT = {'plant', 'plants'}, SEEDS = {'seed', 'seeds'},
+    POWDER_MISC = {'powder', 'powder'}, GLOB = {'glob', 'globs'}, DRINK = {'drink', 'drinks'},
+}
+
+-- Requirements with no item type that ask for a body part, by their flag.
+local BODY_PART_NOUNS = {
+    {'bone', 'bone', 'bones'}, {'shell', 'shell', 'shells'}, {'horn', 'horn', 'horns'},
+    {'pearl', 'pearl', 'pearls'}, {'ivory_tooth', 'tooth', 'teeth'}, {'hair_wool', 'hair', 'hair'},
+}
+
+-- The material family a flag names when no material is set.
+local MATERIAL_FLAG_WORDS = {
+    {'silk', 'silk'}, {'plant', 'plant fibre'}, {'yarn', 'yarn'}, {'metal', 'metal'},
+    {'glass', 'glass'}, {'leather', 'leather'}, {'bone', 'bone'}, {'soap', 'soap'},
+}
+
+local ITEM_FLAG_WORDS = {
+    {'empty', 'empty'}, {'millable', 'millable'}, {'processable', 'processable'},
+    {'murdered', 'murdered'}, {'non_economic', 'non-economic'},
+}
+
+-- The set flags of a job item, which are spread over three bitfields.
+local function job_flags(e)
+    local set = {}
+    for _, field in ipairs{'flags1', 'flags2', 'flags3'} do
+        pcall(function()
+            for name, on in pairs(e[field]) do
+                if on == true then set[name] = true end
+            end
+        end)
+    end
+    return set
+end
+
+-- has_material_reaction_product: what the material must be able to become.
+local PRODUCT_WORDS = {
+    DRINK_MAT = 'brewable', PRESS_LIQUID_MAT = 'pressable', HONEYCOMB_PRESS_MAT = 'pressable',
+    SOAP_MAT = 'soap-making', PRESS_PAPER_MAT = 'paper-making', BAG_ITEM = 'bag-making',
+}
+
+-- Coal (builtin material 7) as a reagent: the forges burn either kind.
+local FUEL_MAT_TYPE = 7
+
+-- "silk cloth", "rough gems", "empty bag", "hematite boulder", "bones".
+local function job_item_label(e, n)
+    local plural = n ~= 1
+    if e.item_type == df.item_type.BAR and e.mat_type == FUEL_MAT_TYPE then
+        return plural and 'charcoal or coke bars' or 'charcoal or coke bar'
+    end
+    local flags = job_flags(e)
+    local words = {}
+    for _, w in ipairs(ITEM_FLAG_WORDS) do
+        if flags[w[1]] then words[#words + 1] = w[2] end
+    end
+    local product = try(function() return e.has_material_reaction_product end)
+    if product and product ~= '' then
+        words[#words + 1] = PRODUCT_WORDS[product] or product:lower():gsub('_mat$', ''):gsub('_', ' ')
+    end
+    local class = try(function() return e.reaction_class end)
+    if class and class ~= '' then words[#words + 1] = (class:lower():gsub('_', ' ')) end
+    local noun, body_part = nil, false
+    local tool_use = try(function() return e.has_tool_use >= 0 and df.tool_uses[e.has_tool_use] end)
+    if tool_use then
+        noun = tostring(tool_use):lower():gsub('_', ' ')
+        if plural then noun = pluralize(noun) end
+    elseif e.item_type < 0 and flags.food_storage then
+        noun = plural and 'barrels or pots' or 'barrel or pot'
+    elseif e.item_type < 0 then
+        for _, b in ipairs(BODY_PART_NOUNS) do
+            if flags[b[1]] then
+                noun = plural and b[3] or b[2]
+                body_part = true
+                break
+            end
+        end
+        noun = noun or (plural and 'items' or 'item')
+    elseif e.item_subtype >= 0 then
+        noun = item_type_label(e.item_type, e.item_subtype, plural)
+    else
+        local nouns = JOB_ITEM_NOUNS[enum_name(df.item_type, e.item_type)]
+        noun = nouns and nouns[plural and 2 or 1] or item_type_label(e.item_type, -1, plural)
+    end
+    local mat = nil
+    if e.mat_type >= 0 and not (e.mat_type == 0 and e.mat_index < 0) then
+        mat = mat_label(e.mat_type, e.mat_index)
+    end
+    if not mat and not body_part then
+        for _, w in ipairs(MATERIAL_FLAG_WORDS) do
+            if flags[w[1]] then
+                mat = w[2]
+                break
+            end
+        end
+    end
+    if mat then words[#words + 1] = mat end
+    words[#words + 1] = noun or '?'
+    return table.concat(words, ' ')
+end
+
+-- One entry per requirement: {e, idx, need, have, div}. Bars, cloth and
+-- thread are asked for in units of size (150 a bar, 10000 a cloth), so both
+-- counts are divided by the size of one.
+local function job_needs(job)
+    local out = {}
+    local elements = try(function() return job.job_items.elements end)
+    if not elements then return out end
+    for i, e in ipairs(elements) do
+        local div = (e.min_dimension and e.min_dimension > 0) and e.min_dimension or 1
+        local got = 0
+        for _, ref in ipairs(job.items) do
+            if ref.job_item_idx == i and ref.item then
+                got = got + (div > 1 and (try(function() return ref.item:getTotalDimension() end) or div) or 1)
+            end
+        end
+        got = math.floor(got / div)
+        local need = math.floor(e.quantity / div)
+        if need <= 0 then need = math.max(got, 1) end
+        out[#out + 1] = {e = e, idx = i, need = need, have = got, div = div}
+    end
+    return out
+end
+
+-- Free items in play by item type, built the first time a mood asks.
+local free_index = nil
+
+local function free_candidates(item_type)
+    if not free_index then
+        free_index = {all = {}}
+        for _, it in ipairs(df.global.world.items.other.IN_PLAY) do
+            local f = it.flags
+            if not (f.forbid or f.in_job or f.trader or f.removed or f.construction or f.in_building
+                or f.owned or f.garbage_collect or f.dump or f.artifact) then
+                local t = it:getType()
+                local list = free_index[t]
+                if not list then
+                    list = {}
+                    free_index[t] = list
+                end
+                list[#list + 1] = it
+                free_index.all[#free_index.all + 1] = it
+            end
+        end
+    end
+    if item_type >= 0 then return free_index[item_type] or {} end
+    return free_index.all
+end
+
+-- How much of a requirement the fortress could still hand over: items nobody
+-- holds, claims or has forbidden, in the same units as `need`.
+local function free_count(e, div)
+    local n = 0
+    for _, it in ipairs(free_candidates(e.item_type)) do
+        local itype, isub = it:getType(), it:getSubtype()
+        if (e.item_subtype < 0 or isub == e.item_subtype)
+            and dfhack.job.isSuitableItem(e, itype, isub)
+            and dfhack.job.isSuitableMaterial(e, it:getMaterial(), it:getMaterialIndex(), itype)
+            and not dfhack.items.getHolderUnit(it) then
+            if div > 1 then
+                n = n + math.floor((try(function() return it:getTotalDimension() end) or 0) / div)
+            else
+                n = n + (try(function() return it:getStackSize() end) or 1)
+            end
+        end
+    end
+    return n
+end
+
+-- [label, need, have] for every requirement of a job.
+local function job_need_rows(job)
+    local out = arr{}
+    for _, n in ipairs(job_needs(job)) do
+        out[#out + 1] = row(job_item_label(n.e, n.need), n.need, n.have)
+    end
+    return out
+end
+
+local function job_state(job)
+    local f = job.flags
+    if f.working then return 'working' end
+    if f.bringing then return 'bringing' end
+    if f.fetching then return 'fetching' end
+    if f.item_lost then return 'item_lost' end
+    return nil
+end
+
+local STRANGE_MOODS = {Fey = true, Secretive = true, Possessed = true, Macabre = true, Fell = true}
+
+local function is_mood_job(job)
+    return try(function()
+        return df.job_type_class[df.job_type.attrs[job.job_type].type] == 'StrangeMood'
+    end) == true
+end
+
+-- What a dwarf in a strange mood is making and still lacks. The demands only
+-- exist once they have claimed a workshop; `free` is counted for the ones
+-- still short.
+local function unit_strange_mood_inner(u, mood)
+    local job = u.job.current_job
+    local mood_job = job and is_mood_job(job)
+    local holder = mood_job and try(dfhack.job.getHolder, job) or nil
+    local needs = arr{}
+    if mood_job then
+        for _, n in ipairs(job_needs(job)) do
+            needs[#needs + 1] = {
+                label = job_item_label(n.e, n.need),
+                item_type = enum_name(df.item_type, n.e.item_type),
+                need = n.need,
+                have = n.have,
+                free = n.have < n.need and try(free_count, n.e, n.div) or nil,
+            }
+        end
+    end
+    local skill = try(function() return u.job.mood_skill end)
+    return {
+        type = mood,
+        skill = (skill and skill >= 0) and enum_name(df.job_skill, skill) or nil,
+        timeout = try(function() return u.job.mood_timeout end),
+        job_id = mood_job and job.id or nil,
+        job = mood_job and enum_name(df.job_type, job.job_type) or nil,
+        building_id = holder and holder.id or nil,
+        working = mood_job and job.flags.working or nil,
+        needs = needs,
+    }
+end
+
+local function unit_strange_mood(u, mood)
+    if not STRANGE_MOODS[mood] then return nil end
+    local ok, res = pcall(unit_strange_mood_inner, u, mood)
+    if ok then return res end
+    return {type = mood, needs = arr{}, error = tostring(res)}
+end
+
 local function unit_row(u)
     local x, y, z = dfhack.units.getPosition(u)
     local soul = u.status.current_soul
@@ -1259,6 +1516,10 @@ local function unit_row(u)
     local caste_id = try(function() return craw.caste[u.caste].caste_id end)
     local visible_name = dfhack.units.getVisibleName(u)
     local traits, values, thoughts = unit_mind(u)
+    -- Babies carry the mood "Baby" while they are being carried around; it
+    -- is not a mood anyone would remark on.
+    local mood = u.mood >= 0 and enum_name(df.mood_type, u.mood) or nil
+    if mood == 'Baby' then mood = nil end
     return row(
         u.id,
         translate(visible_name, false),
@@ -1283,7 +1544,7 @@ local function unit_row(u)
         try(function() return u.counters2.hunger_timer end) or 0,
         try(function() return u.counters2.thirst_timer end) or 0,
         try(function() return u.counters2.sleepiness_timer end) or 0,
-        u.mood >= 0 and enum_name(df.mood_type, u.mood) or nil,
+        mood,
         unit_flags(u),
         unit_skills(u),
         unit_inventory(u),
@@ -1294,7 +1555,8 @@ local function unit_row(u)
         caste_id,
         unit_look(u, craw),
         traits, values, thoughts,
-        unit_sheet(u, craw)
+        unit_sheet(u, craw),
+        unit_strange_mood(u, mood)
     )
 end
 
@@ -1306,8 +1568,18 @@ local ITEM_COLUMNS = arr{
     'id', 'type', 'subtype', 'description', 'material', 'stack', 'quality',
     'wear', 'x', 'y', 'z', 'flags', 'container_id', 'holder_unit_id',
     'holder_building_id', 'value', 'subtype_id', 'mat_class', 'color',
-    'race_id', 'caste_id', 'plant_id', 'corpse_flags',
+    'race_id', 'caste_id', 'plant_id', 'corpse_flags', 'maker_hf', 'owner_id',
+    'artifact_id',
 }
+
+-- Filled before the items are read: item id -> artifact record id, and the
+-- historical figures items and artifacts name, for the figures table.
+local artifact_by_item = {}
+local wanted_figures = {}
+
+local function want_figure(hfid)
+    if hfid ~= nil and hfid >= 0 then wanted_figures[hfid] = true end
+end
 
 -- Corpses, body parts, remains, fish, vermin, eggs and pets carry the
 -- creature they came from; the graphics for them are the creature's.
@@ -1389,12 +1661,19 @@ local function item_row(it)
     local material = ''
     local mi = try(dfhack.matinfo.decode, it)
     if mi then material = try(function() return mi:toString() end) or '' end
-    local color = mi and color_token(try(function() return mi.material.state_color.Solid end)) or nil
+    local color = try(item_dye_color, it)
+        or (mi and color_token(try(function() return mi.material.state_color.Solid end)))
+        or nil
     local plant_id = mi and try(function() return mi.plant.id end) or nil
     local race_id, caste_id = item_creature(it)
     local container = try(dfhack.items.getContainer, it)
     local holder_unit = try(dfhack.items.getHolderUnit, it)
     local holder_building = try(dfhack.items.getHolderBuilding, it)
+    -- Only crafted items record who made them.
+    local maker = try(function() return it.maker end)
+    if maker ~= nil and maker < 0 then maker = nil end
+    want_figure(maker)
+    local owner = it.flags.owned and try(dfhack.items.getOwner, it) or nil
     return row(
         it.id,
         enum_name(df.item_type, itype),
@@ -1416,8 +1695,86 @@ local function item_row(it)
         race_id,
         caste_id,
         plant_id,
-        item_corpse_flags(it)
+        item_corpse_flags(it),
+        maker,
+        owner and owner.id or nil,
+        artifact_by_item[it.id]
     )
+end
+
+-- ---------------------------------------------------------------------------
+-- Artifacts: the records behind artifact items, for those on the map and for
+-- those made, held or owned by the fortress's own people.
+-- ---------------------------------------------------------------------------
+
+local ARTIFACT_COLUMNS = arr{
+    'id', 'item_id', 'name', 'name_english', 'description', 'type', 'maker_hf',
+    'holder_hf', 'owner_hf', 'year', 'tick', 'site_id', 'on_map', 'value',
+}
+
+local function nonneg(v)
+    if v == nil or v < 0 then return nil end
+    return v
+end
+
+local function collect_artifacts(fort_hfs)
+    local rows = {}
+    for _, a in ipairs(df.global.world.artifacts.all) do
+        local it = a.item
+        if it then
+            artifact_by_item[it.id] = a.id
+            local maker = nonneg(try(function() return it.maker end))
+            local holder, owner = nonneg(a.holder_hf), nonneg(a.owner_hf)
+            local on_map = try(dfhack.items.getPosition, it) ~= nil
+            local ours = (maker and fort_hfs[maker]) or (holder and fort_hfs[holder])
+                or (owner and fort_hfs[owner])
+            if on_map or ours then
+                want_figure(maker)
+                want_figure(holder)
+                want_figure(owner)
+                rows[#rows + 1] = row(
+                    a.id,
+                    it.id,
+                    nonempty(translate(a.name, false)),
+                    nonempty(translate(a.name, true)),
+                    try(dfhack.items.getReadableDescription, it) or '',
+                    enum_name(df.item_type, it:getType()),
+                    maker, holder, owner,
+                    nonneg(a.year), nonneg(a.season_tick),
+                    nonneg(a.site),
+                    on_map,
+                    try(dfhack.items.getValue, it) or 0
+                )
+            end
+        end
+    end
+    return rows
+end
+
+-- ---------------------------------------------------------------------------
+-- Figures: the historical figures items and artifacts name (makers, holders,
+-- owners), so the app can name a maker who is not on the map.
+-- ---------------------------------------------------------------------------
+
+local FIGURE_COLUMNS = arr{'hf', 'name', 'name_english', 'race', 'unit_id', 'alive'}
+
+local function collect_figures()
+    local rows = {}
+    for hfid in pairs(wanted_figures) do
+        local hf = hf_find(hfid)
+        if hf then
+            rows[#rows + 1] = row(
+                hfid,
+                nonempty(translate(hf.name, false)),
+                nonempty(translate(hf.name, true)),
+                race_label(hf.race),
+                nonneg(hf.unit_id),
+                hf.died_year == -1
+            )
+        end
+    end
+    table.sort(rows, function(a, b) return a[1] < b[1] end)
+    return rows
 end
 
 -- ---------------------------------------------------------------------------
@@ -1496,7 +1853,7 @@ end
 
 local JOB_COLUMNS = arr{
     'id', 'type', 'name', 'x', 'y', 'z', 'suspended', 'repeat', 'worker_id',
-    'building_id', 'order_id', 'items',
+    'building_id', 'order_id', 'items', 'needs', 'state',
 }
 
 local function job_row(job)
@@ -1512,8 +1869,170 @@ local function job_row(job)
         worker and worker.id or nil,
         holder and holder.id or nil,
         try(function() return job.order_id end) or -1,
-        #job.items
+        #job.items,
+        try(job_need_rows, job) or arr{},
+        try(job_state, job)
     )
+end
+
+-- ---------------------------------------------------------------------------
+-- Manager work orders
+-- ---------------------------------------------------------------------------
+
+local ORDER_COLUMNS = arr{
+    'id', 'job', 'label', 'detail', 'amount_left', 'amount_total', 'frequency',
+    'validated', 'active', 'workshop_id', 'max_workshops', 'conditions', 'finished',
+}
+
+local COMPARE_WORDS = {
+    AtLeast = 'at least', AtMost = 'at most', GreaterThan = 'more than',
+    LessThan = 'fewer than', Exactly = 'exactly', Not = 'not',
+}
+
+local reaction_names = nil
+
+local function reaction_name(code)
+    if not reaction_names then
+        reaction_names = {}
+        for _, r in ipairs(df.global.world.raws.reactions.reactions) do
+            reaction_names[r.code] = r.name
+        end
+    end
+    return nonempty(reaction_names[code])
+end
+
+local function bitfield_names(bits)
+    local out = {}
+    pcall(function()
+        for name, set in pairs(bits) do
+            if set == true and type(name) == 'string' and not name:match('^%d') then out[#out + 1] = name end
+        end
+    end)
+    table.sort(out)
+    return out
+end
+
+local function order_detail(o)
+    local words = {}
+    if o.mat_type >= 0 then
+        words[#words + 1] = mat_label(o.mat_type, o.mat_index)
+    else
+        for _, name in ipairs(bitfield_names(o.material_category)) do words[#words + 1] = name end
+    end
+    if o.item_subtype >= 0 then
+        -- Orders like Make Tool leave the item type to the job.
+        local itype = o.item_type >= 0 and o.item_type
+            or try(function() return df.job_type.attrs[o.job_type].item end)
+        local name = itype and itype >= 0 and item_type_label(itype, o.item_subtype, false)
+        if name then words[#words + 1] = name end
+    end
+    if #words == 0 then return nil end
+    return table.concat(words, ' ')
+end
+
+-- "fewer than 10 barrels", "after order 12 is completed".
+local function order_conditions(o)
+    local out = arr{}
+    for _, c in ipairs(o.item_conditions) do
+        local cmp = COMPARE_WORDS[enum_name(df.logic_condition_type, c.compare_type)]
+        local text = try(job_item_label, c, c.compare_val)
+        if cmp and text then out[#out + 1] = cmp .. ' ' .. c.compare_val .. ' ' .. text end
+    end
+    for _, c in ipairs(o.order_conditions) do
+        local state = try(function() return enum_name(df.manager_order_condition_order.T_condition, c.condition) end)
+        out[#out + 1] = 'after order ' .. c.order_id .. ' is ' .. (state or 'done'):lower()
+    end
+    return out
+end
+
+local function order_row(o)
+    local job = enum_name(df.job_type, o.job_type)
+    local label = (o.reaction_name ~= '' and reaction_name(o.reaction_name))
+        or try(function() return df.job_type.attrs[o.job_type].caption end)
+        or job
+    return row(
+        o.id,
+        job,
+        label,
+        try(order_detail, o),
+        o.amount_left,
+        o.amount_total,
+        enum_name(df.workquota_frequency_type, o.frequency),
+        o.status.validated == true,
+        o.status.active == true,
+        nonneg(o.workshop_id),
+        o.max_workshops,
+        try(order_conditions, o) or arr{},
+        o.finished_year >= 0 and arr{o.finished_year, o.finished_year_tick} or nil
+    )
+end
+
+-- ---------------------------------------------------------------------------
+-- Squads: the fortress's own, with their members, orders and alert routine.
+-- ---------------------------------------------------------------------------
+
+local SQUAD_COLUMNS = arr{'id', 'name', 'alias', 'routine', 'orders', 'positions', 'members'}
+
+local SQUAD_ORDER_WORDS = {
+    MOVE = 'Station', KILL_LIST = 'Kill', DEFEND_BURROWS = 'Defend burrows',
+    PATROL_ROUTE = 'Patrol', TRAIN = 'Train', DRIVE_ENTITY_OFF_SITE = 'Drive off a group',
+    CAUSE_TROUBLE_FOR_ENTITY = 'Cause trouble', KILL_HF = 'Kill someone',
+    DRIVE_ARMIES_FROM_SITE = 'Drive armies away', RETRIEVE_ARTIFACT = 'Retrieve an artifact',
+    RAID_SITE = 'Raid', RESCUE_HF = 'Rescue someone',
+}
+
+local function squad_order_words(list)
+    local out = arr{}
+    for _, o in ipairs(list) do
+        local kind = enum_name(df.squad_order_type, try(function() return o:getType() end))
+        local text = try(function() return utils.call_with_string(o, 'getDescription') end)
+        out[#out + 1] = nonempty(text) or SQUAD_ORDER_WORDS[kind] or kind
+    end
+    return out
+end
+
+local function routine_name(idx)
+    if idx == nil or idx < 0 then return nil end
+    local r = try(function() return df.global.plotinfo.alerts.routines[idx] end)
+    return r and nonempty(r.name) or nil
+end
+
+local function squad_row(sq)
+    local members = arr{}
+    for i, p in ipairs(sq.positions) do
+        if p.occupant >= 0 then
+            local hf = hf_find(p.occupant)
+            members[#members + 1] = {
+                position = i,
+                leader = i == sq.leader_position or nil,
+                hf = p.occupant,
+                unit = hf and nonneg(hf.unit_id) or nil,
+                name = hf and nonempty(translate(hf.name, false)) or nil,
+                uniform = nonempty(try(function() return p.equipment.nickname end)),
+                assigned_items = try(function() return #p.equipment.assigned_items end) or 0,
+                orders = try(squad_order_words, p.orders) or arr{},
+            }
+        end
+    end
+    local name = translate(sq.name, true)
+    return row(
+        sq.id,
+        nonempty(name),
+        nonempty(sq.alias),
+        routine_name(sq.cur_routine_idx),
+        try(squad_order_words, sq.orders) or arr{},
+        #sq.positions,
+        members
+    )
+end
+
+local function collect_squads()
+    local rows = {}
+    local gid = df.global.plotinfo.group_id
+    for _, sq in ipairs(df.global.world.squads.all) do
+        if sq.entity_id == gid then rows[#rows + 1] = squad_row(sq) end
+    end
+    return rows
 end
 
 -- ---------------------------------------------------------------------------
@@ -1601,6 +2120,87 @@ local function count_stock(key)
     return n
 end
 
+local function goods_label(item_type, subtype, mat_type, mat_index, n)
+    local noun = item_type_label(item_type, subtype, n ~= 1) or '?'
+    local mat = (mat_type ~= nil and mat_type >= 0) and mat_label(mat_type, mat_index) or nil
+    return mat and (mat .. ' ' .. noun) or noun
+end
+
+-- Production mandates and export bans. The timeout counts up to its limit;
+-- DFHack warns once fewer than 2500 remain, about a month.
+local function collect_mandates()
+    local out = arr{}
+    for _, m in ipairs(df.global.world.mandates.all) do
+        local u = m.unit
+        out[#out + 1] = {
+            kind = enum_name(df.mandate_type, m.mode),
+            unit_id = u and u.id or nil,
+            noble = u and dfhack.units.getReadableName(u) or nil,
+            position = u and unit_positions(u)[1] or nil,
+            item = goods_label(m.item_type, m.item_subtype, m.mat_type, m.mat_index, m.amount_total),
+            amount_total = m.amount_total,
+            amount_remaining = m.amount_remaining,
+            timeout_counter = m.timeout_counter,
+            timeout_limit = m.timeout_limit,
+            hammerstrikes = try(function() return m.punishment.hammerstrikes end),
+            prison_time = try(function() return m.punishment.prison_time end),
+        }
+    end
+    return out
+end
+
+-- Rooms (and the furniture in them) nobles have demanded.
+local function collect_demands()
+    local out = arr{}
+    local place_enum = try(function() return df.unit_demand._fields.place.type end)
+    for _, u in ipairs(df.global.world.units.active) do
+        local list = try(function() return u.status.demands end)
+        if list and #list > 0 and dfhack.units.isCitizen(u, true) then
+            for _, d in ipairs(list) do
+                out[#out + 1] = {
+                    unit_id = u.id,
+                    name = dfhack.units.getReadableName(u),
+                    position = unit_positions(u)[1],
+                    place = place_enum and enum_name(place_enum, d.place) or tostring(d.place),
+                    item = d.item_type >= 0
+                        and goods_label(d.item_type, d.item_subtype, d.mat_type, d.mat_index, 1) or nil,
+                    timeout_counter = d.timeout_counter,
+                    timeout_limit = d.timeout_limit,
+                }
+            end
+        end
+    end
+    return out
+end
+
+local CARAVAN_TROUBLE = {'casualty', 'hardship', 'seized', 'offended'}
+
+-- Caravans on their way, at the depot or leaving. time_remaining / 120 is in
+-- days, as DFHack's caravan command counts it.
+local function collect_caravans()
+    local out = arr{}
+    for i, car in ipairs(df.global.plotinfo.caravans) do
+        local ent = df.historical_entity.find(car.entity)
+        local craw = ent and df.creature_raw.find(ent.race)
+        local trouble = arr{}
+        for _, flag in ipairs(CARAVAN_TROUBLE) do
+            if try(function() return car.flags[flag] end) == true then trouble[#trouble + 1] = flag end
+        end
+        out[#out + 1] = {
+            index = i,
+            entity_id = car.entity,
+            civ = ent and nonempty(translate(ent.name, true)) or nil,
+            civ_native = ent and nonempty(translate(ent.name, false)) or nil,
+            race = craw and try(function() return craw.name[2] end) or nil,
+            own_civ = car.entity == df.global.plotinfo.civ_id,
+            state = enum_name(df.caravan_state.T_trade_state, car.trade_state),
+            time_remaining = car.time_remaining,
+            trouble = trouble,
+        }
+    end
+    return out
+end
+
 local function parse_cancellation(text)
     -- "Urist McDwarf, Mason cancels Construct rock Door: Needs 1 rock." -> task, reason
     local task, reason = text:match('cancels ([^:]+): (.+)$')
@@ -1654,6 +2254,10 @@ local function collect_summary(units_rows, item_count, building_count, announcem
         local n = count_stock(entry[3])
         s.stocks[#s.stocks + 1] = {key = entry[1], label = entry[2], count = n}
     end
+
+    s.mandates = try(collect_mandates) or arr{}
+    s.demands = try(collect_demands) or arr{}
+    s.caravans = try(collect_caravans) or arr{}
 
     s.wealth = try(function()
         local w = df.global.plotinfo.tasks.wealth
@@ -1713,7 +2317,10 @@ local function collect_summary(units_rows, item_count, building_count, announcem
     end
     local moods = 0
     for _, u in ipairs(df.global.world.units.active) do
-        if dfhack.units.isCitizen(u, true) and u.mood >= 0 then moods = moods + 1 end
+        if dfhack.units.isCitizen(u, true) and u.mood >= 0
+            and STRANGE_MOODS[enum_name(df.mood_type, u.mood)] then
+            moods = moods + 1
+        end
     end
     if moods > 0 then
         alert('mood', 'Strange mood', moods .. ' dwarf(s) are in a strange mood.', moods, 'info')
@@ -1729,15 +2336,91 @@ end
 -- light, subterranean, outside, liquid_type, traffic.
 local FLAG_MASK = 0x0321C3FF
 
+local function vein_priority(ev)
+    local fl = ev.flags
+    if fl.cluster then return 1 end
+    if fl.vein then return 2 end
+    if fl.cluster_small then return 3 end
+    if fl.cluster_one then return 4 end
+    return 5
+end
+
+-- Which inorganic each tile of a block is a vein of, keyed x * 16 + y, by the
+-- rule DFHack's tile-material.lua follows: the smaller kind of vein wins over
+-- the larger, and of two alike the later one. Nil when the block has none.
+local function block_veins(block)
+    local mats, prio = nil, nil
+    for _, ev in ipairs(block.block_events) do
+        if getmetatable(ev) == 'block_square_event_mineralst' then
+            mats = mats or {}
+            prio = prio or {}
+            local p = vein_priority(ev)
+            local mat = ev.inorganic_mat
+            local bits = ev.tile_bitmask.bits
+            for y = 0, 15 do
+                local r = bits[y]
+                if r ~= 0 then
+                    for x = 0, 15 do
+                        if r & (1 << x) ~= 0 then
+                            local k = x * 16 + y
+                            if not prio[k] or p >= prio[k] then
+                                mats[k] = mat
+                                prio[k] = p
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return mats
+end
+
+local function color_hex(idx)
+    local c = idx and idx >= 0 and try(function() return df.global.world.raws.descriptors.colors[idx] end)
+    if not c then return nil end
+    local function byte(v) return math.max(0, math.min(255, math.floor((tonumber(v) or 0) * 255 + 0.5))) end
+    return string.format('#%02x%02x%02x', byte(c.red), byte(c.green), byte(c.blue))
+end
+
+-- id, name, ore / gem / mineral, the metals it smelts into, and its colour.
+local function mineral_entry(idx)
+    local raw = try(function() return df.global.world.raws.inorganics.all[idx] end)
+    if not raw then return nil end
+    local metals = arr{}
+    local ores = try(function() return raw.metal_ore.mat_index end)
+    if ores then
+        for _, m in ipairs(ores) do
+            local metal = try(function() return df.global.world.raws.inorganics.all[m].material.state_name.Solid end)
+            if metal then metals[#metals + 1] = metal end
+        end
+    end
+    local kind = 'mineral'
+    if try(function() return raw.material.flags.IS_GEM end) == true then kind = 'gem'
+    elseif #metals > 0 then kind = 'ore' end
+    return {
+        id = tostring(raw.id),
+        name = clean_name(try(function() return raw.material.state_name.Solid end) or raw.id),
+        kind = kind,
+        metals = metals,
+        color = color_hex(try(function() return raw.material.state_color.Solid end)),
+    }
+end
+
 local function write_map(f)
     local map = df.global.world.map
     local seen = {}
+    local minerals = {}
+    local mineral_tt = {}
+    local MINERAL = df.tiletype_material.MINERAL
     f:write(string.format('{"x_count":%d,"y_count":%d,"z_count":%d,"blocks":[', map.x_count, map.y_count, map.z_count))
     local first = true
     for _, block in ipairs(map.map_blocks) do
         local tt, des = block.tiletype, block.designation
         local tiles, flags = {}, {}
         local tv, tn, fv, fn = nil, 0, nil, 0
+        local veins = block_veins(block)
+        local vtiles, vv, vn, any_vein = {}, nil, 0, false
         for x = 0, 15 do
             local col, dcol = tt[x], des[x]
             for y = 0, 15 do
@@ -1754,17 +2437,55 @@ local function write_map(f)
                     if fv ~= nil then flags[#flags + 1] = fv; flags[#flags + 1] = fn end
                     fv, fn = w, 1
                 end
+                if veins then
+                    -- Only tiles still of the vein's stone: caverns and
+                    -- digging leave mask bits over other ground.
+                    local m = -1
+                    local is_mineral = mineral_tt[t]
+                    if is_mineral == nil then
+                        is_mineral = df.tiletype.attrs[t].material == MINERAL
+                        mineral_tt[t] = is_mineral
+                    end
+                    if is_mineral then
+                        local vm = veins[x * 16 + y]
+                        if vm then
+                            m = vm
+                            any_vein = true
+                            minerals[vm] = true
+                        end
+                    end
+                    if m == vv then vn = vn + 1
+                    else
+                        if vv ~= nil then vtiles[#vtiles + 1] = vv; vtiles[#vtiles + 1] = vn end
+                        vv, vn = m, 1
+                    end
+                end
             end
         end
         tiles[#tiles + 1] = tv; tiles[#tiles + 1] = tn
         flags[#flags + 1] = fv; flags[#flags + 1] = fn
+        local vein_part = ''
+        if any_vein then
+            vtiles[#vtiles + 1] = vv; vtiles[#vtiles + 1] = vn
+            vein_part = ',[' .. table.concat(vtiles, ',') .. ']'
+        end
         local pos = block.map_pos
         f:write(first and '' or ',')
         first = false
-        f:write(string.format('[%d,%d,%d,[%s],[%s]]', pos.z, pos.x // 16, pos.y // 16,
-            table.concat(tiles, ','), table.concat(flags, ',')))
+        f:write(string.format('[%d,%d,%d,[%s],[%s]%s]', pos.z, pos.x // 16, pos.y // 16,
+            table.concat(tiles, ','), table.concat(flags, ','), vein_part))
     end
-    f:write('],"tiletypes":{')
+    f:write('],"minerals":{')
+    local first_m = true
+    for idx in pairs(minerals) do
+        local entry = mineral_entry(idx)
+        if entry then
+            f:write(first_m and '' or ',')
+            first_m = false
+            f:write(jstr(tostring(idx)) .. ':' .. jval(entry))
+        end
+    end
+    f:write('},"tiletypes":{')
     local first_tt = true
     for id in pairs(seen) do
         local attrs = df.tiletype.attrs[id]
@@ -1797,17 +2518,24 @@ local function run()
 
     progress('units')
     local unit_rows = {}
+    -- The fortress's own people, living or dead, by historical figure.
+    local fort_hfs = {}
     for _, u in ipairs(df.global.world.units.active) do
         unit_rows[#unit_rows + 1] = unit_row(u)
+        if u.hist_figure_id >= 0 and (try(dfhack.units.isOwnCiv, u) or try(dfhack.units.isCitizen, u, true)) then
+            fort_hfs[u.hist_figure_id] = true
+        end
     end
 
     progress('items')
+    local artifact_rows = try(collect_artifacts, fort_hfs) or {}
     local item_rows = {}
     for _, it in ipairs(df.global.world.items.all) do
         if not it.flags.garbage_collect then
             item_rows[#item_rows + 1] = item_row(it)
         end
     end
+    local figure_rows = try(collect_figures) or {}
 
     progress('buildings')
     local building_rows = {}
@@ -1820,6 +2548,12 @@ local function run()
     for _, job in utils.listpairs(df.global.world.jobs.list) do
         job_rows[#job_rows + 1] = job_row(job)
     end
+    local order_rows = {}
+    for _, o in ipairs(df.global.world.manager_orders.all) do
+        local ok, r = pcall(order_row, o)
+        if ok then order_rows[#order_rows + 1] = r end
+    end
+    local squad_rows = try(collect_squads) or {}
 
     progress('announcements')
     local announcement_rows = collect_announcements(400)
@@ -1835,6 +2569,10 @@ local function run()
     f:write(',"items":'); write_table(f, ITEM_COLUMNS, item_rows)
     f:write(',"buildings":'); write_table(f, BUILDING_COLUMNS, building_rows)
     f:write(',"jobs":'); write_table(f, JOB_COLUMNS, job_rows)
+    f:write(',"orders":'); write_table(f, ORDER_COLUMNS, order_rows)
+    f:write(',"squads":'); write_table(f, SQUAD_COLUMNS, squad_rows)
+    f:write(',"artifacts":'); write_table(f, ARTIFACT_COLUMNS, artifact_rows)
+    f:write(',"figures":'); write_table(f, FIGURE_COLUMNS, figure_rows)
     f:write(',"announcements":'); write_table(f, ANNOUNCEMENT_COLUMNS, announcement_rows)
     if with_map then
         progress('map')

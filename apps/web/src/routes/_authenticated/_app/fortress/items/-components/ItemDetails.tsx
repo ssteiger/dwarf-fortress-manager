@@ -17,6 +17,7 @@ import type { ReactNode } from 'react'
 import { ItemSprite } from '~/lib/df-assets/components'
 import { formatValue, humanize, splitPascal, unitDisplayName } from '~/lib/fortress/format'
 import { useFortItem } from '~/lib/fortress/queries'
+import type { ItemPerson } from '~/lib/fortress/server'
 import { type ItemHint, itemHints } from '~/lib/fortress/stores'
 import { EmptyState, StatCard } from '../../-components/FortChrome'
 
@@ -127,6 +128,28 @@ export function ItemStatusBadges({
         </Badge>
       ) : null}
     </>
+  )
+}
+
+/** A unit on the map links to their page; anyone else is named, with their race and fate. */
+function PersonLink({ person }: { person: ItemPerson | null }) {
+  if (!person) return null
+  if (person.unit)
+    return (
+      <Link
+        to="/fortress/dwarves/$id"
+        params={{ id: String(person.unit.id) }}
+        className="text-primary underline-offset-4 hover:underline"
+      >
+        {unitDisplayName(person.unit)}
+      </Link>
+    )
+  const about = [person.race, person.alive === false ? 'dead' : null].filter(Boolean).join(', ')
+  return (
+    <span>
+      {person.name ?? 'someone unnamed'}
+      {about ? <span className="text-muted-foreground"> ({about})</span> : null}
+    </span>
   )
 }
 
@@ -261,6 +284,22 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
                     ? item.corpse_flags.map((flag) => humanize(flag)).join(', ')
                     : null,
                 },
+                {
+                  label: 'Made by',
+                  value: data?.maker ? <PersonLink person={data.maker} /> : null,
+                },
+                {
+                  label: 'Owned by',
+                  value: data?.owner ? (
+                    <Link
+                      to="/fortress/dwarves/$id"
+                      params={{ id: String(data.owner.id) }}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {unitDisplayName(data.owner)}
+                    </Link>
+                  ) : null,
+                },
               ]}
             />
             {otherFlags.length ? (
@@ -274,6 +313,49 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
             ) : null}
           </CardContent>
         </Card>
+
+        {data?.artifact ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">
+                {data.artifact.name ?? 'An unnamed artifact'}
+                {data.artifact.name_english && data.artifact.name_english !== data.artifact.name ? (
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {data.artifact.name_english}
+                  </span>
+                ) : null}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Facts
+                items={[
+                  {
+                    label: 'Made by',
+                    value: data.maker ? <PersonLink person={data.maker} /> : null,
+                  },
+                  {
+                    label: 'Made in',
+                    value: data.artifact.year !== null ? `the year ${data.artifact.year}` : null,
+                  },
+                  {
+                    label: 'Held by',
+                    value: data.artifact.holder ? (
+                      <PersonLink person={data.artifact.holder} />
+                    ) : null,
+                  },
+                  {
+                    label: 'Claimed by',
+                    value: data.artifact.owner ? <PersonLink person={data.artifact.owner} /> : null,
+                  },
+                  {
+                    label: 'Where',
+                    value: data.artifact.on_map ? 'in the fortress' : 'elsewhere in the world',
+                  },
+                ]}
+              />
+            </CardContent>
+          </Card>
+        ) : null}
 
         {data?.holder || data?.building || data?.container ? (
           <Card>

@@ -55,7 +55,7 @@ import {
 import { ConcernBadges } from '../-components/Insights'
 import { ShowInGameButton } from './-components/ActionsTab'
 import { DwarfDetails, type DwarfTab } from './-components/DwarfDetails'
-import { Bonds, HelpList, SkillCoverage, WorkGroups } from './-components/PeoplePanels'
+import { Bonds, HelpList, SkillCoverage, Squads, WorkGroups } from './-components/PeoplePanels'
 import {
   UnitLinks,
   legendsRefFor,
@@ -391,6 +391,7 @@ function DwarvesPage() {
               onOpen={setSelected}
             />
           </div>
+          <Squads squads={people.data?.squads ?? []} units={units} onOpen={setSelected} />
           <Bonds
             citizens={citizens}
             bonds={people.data?.bonds ?? []}

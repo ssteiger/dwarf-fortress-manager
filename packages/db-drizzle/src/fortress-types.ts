@@ -128,6 +128,61 @@ export interface FortAlert {
 	severity: "info" | "warning" | "danger";
 }
 
+/**
+ * A noble's mandate: a production order ("Make"), an export ban ("Export")
+ * or a guild's demand. The timeout counts up to its limit; DFHack warns once
+ * fewer than MANDATE_WARN_LEFT remain, about a month.
+ */
+export interface FortMandate {
+	/** mandate_type: Make, Export or Guild. */
+	kind: string;
+	unit_id: number | null;
+	noble: string | null;
+	/** The noble's office, e.g. "mayor". */
+	position: string | null;
+	/** "quivers", "steel bars". */
+	item: string;
+	amount_total: number;
+	amount_remaining: number;
+	timeout_counter: number;
+	timeout_limit: number;
+	hammerstrikes: number | null;
+	prison_time: number | null;
+}
+
+export const MANDATE_WARN_LEFT = 2500;
+
+/** A room a noble has demanded, by the game's demand_room (Office, Bedroom, DiningRoom, Tomb). */
+export interface FortDemand {
+	unit_id: number;
+	name: string;
+	position: string | null;
+	place: string;
+	item: string | null;
+	timeout_counter: number;
+	timeout_limit: number;
+}
+
+/** A caravan on its way, at the depot or leaving. */
+export interface FortCaravan {
+	index: number;
+	entity_id: number;
+	civ: string | null;
+	civ_native: string | null;
+	/** Race adjective, e.g. "dwarven", "human". */
+	race: string | null;
+	/** The caravan comes from the fortress's own civilization. */
+	own_civ: boolean;
+	/** caravan_state trade_state: None, Approaching, AtDepot, Leaving or Stuck. */
+	state: string;
+	/** Divide by CARAVAN_TICKS_PER_DAY for days, as DFHack's caravan command does. */
+	time_remaining: number;
+	/** casualty, hardship, seized, offended. */
+	trouble: string[];
+}
+
+export const CARAVAN_TICKS_PER_DAY = 120;
+
 export interface FortSummary {
 	adults: number;
 	children: number;
@@ -160,6 +215,10 @@ export interface FortSummary {
 	} | null;
 	items_total: number;
 	buildings_total: number;
+	/** Absent in dumps older than version 9. */
+	mandates?: FortMandate[];
+	demands?: FortDemand[];
+	caravans?: FortCaravan[];
 }
 
 /**
@@ -234,6 +293,12 @@ export interface GeneratedLook {
 export interface UnitLook {
 	/** Top of the profession tree: MINER, FARMER, STANDARD, CHILD, ... */
 	profession_category: string | null;
+	/**
+	 * True while the game colours clothing by profession, i.e. with
+	 * DISPLAY_CLOTHING_WITH_DYES_IN_FORT_MODE:NO; otherwise clothes show their
+	 * dye or material. Absent in dumps older than version 10.
+	 */
+	profession_colors?: boolean | null;
 	/** SYN_CLASS tokens of active syndromes (ZOMBIE, VAMPCURSE, NECROMANCER, ...). */
 	syn_classes: string[];
 	haul_count: number;
@@ -349,6 +414,38 @@ export interface UnitSheet {
 	error?: string;
 }
 
+/** One demand of a strange mood, as `showmood` lists it. */
+export interface StrangeMoodNeed {
+	/** "silk cloth", "rough gem", "leather", "bones". */
+	label: string;
+	/** item_type token, e.g. CLOTH; NONE for body parts. */
+	item_type: string;
+	/** In whole items: three cloth, not 30000. */
+	need: number;
+	have: number;
+	/** Matching items nobody holds, claims or has forbidden; only for demands still short. */
+	free?: number;
+}
+
+/** What a dwarf in a strange mood (Fey, Secretive, Possessed, Macabre, Fell) is after. */
+export interface StrangeMood {
+	type: string;
+	/** job_skill token of the artifact they will make, e.g. CLOTHESMAKING. */
+	skill: string | null;
+	/** unit.job.mood_timeout as the game holds it. */
+	timeout: number | null;
+	job_id: number | null;
+	/** StrangeMoodCrafter, StrangeMoodWeaver, ... */
+	job: string | null;
+	/** The workshop they claimed; null until they have one. */
+	building_id: number | null;
+	/** True once they have everything and started work. */
+	working?: boolean | null;
+	/** Empty until a workshop is claimed: the demands come with it. */
+	needs: StrangeMoodNeed[];
+	error?: string;
+}
+
 export interface FortUnit {
 	id: number;
 	name: string;
@@ -397,6 +494,8 @@ export interface FortUnit {
 	thoughts?: [string, string, number, number, number][] | null;
 	/** Attributes, needs, preferences, people and more. Absent in older dumps and in unit lists. */
 	sheet?: UnitSheet | null;
+	/** Set while in a strange mood. Absent in dumps older than version 9. */
+	strange_mood?: StrangeMood | null;
 }
 
 export interface FortItem {
@@ -420,7 +519,7 @@ export interface FortItem {
 	subtype_id: string | null;
 	/** METAL, STONE, WOOD, GLASS, GEM, LEATHER, BONE, SHELL, CLOTH, SOAP, PLANT; null in older dumps. */
 	mat_class: string | null;
-	/** Descriptor colour token of the material (COPPER, GRAY); null in older dumps. */
+	/** Descriptor colour token of the dye when dyed, else of the material (COPPER, GRAY); null in older dumps. */
 	color: string | null;
 	/** Creature token for corpses, body parts, remains, fish, vermin, eggs; null otherwise or in older dumps. */
 	race_id: string | null;
@@ -429,6 +528,12 @@ export interface FortItem {
 	plant_id: string | null;
 	/** Set corpse_flags of a body part (bone, skull, skin, horn, ...); null otherwise or in older dumps. */
 	corpse_flags: string[] | null;
+	/** Historical figure who made it (see the figures table); only crafted items. Absent before version 9. */
+	maker_hf?: number | null;
+	/** Unit who owns it. Absent before version 9. */
+	owner_id?: number | null;
+	/** Its artifact record (see the artifacts table). Absent before version 9. */
+	artifact_id?: number | null;
 }
 
 export interface FortBuilding {
@@ -465,6 +570,89 @@ export interface FortJob {
 	building_id: number | null;
 	order_id: number;
 	items: number;
+	/** [what, how many, how many brought] per requirement, e.g. ["iron bars", 3, 2]. Absent before version 9. */
+	needs?: [string, number, number][];
+	/** working, bringing, fetching, item_lost; null while it waits. Absent before version 9. */
+	state?: string | null;
+}
+
+/** A manager work order. */
+export interface FortOrder {
+	id: number;
+	/** job_type token. */
+	job: string;
+	/** The reaction's name or the job's caption: "brew drink from plant", "Make Barrel". */
+	label: string;
+	/** Material and item, e.g. "steel breastplate", "wood". */
+	detail: string | null;
+	amount_left: number;
+	amount_total: number;
+	/** OneTime, Daily, Monthly, Seasonally, Yearly. */
+	frequency: string;
+	/** Checked by the manager. */
+	validated: boolean;
+	/** Its conditions hold, so its jobs are queued. */
+	active: boolean;
+	workshop_id: number | null;
+	max_workshops: number;
+	/** "fewer than 10 empty barrels", "after order 12 is completed". */
+	conditions: string[];
+	/** [year, year tick] it last finished. */
+	finished: [number, number] | null;
+}
+
+export interface FortSquadMember {
+	/** Index into the squad's positions. */
+	position: number;
+	leader?: boolean | null;
+	hf: number;
+	unit: number | null;
+	name: string | null;
+	/** The uniform's name, e.g. "Melee, metal armor". */
+	uniform: string | null;
+	assigned_items: number;
+	orders: string[];
+}
+
+export interface FortSquad {
+	id: number;
+	name: string | null;
+	alias: string | null;
+	/** The alert routine it follows, e.g. "Constant training". */
+	routine: string | null;
+	orders: string[];
+	/** Positions in the squad, filled or not. */
+	positions: number;
+	members: FortSquadMember[];
+}
+
+/** An artifact on the map, or made, held or owned by the fortress's people. */
+export interface FortArtifact {
+	id: number;
+	item_id: number;
+	name: string | null;
+	name_english: string | null;
+	description: string;
+	/** item_type token. */
+	type: string;
+	maker_hf: number | null;
+	holder_hf: number | null;
+	owner_hf: number | null;
+	year: number | null;
+	tick: number | null;
+	site_id: number | null;
+	on_map: boolean;
+	value: number;
+}
+
+/** A historical figure items and artifacts name. */
+export interface FortFigure {
+	hf: number;
+	name: string | null;
+	name_english: string | null;
+	race: string | null;
+	unit_id: number | null;
+	alive: boolean;
 }
 
 export interface FortAnnouncement {
@@ -489,6 +677,11 @@ export interface FortDumpPayload {
 	items: RowTable | null;
 	buildings: RowTable | null;
 	jobs: RowTable | null;
+	/** Version 9 on. */
+	orders?: RowTable | null;
+	squads?: RowTable | null;
+	artifacts?: RowTable | null;
+	figures?: RowTable | null;
 	announcements: RowTable | null;
 	map: FortMapPayload | null;
 	error?: string;
@@ -510,6 +703,10 @@ export interface FortDumpPayload {
  *   bit  16   outside
  *   bit  21   liquid is magma (otherwise water)
  *   bits 24-25 traffic (0 normal, 1 low, 2 high, 3 restricted)
+ *
+ * `veins`, present only on blocks with ore or gem tiles, is run-length
+ * encoded the same way: the inorganic index (a key of `minerals`) each
+ * MINERAL tile is a vein of, -1 elsewhere.
  */
 export type FortMapBlock = [
 	z: number,
@@ -517,6 +714,7 @@ export type FortMapBlock = [
 	by: number,
 	tiles: number[],
 	flags: number[],
+	veins?: number[],
 ];
 
 export interface FortTiletype {
@@ -525,12 +723,26 @@ export interface FortTiletype {
 	material: string;
 }
 
+/** An inorganic that veins on the map are made of. */
+export interface FortMineral {
+	/** Raw token, e.g. NATIVE_GOLD. */
+	id: string;
+	name: string;
+	kind: "ore" | "gem" | "mineral";
+	/** What it smelts into, e.g. ["lead", "silver"]. */
+	metals: string[];
+	/** The game's colour for it, e.g. "#ffd700". */
+	color?: string | null;
+}
+
 export interface FortMapPayload {
 	x_count: number;
 	y_count: number;
 	z_count: number;
 	tiletypes: Record<string, FortTiletype>;
 	blocks: FortMapBlock[];
+	/** Inorganic index -> mineral, for the veins in `blocks`. Version 9 on. */
+	minerals?: Record<string, FortMineral>;
 }
 
 export const FORT_FLAG = {

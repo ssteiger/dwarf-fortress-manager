@@ -17,10 +17,13 @@ import type { ColumnDef } from '@tanstack/react-table'
 import {
   BackpackIcon,
   BrainIcon,
+  CheckIcon,
+  CircleAlertIcon,
   DramaIcon,
   HammerIcon,
   HandHelpingIcon,
   MapIcon,
+  SparklesIcon,
   UserIcon,
   UsersIcon,
 } from 'lucide-react'
@@ -53,6 +56,8 @@ import {
   gameTimeOf,
   isCitizenish,
   makeNameLinker,
+  moodNeedsText,
+  moodText,
   storyKind,
   unitConcerns,
   unitStory,
@@ -85,6 +90,9 @@ export const DWARF_TABS: { key: DwarfTab; label: string; Icon: typeof UserIcon }
 export function isDwarfTab(value: unknown): value is DwarfTab {
   return DWARF_TABS.some((t) => t.key === value)
 }
+
+/** The coordinate the game gives a job that has no place yet, such as a strange mood's. */
+const NO_POSITION = -30000
 
 const HUNGER_DANGER = 75_000
 const THIRST_DANGER = 50_000
@@ -317,12 +325,24 @@ function StatStrip({
     <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
       <StatCard
         title="Doing"
-        value={living ? (unit.mood ? 'Strange mood' : unit.job ? 'Working' : 'Idle') : 'Dead'}
+        value={
+          living
+            ? unit.strange_mood
+              ? 'Strange mood'
+              : unit.mood
+                ? (moodText(unit.mood)?.label ?? 'In a mood')
+                : unit.job
+                  ? 'Working'
+                  : 'Idle'
+            : 'Dead'
+        }
         hint={
           living && unit.job
-            ? detail?.job
+            ? detail?.job && detail.job.x > NO_POSITION
               ? `${unit.job} · ${detail.job.x},${detail.job.y} z${detail.job.z}`
-              : unit.job
+              : detail?.moodWorkshop
+                ? `${unit.job} · ${buildingLabel(detail.moodWorkshop)}`
+                : unit.job
             : (unit.squad ?? undefined)
         }
       />
@@ -437,6 +457,9 @@ function OverviewTab({
   )
   return (
     <div className="flex flex-col gap-4">
+      {unit.strange_mood && isLiving(unit) ? (
+        <StrangeMoodSection unit={unit} workshop={detail?.moodWorkshop ?? null} />
+      ) : null}
       <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-3')}>
         <Section
           title={
@@ -616,6 +639,92 @@ function OverviewTab({
         </Section>
       ) : null}
     </div>
+  )
+}
+
+/** What a dwarf in a strange mood demands, what they have, and what the stores hold. */
+function StrangeMoodSection({ unit, workshop }: { unit: FortUnit; workshop: FortBuilding | null }) {
+  const mood = unit.strange_mood
+  if (!mood) return null
+  const summary = moodNeedsText(mood)
+  return (
+    <Section
+      title={
+        <span className="flex items-center gap-2">
+          <SparklesIcon className="size-4 text-primary" aria-hidden />
+          {moodText(unit.mood)?.label ?? 'Strange mood'}
+        </span>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        {summary ? <p className="text-sm">{summary}</p> : null}
+        <Facts
+          items={[
+            {
+              label: 'Workshop',
+              value: workshop ? (
+                <span>
+                  {buildingLabel(workshop)}
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">
+                    {workshop.cx},{workshop.cy} z{workshop.z}
+                  </span>
+                </span>
+              ) : (
+                'not claimed yet'
+              ),
+            },
+            { label: 'Skill', value: mood.skill ? skillName(mood.skill, unit) : null },
+          ]}
+        />
+        {mood.needs.length ? (
+          <ul className="flex flex-col divide-y text-sm">
+            {mood.needs.map((need, i) => {
+              const done = need.have >= need.need
+              const none = !done && need.free === 0
+              return (
+                <li
+                  // biome-ignore lint/suspicious/noArrayIndexKey: demands repeat (two rough gems) and keep their order
+                  key={i}
+                  className="flex items-center justify-between gap-3 py-1.5 first:pt-0 last:pb-0"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {done ? (
+                      <CheckIcon className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <CircleAlertIcon
+                        className={cn(
+                          'size-4 shrink-0',
+                          none ? 'text-red-600 dark:text-red-400' : 'text-amber-600',
+                        )}
+                      />
+                    )}
+                    <span className="truncate">
+                      {need.need} {need.label}
+                    </span>
+                  </span>
+                  <span
+                    className={cn(
+                      'shrink-0 tabular-nums',
+                      none ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+                    )}
+                  >
+                    {done
+                      ? 'brought'
+                      : `${need.have} of ${need.need}${
+                          need.free === undefined
+                            ? ''
+                            : need.free === 0
+                              ? ' · none in the fortress'
+                              : ` · ${need.free.toLocaleString()} in the stores`
+                        }`}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
+      </div>
+    </Section>
   )
 }
 

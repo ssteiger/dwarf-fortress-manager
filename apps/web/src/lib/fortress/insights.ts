@@ -1,4 +1,13 @@
-import type { FortAlert, FortEvent, FortSummary, FortUnit } from '@fortress/db-drizzle'
+import type {
+  FortAlert,
+  FortEvent,
+  FortSummary,
+  FortUnit,
+  StrangeMood,
+  StrangeMoodNeed,
+} from '@fortress/db-drizzle'
+// Client-safe subpath: the package entry also creates the Postgres client.
+import { CARAVAN_TICKS_PER_DAY, MANDATE_WARN_LEFT } from '@fortress/db-drizzle/fortress-types'
 
 import { humanize, isLiving, splitPascal, stressLabel, unitGroup, unitNeeds } from './format'
 import type { FortConcerns } from './server'
@@ -475,7 +484,7 @@ export function unitStory(unit: FortUnit, now: GameTime | null): string {
     .replace('{their}', p.their)
     .replace('{self}', p.self)
   sentences.push(
-    `Right now ${p.they} ${p.is} ${verb}${unit.job && activity.key !== 'idle' ? `: ${unit.job.toLowerCase()}` : ''}.`,
+    `Right now ${p.they} ${p.is} ${verb}${unit.job && activity.key !== 'idle' && activity.key !== 'mood' ? `: ${unit.job.toLowerCase()}` : ''}.`,
   )
   if (isCitizenish(unit)) sentences.push(`${They} ${p.is} ${stressLabel(unit.stress_category)}.`)
   const recent = (unit.thoughts ?? []).filter(
@@ -568,6 +577,55 @@ export function moodText(mood: string | null) {
   )
 }
 
+/** "a, b and c". */
+function listWords(words: string[]): string {
+  if (words.length <= 1) return words.join('')
+  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
+
+/** A strange mood's demands not yet brought, and those the fortress has none of. */
+export function moodShortfall(mood: StrangeMood | null | undefined): {
+  missing: StrangeMoodNeed[]
+  lacking: StrangeMoodNeed[]
+} {
+  const missing = (mood?.needs ?? []).filter((n) => n.have < n.need)
+  return { missing, lacking: missing.filter((n) => n.free === 0) }
+}
+
+/** Where a strange mood stands, in a sentence or two; null without the details. */
+export function moodNeedsText(mood: StrangeMood | null | undefined): string | null {
+  if (!mood || mood.error) return null
+  if (mood.working) return 'They have everything they asked for and are at work. Leave them be.'
+  if (mood.building_id === null)
+    return 'They are looking for a free workshop to claim. Their demands come with it.'
+  const { missing, lacking } = moodShortfall(mood)
+  if (!missing.length) return 'They have everything they asked for and will start work soon.'
+  const parts = missing.map((n) => {
+    const count = `${n.need - n.have} ${n.label}`
+    if (n.free === undefined) return count
+    return n.free === 0
+      ? `${count} (none in the fortress)`
+      : `${count} (${n.free.toLocaleString()} in the stores)`
+  })
+  return lacking.length
+    ? `Still needs ${listWords(parts)}. Make or trade for the ${listWords(lacking.map((n) => n.label))} soon: if they cannot finish, they go mad.`
+    : `Still needs ${listWords(parts)}. Dwarves will bring it from the stores.`
+}
+
+/** The concern a mood raises: its demands when the dump has them, the general advice otherwise. */
+function moodConcern(unit: FortUnit): { label: string; severity: Severity; hint: string } | null {
+  const mood = moodText(unit.mood)
+  if (!mood) return null
+  const needs = moodNeedsText(unit.strange_mood)
+  if (!needs) return mood
+  const general = unit.mood === 'Fey' || unit.mood === 'Secretive' ? null : mood.hint
+  return {
+    label: mood.label,
+    severity: moodShortfall(unit.strange_mood).lacking.length ? 'danger' : mood.severity,
+    hint: general ? `${general} ${needs}` : needs,
+  }
+}
+
 const NEED_HINTS: Record<string, string> = {
   Starving: 'Check food is stocked and nothing blocks the way to it.',
   Hungry: 'They will eat when they can reach food.',
@@ -580,7 +638,7 @@ const NEED_HINTS: Record<string, string> = {
 export function unitConcerns(unit: FortUnit, now: GameTime | null = null): Concern[] {
   if (!isLiving(unit)) return []
   const out: Concern[] = []
-  const mood = moodText(unit.mood)
+  const mood = moodConcern(unit)
   if (mood)
     out.push({
       key: 'mood',
@@ -661,7 +719,9 @@ export type NoticeKind =
   | 'health'
   | 'needs'
   | 'stress'
+  | 'nobles'
   | 'supply'
+  | 'trade'
   | 'work'
   | 'comfort'
 
@@ -694,7 +754,9 @@ const KIND_ORDER: NoticeKind[] = [
   'health',
   'needs',
   'stress',
+  'nobles',
   'supply',
+  'trade',
   'work',
   'comfort',
 ]
@@ -831,14 +893,14 @@ export function fortNotices({
 
   // Strange moods and madness: each one is its own story.
   for (const unit of citizens) {
-    const mood = moodText(unit.mood)
+    const mood = moodConcern(unit)
     if (!mood) continue
     notices.push({
       key: `mood-${unit.id}`,
       severity: mood.severity,
       kind: 'mood',
       title: `${firstName(unit)} is ${mood.label.charAt(0).toLowerCase()}${mood.label.slice(1)}`,
-      detail: unit.job ? `Now: ${unit.job}.` : undefined,
+      detail: unit.job && !unit.strange_mood?.job_id ? `Now: ${unit.job}.` : undefined,
       hint: mood.hint,
       units: [unit],
     })
@@ -939,6 +1001,85 @@ export function fortNotices({
       }),
       hint: 'Unhappy dwarves throw tantrums, and tantrums spread. Good meals, finer bedrooms and time with friends turn it around.',
       units: unhappy,
+    })
+  }
+
+  // What the nobles have ordered, banned and demanded.
+  const unitById = new Map(units.map((u) => [u.id, u]))
+  const nobleOf = (id: number | null) => (id !== null ? unitById.get(id) : undefined)
+  for (const [i, m] of (summary?.mandates ?? []).entries()) {
+    const noble = nobleOf(m.unit_id)
+    const who = m.position ? `The ${m.position}` : noble ? firstName(noble) : 'A noble'
+    const left = m.timeout_limit - m.timeout_counter
+    const punishment = m.hammerstrikes
+      ? `If it is not done in time, the ${m.position ?? 'noble'} has someone beaten with ${plural(m.hammerstrikes, 'hammerstrike')}${m.prison_time ? ' and locked up' : ''}.`
+      : `If it is not done in time, the ${m.position ?? 'noble'} punishes someone.`
+    if (m.kind === 'Export') {
+      notices.push({
+        key: `nobles-ban-${i}`,
+        severity: 'info',
+        kind: 'nobles',
+        title: `${who} has banned the export of ${m.item}`,
+        hint: `Keep them out of the trade depot. ${punishment}`,
+        units: noble ? [noble] : undefined,
+      })
+      continue
+    }
+    if (m.amount_remaining <= 0) continue
+    const near = left < MANDATE_WARN_LEFT
+    notices.push({
+      key: `nobles-mandate-${i}`,
+      severity: near ? 'warning' : 'info',
+      kind: 'nobles',
+      title: `${who} wants ${m.amount_remaining} more ${m.item} made`,
+      detail: near
+        ? 'The deadline is less than a month away.'
+        : `${Math.round((left / Math.max(m.timeout_limit, 1)) * 100)}% of the time is left.`,
+      hint: `Queue a work order for them at the manager. ${punishment}`,
+      units: noble ? [noble] : undefined,
+      link: { to: '/fortress/work', label: 'Open work' },
+    })
+  }
+  for (const [i, d] of (summary?.demands ?? []).entries()) {
+    const noble = nobleOf(d.unit_id)
+    const place = splitPascal(d.place).toLowerCase()
+    notices.push({
+      key: `nobles-demand-${i}`,
+      severity: 'info',
+      kind: 'nobles',
+      title: `${noble ? firstName(noble) : d.name} demands ${/^[aeiou]/.test(place) ? 'an' : 'a'} ${place}${d.item ? ` with ${d.item}` : ''}`,
+      hint: `Build one fit for ${d.position ? `a ${d.position}` : 'them'} and assign it to them from the room's settings. Unmet demands make nobles unhappy.`,
+      units: noble ? [noble] : undefined,
+    })
+  }
+
+  // Caravans on their way or at the depot.
+  for (const c of summary?.caravans ?? []) {
+    if (c.state !== 'Approaching' && c.state !== 'AtDepot' && c.state !== 'Stuck') continue
+    const days = Math.floor(c.time_remaining / CARAVAN_TICKS_PER_DAY)
+    const who = `${c.race ? `${/^[aeiou]/i.test(c.race) ? 'An' : 'A'} ${c.race}` : 'A'} caravan${c.civ ? ` from ${c.civ}` : ''}`
+    const trouble = c.trouble.length
+      ? ` They have had trouble: ${listWords(c.trouble.map((t) => t.replace(/_/g, ' ')))}.`
+      : ''
+    notices.push({
+      key: `trade-caravan-${c.index}`,
+      severity: c.state === 'Stuck' ? 'warning' : 'info',
+      kind: 'trade',
+      title:
+        c.state === 'AtDepot'
+          ? `${who} is at the depot`
+          : c.state === 'Stuck'
+            ? `${who} cannot reach the depot`
+            : `${who} is on its way`,
+      detail:
+        c.state === 'Stuck'
+          ? `Their wagons have found no way to the trade depot.${trouble}`
+          : `${days > 0 ? `${plural(days, 'day')} left to trade.` : 'They are about to leave.'}${trouble}`,
+      hint:
+        c.state === 'Stuck'
+          ? 'Wagons need a path three tiles wide from the map edge to the depot, with no stairs in the way.'
+          : 'Haul goods to the trade depot and have a broker meet them there.',
+      link: { to: '/fortress/items', label: 'Browse the stores' },
     })
   }
 

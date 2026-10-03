@@ -14,7 +14,7 @@ import { ArrowRightIcon, CirclePauseIcon, CoffeeIcon, RepeatIcon, WrenchIcon } f
 import * as React from 'react'
 
 import type { Advice, WorkshopRow } from '~/lib/fortress/advisor'
-import { splitPascal } from '~/lib/fortress/format'
+import { jobNeedsText, splitPascal } from '~/lib/fortress/format'
 import { adviceGuide, workshopGuide } from '~/lib/fortress/guides'
 import { cancellationHint } from '~/lib/fortress/insights'
 import { useOpenGuide } from '../../-components/Guide'
@@ -52,14 +52,18 @@ export function SuspendedJobs({
   advice: Advice | undefined
 }) {
   const groups = React.useMemo(() => {
-    const byKind = new Map<string, { name: string; building: string | null; jobs: FortJob[] }>()
+    const byKind = new Map<
+      string,
+      { name: string; building: string | null; needs: string; jobs: FortJob[] }
+    >()
     for (const job of jobs) {
       if (!job.suspended) continue
       const name = job.name || splitPascal(job.type)
       const building =
         job.building_id !== null ? (buildingNames.get(job.building_id) ?? null) : null
-      const key = `${name}|${building ?? ''}`
-      const group = byKind.get(key) ?? { name, building, jobs: [] }
+      const needs = jobNeedsText(job)
+      const key = `${name}|${building ?? ''}|${needs}`
+      const group = byKind.get(key) ?? { name, building, needs, jobs: [] }
       group.jobs.push(job)
       byKind.set(key, group)
     }
@@ -111,6 +115,9 @@ export function SuspendedJobs({
                     ? `  ·  ${group.jobs.length - WHERE_SHOWN} more`
                     : ''}
                 </span>
+                {group.needs ? (
+                  <span className="text-sm text-muted-foreground">Needs {group.needs}</span>
+                ) : null}
               </li>
             ))}
           </ul>

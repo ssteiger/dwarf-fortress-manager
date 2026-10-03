@@ -1,4 +1,4 @@
-import type { FortMapBlock, FortTiletype } from '@fortress/db-drizzle'
+import type { FortMapBlock, FortMineral, FortTiletype } from '@fortress/db-drizzle'
 // Client-safe subpath: the package entry also creates the Postgres client.
 import { FORT_FLAG } from '@fortress/db-drizzle/fortress-types'
 
@@ -11,18 +11,22 @@ export interface LevelGrid {
   height: number
   tiles: Int32Array
   flags: Int32Array
+  /** Inorganic index of the vein a mineral tile belongs to, -1 elsewhere. */
+  veins: Int32Array
 }
 
 export function decodeLevel(blocks: FortMapBlock[], width: number, height: number): LevelGrid {
   const tiles = new Int32Array(width * height).fill(-1)
   const flags = new Int32Array(width * height)
-  for (const [, bx, by, tileRle, flagRle] of blocks) {
+  const veins = new Int32Array(width * height).fill(-1)
+  for (const [, bx, by, tileRle, flagRle, veinRle] of blocks) {
     const x0 = bx * 16
     const y0 = by * 16
     fillRle(tiles, tileRle, x0, y0, width)
     fillRle(flags, flagRle, x0, y0, width)
+    if (veinRle) fillRle(veins, veinRle, x0, y0, width)
   }
-  return { width, height, tiles, flags }
+  return { width, height, tiles, flags, veins }
 }
 
 function fillRle(target: Int32Array, rle: number[], x0: number, y0: number, width: number) {
@@ -67,8 +71,28 @@ const SHAPE_LABEL: Record<string, string> = {
   TWIG: 'twigs',
 }
 
+/** "native gold, gold ore", "rock crystal, gem". */
+export function mineralLabel(mineral: FortMineral): string {
+  if (mineral.kind === 'ore') return `${mineral.name}, ${mineral.metals.join(' and ')} ore`
+  if (mineral.kind === 'gem') return `${mineral.name}, gem`
+  return mineral.name
+}
+
+/** The mineral's own colour, lifted when too dark to see on the map and dimmed for floors. */
+export function mineralColor(mineral: FortMineral, wall: boolean): string {
+  const base = mineral.color ?? (mineral.kind === 'gem' ? '#a855f7' : '#b45309')
+  const [r, g, b] = hex(base)
+  const light = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  const visible = light < 0.3 ? mix(base, '#a1a1aa', 0.45) : base
+  return wall ? visible : mix(visible, '#18181b', 0.55)
+}
+
 /** Colour and label for a tile, given its tiletype attributes and packed flags. */
-export function tileStyle(tt: FortTiletype | undefined, flags: number): TileStyle {
+export function tileStyle(
+  tt: FortTiletype | undefined,
+  flags: number,
+  mineral?: FortMineral,
+): TileStyle {
   const liquid = flags & FORT_FLAG.LIQUID_MASK
   if (liquid > 0) {
     const magma = (flags & FORT_FLAG.MAGMA) !== 0
@@ -110,6 +134,11 @@ export function tileStyle(tt: FortTiletype | undefined, flags: number): TileStyl
   if (material === 'ASHES') return { color: '#525252', label }
   if (material === 'HFS' || material === 'UNDERWORLD_GATE') return { color: '#7e22ce', label }
   if (material === 'MINERAL') {
+    if (mineral)
+      return {
+        color: mineralColor(mineral, shape === 'WALL'),
+        label: `${SHAPE_LABEL[shape] ?? shape.toLowerCase()} · ${mineralLabel(mineral)}`,
+      }
     return shape === 'WALL' ? { color: '#b45309', label } : { color: '#78350f', label }
   }
   if (material === 'FEATURE') return { color: '#0891b2', label }
@@ -155,6 +184,7 @@ function mix(from: string, to: string, t: number): string {
 }
 
 function hex(color: string): number[] {
+  if (color.startsWith('rgb')) return (color.match(/\d+/g) ?? []).slice(0, 3).map(Number)
   const n = Number.parseInt(color.slice(1), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
 }

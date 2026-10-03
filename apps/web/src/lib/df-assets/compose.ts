@@ -194,11 +194,20 @@ export interface Composite {
 }
 
 /**
- * Stack the layers around one tile of the first layer's sheet. The canvas
- * grows to fit wider or taller pieces (a wielded pick, a beast's wings):
- * everything is centred horizontally and bottom-aligned, so a two-tile-tall
- * wing rises above the body it belongs to. Group offsets shift in pixels
- * like the game's LG_OFFSET.
+ * Where a layer of `w` x `h` tiles sits relative to the unit's own tile, in
+ * tiles. The game draws a unit in a frame three tiles wide and two tall with
+ * the unit on the bottom middle tile: a one-tile layer covers that tile, a
+ * wider one starts a tile to its left (a two-tile pick held in either hand
+ * has its right half on the body), and a taller one rises above it.
+ */
+function reach(w: number, h: number): [left: number, up: number] {
+  return [Math.min(w - 1, 1), h - 1]
+}
+
+/**
+ * Stack the layers on one tile of the first layer's sheet, the way the game
+ * places them (see `reach`); the canvas grows to fit what spills beyond the
+ * unit's tile. Group offsets shift in pixels like the game's LG_OFFSET.
  */
 export async function composeLayers(
   index: DfAssetIndex,
@@ -208,33 +217,45 @@ export async function composeLayers(
   const base = index.pages[layers[0].page]
   if (!base) return null
   const canvases = await Promise.all(layers.map((layer) => layerCanvas(index, layer)))
-  let width = base.tileWidth
-  let height = base.tileHeight
-  for (const c of canvases) {
-    if (!c) continue
-    width = Math.max(width, c.width)
-    height = Math.max(height, c.height)
-  }
-  const canvas = makeCanvas(width, height)
-  const ctx = context2d(canvas)
-  layers.forEach((layer, i) => {
-    const c = canvases[i]
-    if (!c) return
-    const dx = layer.offset[0] + Math.round((width - c.width) / 2)
-    const dy = layer.offset[1] + (height - c.height)
-    ctx.drawImage(c, dx, dy)
+  const places = layers.map((layer) => {
+    const page = index.pages[layer.page] ?? base
+    const [left, up] = reach(layer.w, layer.h)
+    return [layer.offset[0] - left * page.tileWidth, layer.offset[1] - up * page.tileHeight]
   })
-  return trimToBase(canvas, base.tileWidth, base.tileHeight)
+  let minX = 0
+  let minY = 0
+  let maxX = base.tileWidth
+  let maxY = base.tileHeight
+  canvases.forEach((c, i) => {
+    if (!c) return
+    const [x, y] = places[i]
+    minX = Math.min(minX, x)
+    minY = Math.min(minY, y)
+    maxX = Math.max(maxX, x + c.width)
+    maxY = Math.max(maxY, y + c.height)
+  })
+  const canvas = makeCanvas(maxX - minX, maxY - minY)
+  const ctx = context2d(canvas)
+  canvases.forEach((c, i) => {
+    if (c) ctx.drawImage(c, places[i][0] - minX, places[i][1] - minY)
+  })
+  return trimToBase(canvas, -minX, -minY, base.tileWidth, base.tileHeight)
 }
 
 /**
  * Drop the empty part of oversized layers. A two-tile pony tail with three
  * rows of hair above the head would otherwise double the stack's height,
  * and whoever draws it at a fixed size would get a dwarf half as tall. The
- * base tile always stays; the crop grows only as far as there are pixels,
+ * unit's tile always stays; the crop grows only as far as there are pixels,
  * evenly on both sides so the body stays centred.
  */
-function trimToBase(canvas: HTMLCanvasElement, baseWidth: number, baseHeight: number): Composite {
+function trimToBase(
+  canvas: HTMLCanvasElement,
+  baseX: number,
+  baseY: number,
+  baseWidth: number,
+  baseHeight: number,
+): Composite {
   const { width, height } = canvas
   if (width === baseWidth && height === baseHeight) {
     return { canvas, tileWidth: width, tileHeight: height }
@@ -243,23 +264,26 @@ function trimToBase(canvas: HTMLCanvasElement, baseWidth: number, baseHeight: nu
   let left = width
   let right = -1
   let top = height
+  let bottom = -1
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (data[(y * width + x) * 4 + 3] === 0) continue
       if (x < left) left = x
       if (x > right) right = x
       if (y < top) top = y
+      if (y > bottom) bottom = y
     }
   }
   if (right < 0) return { canvas, tileWidth: width, tileHeight: height }
-  const baseLeft = Math.round((width - baseWidth) / 2)
-  const spill = Math.max(0, baseLeft - left, right + 1 - (baseLeft + baseWidth))
-  const x0 = baseLeft - spill
-  const y0 = Math.min(height - baseHeight, top)
+  const spill = Math.max(0, baseX - left, right + 1 - (baseX + baseWidth))
+  const x0 = baseX - spill
+  const y0 = Math.min(baseY, top)
   const w = baseWidth + spill * 2
-  const h = height - y0
-  if (w === width && h === height) return { canvas, tileWidth: width, tileHeight: height }
+  const h = Math.max(baseY + baseHeight, bottom + 1) - y0
+  if (x0 === 0 && y0 === 0 && w === width && h === height) {
+    return { canvas, tileWidth: width, tileHeight: height }
+  }
   const trimmed = makeCanvas(w, h)
-  context2d(trimmed).drawImage(canvas, x0, y0, w, h, 0, 0, w, h)
+  context2d(trimmed).drawImage(canvas, -x0, -y0)
   return { canvas: trimmed, tileWidth: w, tileHeight: h }
 }

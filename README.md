@@ -78,7 +78,7 @@ Import a world's exports and `/legends` becomes a reader for its history: an ove
 
 ### Reading
 
-On start the worker copies [fortress-snapshot.lua](apps/worker/src/dfhack/fortress-snapshot.lua) into the game's `dfhack-config/` folder. It then runs the script over DFHack's remote console on the schedule chosen in **Settings → Game connection** (every 30 s by default, or only when asked); the script walks units, items, buildings, jobs and announcements and writes one JSON file, which the worker reads back into Postgres. The map is included at most every `DF_MAP_POLL_MS`. Each dump pauses the game while it runs: a couple of seconds for a young fort, longer as units and items pile up. The worker logs how long each one took, and Settings shows the last one.
+On start the worker copies [fortress-snapshot.lua](apps/worker/src/dfhack/fortress-snapshot.lua) into the game's `dfhack-config/` folder. It then runs the script over DFHack's remote console on the schedule chosen in **Settings → Game connection** (every 30 s by default, or only when asked); the script walks units (with what a strange mood demands), items, buildings, jobs (with what each asks for), work orders, squads, artifacts and announcements and writes one JSON file, which the worker reads back into Postgres. The map is included at most every `DF_MAP_POLL_MS`. Each dump pauses the game while it runs: a couple of seconds for a young fort, longer as units and items pile up. The worker logs how long each one took, and Settings shows the last one.
 
 The refresh button at the top right of every page asks for a dump now, whatever the schedule. The schedule and the requests live in the single-row `fort_worker` table, which the worker checks every `DF_COMMAND_POLL_MS`, so changes apply without a restart. While the script runs it writes the part it is on to `<dump>.progress` next to the dump; the worker follows that file and keeps the step in `fort_worker.dump_progress`, which the refresh window shows while the game is paused.
 
@@ -175,9 +175,9 @@ fortress/
 
 | Table | Written by | Holds |
 | --- | --- | --- |
-| `fort_state` | worker | One row: whether the game is live, on a menu or offline, the world and date, the summary. |
-| `fort_dump` | worker | One row: the last dump of units, items, buildings, jobs and announcements, each as `columns` + `rows`. |
-| `fort_map` | worker | One row: the last map dump, run-length encoded per 16×16 block. |
+| `fort_state` | worker | One row: whether the game is live, on a menu or offline, the world and date, the summary (including noble mandates and demands, and caravans). |
+| `fort_dump` | worker | One row: the last dump of units, items, buildings, jobs, manager work orders, squads, artifacts, the historical figures items name, and announcements, each as `columns` + `rows`. |
+| `fort_map` | worker | One row: the last map dump, run-length encoded per 16×16 block, with the ore and gem veins and the minerals they are made of. |
 | `fort_events` | worker | Every announcement ever seen, append-only, keyed per save and site. |
 | `fort_commands` | web, then worker | The command queue described above. |
 | `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers, the progress of the latest read and a heartbeat (worker). |

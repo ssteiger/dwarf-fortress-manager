@@ -1,6 +1,12 @@
-import type { FortUnit } from '@fortress/db-drizzle'
-import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '@fortress/ui'
-import { BriefcaseIcon, GraduationCapIcon, HandHelpingIcon, HeartHandshakeIcon } from 'lucide-react'
+import type { FortSquad, FortUnit } from '@fortress/db-drizzle'
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '@fortress/ui'
+import {
+  BriefcaseIcon,
+  GraduationCapIcon,
+  HandHelpingIcon,
+  HeartHandshakeIcon,
+  ShieldIcon,
+} from 'lucide-react'
 import * as React from 'react'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
@@ -251,6 +257,104 @@ export function WorkGroups({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
             </div>
           ))}
         </dl>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Squads
+
+/** Each squad's alert routine, orders, uniform and who serves in it. */
+export function Squads({
+  squads,
+  units,
+  onOpen,
+}: {
+  squads: FortSquad[]
+  units: FortUnit[]
+  onOpen: OpenUnit
+}) {
+  const byId = React.useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
+  if (!squads.length) return null
+  return (
+    <Card className="gap-4">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldIcon className="size-4 text-primary" />
+          Squads
+          <span className="text-sm font-normal text-muted-foreground tabular-nums">
+            {squads.length}
+          </span>
+        </CardTitle>
+        <p className="text-sm text-muted-foreground">
+          What each squad is doing, what it wears, and who serves. Soldiers with no equipment
+          assigned are outlined in amber.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <ul className="flex flex-col divide-y">
+          {squads.map((squad) => {
+            const uniforms = [...new Set(squad.members.map((m) => m.uniform).filter(Boolean))]
+            const unequipped = squad.members.filter((m) => m.assigned_items === 0).length
+            return (
+              <li key={squad.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="font-medium">
+                    {squad.alias || squad.name || `Squad ${squad.id}`}
+                  </span>
+                  {squad.alias && squad.name ? (
+                    <span className="text-sm text-muted-foreground">{squad.name}</span>
+                  ) : null}
+                  <span className="text-sm text-muted-foreground tabular-nums">
+                    {squad.members.length} of {squad.positions} filled
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                  {squad.routine ? <Badge variant="secondary">{squad.routine}</Badge> : null}
+                  {squad.orders.length ? (
+                    squad.orders.map((order) => (
+                      <Badge key={order} variant="outline">
+                        {order}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-muted-foreground">no orders</span>
+                  )}
+                  {uniforms.length ? (
+                    <span className="text-muted-foreground">· {uniforms.join(', ')}</span>
+                  ) : null}
+                  {unequipped ? (
+                    <span className="text-amber-700 dark:text-amber-300">
+                      · {unequipped} without equipment
+                    </span>
+                  ) : null}
+                </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {squad.members.map((member) => {
+                    const unit = member.unit !== null ? byId.get(member.unit) : undefined
+                    return unit ? (
+                      <UnitChip
+                        key={member.position}
+                        unit={unit}
+                        onOpen={onOpen}
+                        className={cn(member.assigned_items === 0 && 'border-amber-500/70')}
+                      />
+                    ) : (
+                      <span
+                        key={member.position}
+                        className="rounded-full border border-dashed px-2 py-0.5 text-sm text-muted-foreground"
+                        title="Not on the map"
+                      >
+                        {member.name ?? `Position ${member.position + 1}`}
+                      </span>
+                    )
+                  })}
+                </div>
+              </li>
+            )
+          })}
+        </ul>
       </CardContent>
     </Card>
   )

@@ -18,6 +18,7 @@ import {
   fortFeelings,
   isCitizenish,
   isGrownCitizen,
+  moodNeedsText,
   pronouns,
   seasonOf,
 } from './insights'
@@ -1267,7 +1268,15 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         'Success brings a legendary artifact and skill. Failure ends in melancholy, raving or a berserk rage.',
       ],
       now: moody.length
-        ? `${names(moody)} ${moody.length === 1 ? 'is' : 'are'} in a mood.`
+        ? [
+            `${names(moody)} ${moody.length === 1 ? 'is' : 'are'} in a mood.`,
+            ...moody.map((u) => {
+              const needs = moodNeedsText(u.strange_mood)
+              return needs ? `${firstName(u)}: ${needs}` : null
+            }),
+          ]
+            .filter(Boolean)
+            .join(' ')
         : undefined,
     },
     {

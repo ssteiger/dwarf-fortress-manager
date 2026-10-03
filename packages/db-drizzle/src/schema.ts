@@ -58,6 +58,10 @@ export const fort_dump = pgTable("fort_dump", {
 	buildings: jsonb().$type<RowTable>(),
 	jobs: jsonb().$type<RowTable>(),
 	announcements: jsonb().$type<RowTable>(),
+	orders: jsonb().$type<RowTable>(),
+	squads: jsonb().$type<RowTable>(),
+	artifacts: jsonb().$type<RowTable>(),
+	figures: jsonb().$type<RowTable>(),
 });
 
 /** Single row (id = 1): the map, dumped on its own slower cadence. */
@@ -71,6 +75,7 @@ export const fort_map = pgTable("fort_map", {
 	z_count: integer().notNull(),
 	tiletypes: jsonb().$type<FortMapPayload["tiletypes"]>().notNull(),
 	blocks: jsonb().$type<FortMapPayload["blocks"]>().notNull(),
+	minerals: jsonb().$type<NonNullable<FortMapPayload["minerals"]>>(),
 });
 
 /**

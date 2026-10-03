@@ -1,9 +1,14 @@
 import {
+  type FortArtifact,
   type FortBuilding,
   type FortEvent,
+  type FortFigure,
   type FortItem,
   type FortJob,
   type FortMapBlock,
+  type FortMineral,
+  type FortOrder,
+  type FortSquad,
   type FortState,
   type FortTiletype,
   type FortUnit,
@@ -170,6 +175,8 @@ export interface FortPeopleResult {
   capturedAt: string | null
   bonds: FortBond[]
   wasted: FortWastedTalent[]
+  /** The fortress's squads; empty in dumps older than version 9. */
+  squads: FortSquad[]
 }
 
 /** Proficient: the level from which a disabled labor reads as a waste. */
@@ -185,7 +192,11 @@ const NOT_WORK_SKILLS = new Set(['SNEAK', 'TRACKING'])
 export const getFortPeople = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortPeopleResult> => {
     const rows = await postgres_db
-      .select({ captured_at: schema.fort_dump.captured_at, units: schema.fort_dump.units })
+      .select({
+        captured_at: schema.fort_dump.captured_at,
+        units: schema.fort_dump.units,
+        squads: schema.fort_dump.squads,
+      })
       .from(schema.fort_dump)
       .where(eq(schema.fort_dump.id, SINGLETON_ID))
       .limit(1)
@@ -220,7 +231,12 @@ export const getFortPeople = createServerFn({ method: 'GET' }).handler(
         })
       }
     }
-    return { capturedAt: row?.captured_at ?? null, bonds, wasted }
+    return {
+      capturedAt: row?.captured_at ?? null,
+      bonds,
+      wasted,
+      squads: decodeTable<FortSquad>(row?.squads),
+    }
   },
 )
 
@@ -592,6 +608,8 @@ export interface FortUnitDetail {
   inventory: CarriedItem[]
   buildings: FortBuilding[]
   job: FortJob | null
+  /** The workshop a strange mood has claimed. */
+  moodWorkshop: FortBuilding | null
 }
 
 export const getFortUnit = createServerFn({ method: 'GET' })
@@ -615,6 +633,7 @@ export const getFortUnit = createServerFn({ method: 'GET' })
       inventory: [],
       buildings: [],
       job: null,
+      moodWorkshop: null,
     }
     if (!row) return empty
     const unit = decodeTable<FortUnit>(row.units).find((u) => u.id === data.id) ?? null
@@ -634,17 +653,19 @@ export const getFortUnit = createServerFn({ method: 'GET' })
       }
     }
 
+    const buildings = decodeTable<FortBuilding>(row.buildings)
+    const moodWorkshopId = unit.strange_mood?.building_id ?? null
     return {
       capturedAt: row.captured_at ?? null,
       unit,
       inventory,
-      buildings: decodeTable<FortBuilding>(row.buildings).filter((b) =>
-        b.assigned_units.includes(unit.id),
-      ),
+      buildings: buildings.filter((b) => b.assigned_units.includes(unit.id)),
       job:
         unit.job_id !== null
           ? (decodeTable<FortJob>(row.jobs).find((j) => j.id === unit.job_id) ?? null)
           : null,
+      moodWorkshop:
+        moodWorkshopId !== null ? (buildings.find((b) => b.id === moodWorkshopId) ?? null) : null,
     }
   })
 
@@ -652,14 +673,34 @@ export interface FortItemQuery {
   id: number
 }
 
+type UnitRef = Pick<FortUnit, 'id' | 'name' | 'readable'>
+
+/** Someone an item names: a unit on the map when there is one, else the historical figure. */
+export interface ItemPerson {
+  unit: UnitRef | null
+  name: string | null
+  race: string | null
+  alive: boolean | null
+}
+
 export interface FortItemDetail {
   capturedAt: string | null
   item: FortItem | null
-  holder: Pick<FortUnit, 'id' | 'name' | 'readable'> | null
+  holder: UnitRef | null
   building: FortBuilding | null
   container: Pick<FortItem, 'id' | 'description'> | null
   contents: FortItem[]
+  /** Who made it; only crafted items record it. */
+  maker: ItemPerson | null
+  owner: UnitRef | null
+  artifact: (FortArtifact & { holder: ItemPerson | null; owner: ItemPerson | null }) | null
 }
+
+const unitRef = (unit: FortUnit): UnitRef => ({
+  id: unit.id,
+  name: unit.name,
+  readable: unit.readable,
+})
 
 export const getFortItem = createServerFn({ method: 'GET' })
   .inputValidator((input: FortItemQuery) => input)
@@ -670,6 +711,8 @@ export const getFortItem = createServerFn({ method: 'GET' })
         units: schema.fort_dump.units,
         items: schema.fort_dump.items,
         buildings: schema.fort_dump.buildings,
+        artifacts: schema.fort_dump.artifacts,
+        figures: schema.fort_dump.figures,
       })
       .from(schema.fort_dump)
       .where(eq(schema.fort_dump.id, SINGLETON_ID))
@@ -682,16 +725,42 @@ export const getFortItem = createServerFn({ method: 'GET' })
       building: null,
       container: null,
       contents: [],
+      maker: null,
+      owner: null,
+      artifact: null,
     }
     if (!row) return empty
     const items = decodeTable<FortItem>(row.items)
     const item = items.find((entry) => entry.id === data.id) ?? null
     if (!item) return empty
 
-    const holderUnit =
-      item.holder_unit_id !== null
-        ? (decodeTable<FortUnit>(row.units).find((unit) => unit.id === item.holder_unit_id) ?? null)
+    const units = decodeTable<FortUnit>(row.units)
+    const unitById = new Map(units.map((unit) => [unit.id, unit]))
+    const unitByFigure = new Map(
+      units.filter((unit) => unit.hist_figure_id >= 0).map((unit) => [unit.hist_figure_id, unit]),
+    )
+    const figures = new Map(decodeTable<FortFigure>(row.figures).map((f) => [f.hf, f]))
+    const personOf = (hf: number | null | undefined): ItemPerson | null => {
+      if (hf === null || hf === undefined || hf < 0) return null
+      const figure = figures.get(hf)
+      const unit =
+        unitByFigure.get(hf) ?? (figure?.unit_id != null ? unitById.get(figure.unit_id) : undefined)
+      if (!unit && !figure) return null
+      return {
+        unit: unit ? unitRef(unit) : null,
+        name: figure?.name ?? unit?.name ?? null,
+        race: figure?.race ?? unit?.race ?? null,
+        alive: figure?.alive ?? (unit ? !unit.flags.includes('dead') : null),
+      }
+    }
+    const record =
+      item.artifact_id != null
+        ? (decodeTable<FortArtifact>(row.artifacts).find((a) => a.id === item.artifact_id) ?? null)
         : null
+    const ownerUnit = item.owner_id != null ? unitById.get(item.owner_id) : undefined
+
+    const holderUnit =
+      item.holder_unit_id !== null ? (unitById.get(item.holder_unit_id) ?? null) : null
     const building =
       item.holder_building_id !== null
         ? (decodeTable<FortBuilding>(row.buildings).find(
@@ -706,12 +775,15 @@ export const getFortItem = createServerFn({ method: 'GET' })
     return {
       capturedAt: row.captured_at ?? null,
       item,
-      holder: holderUnit
-        ? { id: holderUnit.id, name: holderUnit.name, readable: holderUnit.readable }
-        : null,
+      holder: holderUnit ? unitRef(holderUnit) : null,
       building,
       container: container ? { id: container.id, description: container.description } : null,
       contents: items.filter((entry) => entry.container_id === item.id),
+      maker: personOf(item.maker_hf ?? record?.maker_hf),
+      owner: ownerUnit ? unitRef(ownerUnit) : null,
+      artifact: record
+        ? { ...record, holder: personOf(record.holder_hf), owner: personOf(record.owner_hf) }
+        : null,
     }
   })
 
@@ -916,6 +988,8 @@ export interface FortWorkResult {
   capturedAt: string | null
   buildings: FortBuilding[]
   jobs: FortJob[]
+  /** Manager work orders; empty in dumps older than version 9. */
+  orders: FortOrder[]
   units: Pick<FortUnit, 'id' | 'name' | 'profession'>[]
 }
 
@@ -926,6 +1000,7 @@ export const getFortWork = createServerFn({ method: 'GET' }).handler(
         captured_at: schema.fort_dump.captured_at,
         buildings: schema.fort_dump.buildings,
         jobs: schema.fort_dump.jobs,
+        orders: schema.fort_dump.orders,
         units: schema.fort_dump.units,
       })
       .from(schema.fort_dump)
@@ -936,6 +1011,7 @@ export const getFortWork = createServerFn({ method: 'GET' }).handler(
       capturedAt: row?.captured_at ?? null,
       buildings: decodeTable<FortBuilding>(row?.buildings),
       jobs: decodeTable<FortJob>(row?.jobs),
+      orders: decodeTable<FortOrder>(row?.orders),
       units: decodeTable<FortUnit>(row?.units).map((u) => ({
         id: u.id,
         name: u.name,
@@ -1041,9 +1117,11 @@ export interface FortMapLevel {
   z: number
   /** Z-levels that contain at least one block, ascending. */
   levels: number[]
-  /** Blocks on this level only: [z, bx, by, tilesRle, flagsRle]. */
+  /** Blocks on this level only: [z, bx, by, tilesRle, flagsRle, veinsRle?]. */
   blocks: FortMapBlock[]
   tiletypes: Record<string, FortTiletype>
+  /** Inorganic index -> what the veins in `blocks` are made of; empty in maps older than version 9. */
+  minerals: Record<string, FortMineral>
   units: MapLevelUnit[]
   buildings: MapLevelBuilding[]
   /** Highest z on which a citizen currently stands, a good default level. */
@@ -1108,6 +1186,7 @@ export const getFortMapLevel = createServerFn({ method: 'GET' })
       levels,
       blocks: map.blocks.filter((b) => b[0] === z),
       tiletypes: map.tiletypes,
+      minerals: map.minerals ?? {},
       units: levelUnits,
       buildings: buildings
         .filter((b) => b.z === z)

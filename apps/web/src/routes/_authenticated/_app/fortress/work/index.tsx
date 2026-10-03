@@ -1,4 +1,4 @@
-import type { FortBuilding, FortJob } from '@fortress/db-drizzle'
+import type { FortBuilding, FortJob, FortOrder } from '@fortress/db-drizzle'
 import {
   Badge,
   Card,
@@ -10,6 +10,7 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
+  cn,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -17,6 +18,7 @@ import type { ColumnDef } from '@tanstack/react-table'
 import {
   CircleCheckIcon,
   CirclePauseIcon,
+  ClipboardListIcon,
   HammerIcon,
   LeafIcon,
   LifeBuoyIcon,
@@ -36,7 +38,7 @@ import {
   situations,
   workshopBoard,
 } from '~/lib/fortress/advisor'
-import { formatNumber, splitPascal } from '~/lib/fortress/format'
+import { formatNumber, jobNeedsText, splitPascal } from '~/lib/fortress/format'
 import { gameTimeOf, isGrownCitizen } from '~/lib/fortress/insights'
 import {
   FORT_REFRESH_MS,
@@ -63,6 +65,7 @@ const TABS = [
   { key: 'checklist', label: 'Checklist', icon: ListChecksIcon },
   { key: 'stuck', label: 'Stuck', icon: CirclePauseIcon },
   { key: 'queue', label: 'Queue', icon: ListTodoIcon },
+  { key: 'orders', label: 'Orders', icon: ClipboardListIcon },
   { key: 'workshops', label: 'Workshops', icon: HammerIcon },
   { key: 'buildings', label: 'Buildings', icon: WarehouseIcon },
 ] as const
@@ -84,6 +87,31 @@ function jobLabel(job: FortJob): string {
 
 function jobFlagScore(job: FortJob): number {
   return (job.suspended ? 4 : 0) + (job.repeat ? 2 : 0) + (job.order_id >= 0 ? 1 : 0)
+}
+
+const JOB_STATE_LABEL: Record<string, string> = {
+  working: 'Working',
+  bringing: 'Bringing',
+  fetching: 'Fetching',
+  item_lost: 'Item lost',
+}
+
+const FREQUENCY_LABEL: Record<string, string> = {
+  OneTime: 'Once',
+  Daily: 'Daily',
+  Monthly: 'Monthly',
+  Seasonally: 'Each season',
+  Yearly: 'Yearly',
+}
+
+function orderStatus(order: FortOrder): { label: string; rank: number } {
+  if (!order.validated) return { label: 'Not checked', rank: 2 }
+  if (order.active) return { label: 'Active', rank: 0 }
+  return { label: 'Waiting', rank: 1 }
+}
+
+function capitalizeFirst(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
 function buildingLabel(b: FortBuilding): string {
@@ -108,6 +136,7 @@ function WorkPage() {
   const supplies = useFortSupplies()
   const buildings = data?.buildings ?? []
   const jobs = data?.jobs ?? []
+  const orders = data?.orders ?? []
   const units = everyone.data?.units ?? []
   const state = overview.data?.state ?? null
   const now = gameTimeOf(state)
@@ -178,6 +207,7 @@ function WorkPage() {
     checklist: counts.problem + counts.attention,
     stuck: suspended + failing + blocked,
     queue: jobs.length,
+    orders: orders.length,
     workshops: groups.workshops.length,
     buildings: groups.stockpiles.length + groups.zones.length + groups.furniture.length,
   }
@@ -213,6 +243,30 @@ function WorkPage() {
         cell: ({ getValue }) => getValue<string | null>() ?? '—',
       },
       {
+        id: 'needs',
+        header: 'Needs',
+        accessorFn: (job) => jobNeedsText(job) || null,
+        sortUndefined: 'last',
+        meta: { cellClassName: 'max-w-[320px] text-sm text-muted-foreground' },
+        cell: ({ row }) => {
+          const needs = row.original.needs ?? []
+          if (!needs.length) return '—'
+          return (
+            <span className="flex flex-wrap gap-x-2 gap-y-0.5">
+              {needs.map(([label, need, have], i) => (
+                <span
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a job can ask for the same thing twice
+                  key={i}
+                  className={cn('tabular-nums', have >= need && 'text-foreground')}
+                >
+                  {have}/{need} {label}
+                </span>
+              ))}
+            </span>
+          )
+        },
+      },
+      {
         id: 'flags',
         header: 'Flags',
         accessorFn: (job) => jobFlagScore(job),
@@ -222,12 +276,18 @@ function WorkPage() {
               job.suspended ? 'suspended' : '',
               job.repeat ? 'repeat' : '',
               job.order_id >= 0 ? 'manager order' : '',
+              job.state ? (JOB_STATE_LABEL[job.state] ?? job.state) : '',
             ]
               .filter(Boolean)
               .join(' '),
         },
         cell: ({ row }) => (
           <div className="flex gap-1">
+            {row.original.state ? (
+              <Badge variant={row.original.state === 'item_lost' ? 'destructive' : 'outline'}>
+                {JOB_STATE_LABEL[row.original.state] ?? row.original.state}
+              </Badge>
+            ) : null}
             {row.original.suspended ? <Badge variant="destructive">Suspended</Badge> : null}
             {row.original.repeat ? <Badge variant="outline">Repeat</Badge> : null}
             {row.original.order_id >= 0 ? <Badge variant="secondary">Manager order</Badge> : null}
@@ -239,10 +299,97 @@ function WorkPage() {
         header: 'Where',
         accessorFn: (job) => `${job.z} ${job.y} ${job.x}`,
         meta: { align: 'right', cellClassName: 'font-mono text-muted-foreground' },
-        cell: ({ row }) => `${row.original.x},${row.original.y} z${row.original.z}`,
+        // Jobs without a place yet, like a strange mood's, sit at -30000.
+        cell: ({ row }) =>
+          row.original.x <= -30000 ? '—' : `${row.original.x},${row.original.y} z${row.original.z}`,
       },
     ],
     [buildingNames, unitNames],
+  )
+
+  const orderCounts = {
+    active: orders.filter((o) => orderStatus(o).label === 'Active').length,
+    waiting: orders.filter((o) => orderStatus(o).label === 'Waiting').length,
+    unchecked: orders.filter((o) => !o.validated).length,
+  }
+  const orderColumns = React.useMemo<ColumnDef<FortOrder>[]>(
+    () => [
+      {
+        id: 'order',
+        header: 'Order',
+        accessorFn: (order) => `${order.label} ${order.detail ?? ''}`,
+        meta: { cellClassName: 'max-w-[280px]' },
+        cell: ({ row }) => (
+          <span className="flex flex-col">
+            <span className="font-medium">{capitalizeFirst(row.original.label)}</span>
+            {row.original.detail ? (
+              <span className="text-sm text-muted-foreground">{row.original.detail}</span>
+            ) : null}
+          </span>
+        ),
+      },
+      {
+        id: 'done',
+        header: 'Done',
+        accessorFn: (order) =>
+          order.amount_total ? (order.amount_total - order.amount_left) / order.amount_total : 0,
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+        cell: ({ row }) =>
+          `${(row.original.amount_total - row.original.amount_left).toLocaleString()} of ${row.original.amount_total.toLocaleString()}`,
+      },
+      {
+        id: 'repeats',
+        header: 'Repeats',
+        accessorFn: (order) => FREQUENCY_LABEL[order.frequency] ?? order.frequency,
+        meta: { cellClassName: 'text-sm' },
+      },
+      {
+        id: 'status',
+        header: 'Status',
+        accessorFn: (order) => orderStatus(order).rank,
+        meta: { searchText: (order) => orderStatus(order).label },
+        cell: ({ row }) => {
+          const status = orderStatus(row.original)
+          return (
+            <Badge
+              variant={status.rank === 0 ? 'secondary' : 'outline'}
+              className={cn(
+                status.rank === 2 && 'border-amber-500/50 text-amber-700 dark:text-amber-300',
+              )}
+            >
+              {status.label}
+            </Badge>
+          )
+        },
+      },
+      {
+        id: 'conditions',
+        header: 'Runs when',
+        accessorFn: (order) => order.conditions.join('; ') || null,
+        sortUndefined: 'last',
+        meta: { cellClassName: 'max-w-[360px] text-sm text-muted-foreground' },
+        cell: ({ row }) =>
+          row.original.conditions.length ? (
+            <span className="flex flex-col">
+              {row.original.conditions.map((condition) => (
+                <span key={condition}>{condition}</span>
+              ))}
+            </span>
+          ) : (
+            'always'
+          ),
+      },
+      {
+        id: 'workshop',
+        header: 'Workshop',
+        accessorFn: (order) =>
+          order.workshop_id !== null ? (buildingNames.get(order.workshop_id) ?? null) : null,
+        sortUndefined: 'last',
+        meta: { cellClassName: 'text-sm text-muted-foreground' },
+        cell: ({ getValue }) => getValue<string | null>() ?? 'any',
+      },
+    ],
+    [buildingNames],
   )
 
   return (
@@ -425,6 +572,38 @@ function WorkPage() {
                     rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
                   />
                 )}
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="orders" className="flex flex-col gap-4">
+              <Card className="gap-0 overflow-hidden p-0">
+                <CardHeader className="gap-1.5 px-4 pt-4 pb-4">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ClipboardListIcon className="size-4 text-primary" />
+                    Work orders
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    {orders.length
+                      ? `${formatNumber(orders.length)} orders at the manager: ${formatNumber(orderCounts.active)} active, ${formatNumber(orderCounts.waiting)} waiting for their conditions${orderCounts.unchecked ? `, and ${formatNumber(orderCounts.unchecked)} the manager has not checked yet` : ''}.`
+                      : 'No work orders, or the dump predates them. Restart the worker so it installs the new dump script.'}
+                    {orderCounts.unchecked
+                      ? ' Orders run only once the manager has checked them: appoint a manager if nobody holds the post.'
+                      : ''}
+                  </p>
+                </CardHeader>
+                {orders.length ? (
+                  <DataTable
+                    data={orders}
+                    columns={orderColumns}
+                    showSelectColumn={false}
+                    showActionsColumn={false}
+                    showToolbar={false}
+                    enableSortingRemoval={false}
+                    defaultSort={[{ id: 'status', desc: false }]}
+                    getRowId={(order) => String(order.id)}
+                    rowClassName={(order) => (order.validated ? undefined : 'opacity-60')}
+                  />
+                ) : null}
               </Card>
             </TabsContent>
 
