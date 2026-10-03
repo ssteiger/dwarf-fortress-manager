@@ -32,7 +32,11 @@ function targetLink(note: LegendsNote, worldId: number) {
     return null
   }
   if (note.target_kind === 'story')
-    return { to: '/legends/stories' as const, search: { world: worldId } }
+    return {
+      to: '/legends/stories/$key' as const,
+      params: { key: note.target_id },
+      search: { world: worldId },
+    }
   if (note.target_kind === 'event' || note.target_kind === 'narration') return null
   return {
     to: '/legends/$kind/$id' as const,

@@ -492,7 +492,10 @@ export function DataTable<TData>({
           <div className="flex-1 tabular-nums">
             {showSelectColumn
               ? `${table.getFilteredSelectedRowModel().rows.length} of ${table.getFilteredRowModel().rows.length} row(s) selected.`
-              : `${(rowCount ?? table.getFilteredRowModel().rows.length).toLocaleString()} rows`}
+              : (() => {
+                  const n = rowCount ?? table.getFilteredRowModel().rows.length
+                  return `${n.toLocaleString()} ${n === 1 ? 'row' : 'rows'}`
+                })()}
           </div>
           <div className="flex w-full items-center gap-6 lg:w-fit">
             <div className="hidden items-center gap-2 lg:flex">

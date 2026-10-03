@@ -1,9 +1,8 @@
-import { Button, cn } from '@fortress/ui'
+import { Button } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import {
   ArrowRightIcon,
-  DicesIcon,
   GlobeIcon,
   HourglassIcon,
   LibraryIcon,
@@ -14,20 +13,20 @@ import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { formatNumber } from '~/lib/fortress/format'
-import type { Story } from '~/lib/legends/chronicle'
-import { yearSpan } from '~/lib/legends/events'
 import { BROWSE_TABS, racePlural, raceToken, titleCase } from '~/lib/legends/model'
 import { type LegendsWorldSummary, getLegendsNames } from '~/lib/legends/server'
+import { useFortressInLegends } from './-components/FortressTie'
 import { HistoryChart } from './-components/HistoryChart'
 import { useJournal } from './-components/Journal'
 import {
+  Fragments,
   LegendsShell,
   type LiveFortress,
   RecordLink,
   Section,
   parseWorldParam,
 } from './-components/LegendsChrome'
-import { StoryCard, leadRef, useStories } from './-components/Stories'
+import { FeaturedStory, featuredStories, useStories } from './-components/Stories'
 import { TrailList } from './-components/Trail'
 
 interface LegacySearch {
@@ -72,22 +71,53 @@ function OverviewBody({
 }) {
   const navigate = useNavigate()
   const years = summary?.years ?? null
-  const yearsOfHistory = years ? years.max - years.min + 1 : null
+  const stories = useStories(worldId)
+  const ourCiv = matchesLive ? (live?.civId ?? null) : null
+  const featured = React.useMemo(
+    () => featuredStories(stories.data, ourCiv),
+    [stories.data, ourCiv],
+  )
 
   return (
     <div className="flex flex-col gap-4">
-      <AtAGlance worldId={worldId} counts={counts} summary={summary} />
+      <Section title="Other ways in">
+        <WaysIn worldId={worldId} />
+      </Section>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <Section
-          title="Where to begin"
-          description={`${worldName} is ${yearsOfHistory ? `${yearsOfHistory.toLocaleString()} years` : 'a long history'} of wars, lives and strange ends. Here are five ways into it.`}
-        >
-          <WaysIn worldId={worldId} counts={counts} yearsOfHistory={yearsOfHistory} />
-        </Section>
+      <Section
+        title="The size of the world"
+        description={`What the export holds for ${worldName}. Each count opens that part of the archive.`}
+      >
+        <AtAGlance worldId={worldId} counts={counts} summary={summary} />
+      </Section>
 
-        <div className="flex flex-col gap-4">
-          {live ? (
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="xl:col-start-1 xl:row-start-1">
+          {featured.length ? (
+            <FeaturedStory
+              worldId={worldId}
+              candidates={featured}
+              title="A story to start with"
+              start={ourCiv !== null ? 'first' : 'random'}
+              action={
+                <Button asChild variant="ghost" size="sm">
+                  <Link to="/legends/stories" search={{ world: worldId }}>
+                    All stories
+                  </Link>
+                </Button>
+              }
+            />
+          ) : (
+            <Section title="A story to start with">
+              <p className="text-sm text-muted-foreground">
+                {stories.isLoading ? 'Sifting the chronicles for a story…' : 'No stories yet.'}
+              </p>
+            </Section>
+          )}
+        </div>
+
+        {live ? (
+          <div className="xl:col-start-2 xl:row-span-2 xl:row-start-1">
             <YourFortress
               worldId={worldId}
               worldName={worldName}
@@ -95,12 +125,12 @@ function OverviewBody({
               matchesLive={matchesLive}
               summary={summary}
             />
-          ) : null}
+          </div>
+        ) : null}
+        <div className={live ? 'xl:col-start-1 xl:row-start-2' : 'xl:col-start-2 xl:row-start-1'}>
           <PickUp worldId={worldId} />
         </div>
       </div>
-
-      <StoryToStart worldId={worldId} />
 
       {summary?.timeline.length && years ? (
         <Section
@@ -165,105 +195,86 @@ function AtAGlance({
     { label: 'writings & arts', value: tabCount('culture'), archive: 'culture' },
   ]
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-      {items.map((item) =>
-        item.archive ? (
-          <Link
-            key={item.label}
-            to="/legends/archive"
-            search={{ world: worldId, archive: item.archive, type: item.type }}
-            className="rounded-xl border bg-card px-4 py-3 transition-colors hover:border-primary/50 hover:bg-accent/40"
-          >
-            <GlanceFigure value={item.value} label={item.label} />
-          </Link>
-        ) : (
-          <div key={item.label} className="rounded-xl border bg-card px-4 py-3">
-            <GlanceFigure value={item.value} label={item.label} />
-          </div>
-        ),
-      )}
-    </div>
+    <ul className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:grid-cols-7">
+      {items.map((item) => {
+        const figure = (
+          <>
+            <span className="block text-lg font-medium tabular-nums">
+              {item.value === null || item.value === undefined ? '—' : formatNumber(item.value)}
+            </span>
+            <span className="block text-sm text-muted-foreground group-hover:text-foreground group-hover:underline">
+              {item.label}
+            </span>
+          </>
+        )
+        return (
+          <li key={item.label}>
+            {item.archive ? (
+              <Link
+                to="/legends/archive"
+                search={{ world: worldId, archive: item.archive, type: item.type }}
+                className="group block underline-offset-4"
+              >
+                {figure}
+              </Link>
+            ) : (
+              figure
+            )}
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 
-function GlanceFigure({ value, label }: { value: number | null | undefined; label: string }) {
-  return (
-    <>
-      <div className="text-2xl font-semibold tabular-nums">
-        {value === null || value === undefined ? '—' : formatNumber(value)}
-      </div>
-      <div className="text-sm text-muted-foreground">{label}</div>
-    </>
-  )
-}
+const WAYS_IN = [
+  {
+    to: '/legends/world' as const,
+    icon: GlobeIcon,
+    title: 'Watch the world unfold',
+    body: 'Scrub the map through the years.',
+  },
+  {
+    to: '/legends/history' as const,
+    icon: HourglassIcon,
+    title: 'Read an age',
+    body: 'Any stretch of years, told as a chronicle.',
+  },
+  {
+    to: '/legends/stories' as const,
+    icon: SparklesIcon,
+    title: 'Follow a story',
+    body: 'Battles, beasts, the cursed and the strange ends.',
+  },
+  {
+    to: '/legends/archive' as const,
+    icon: LibraryIcon,
+    title: 'Look someone up',
+    body: 'Figures and events by name. ⌘K works on any legends page.',
+  },
+  {
+    to: '/legends/journal' as const,
+    icon: NotebookPenIcon,
+    title: 'Keep a journal',
+    body: 'Pin what you read and leave notes.',
+  },
+]
 
-function WaysIn({
-  worldId,
-  counts,
-  yearsOfHistory,
-}: {
-  worldId: number
-  counts: Record<string, number>
-  yearsOfHistory: number | null
-}) {
-  const ways = [
-    {
-      to: '/legends/world' as const,
-      icon: GlobeIcon,
-      title: 'Watch the world unfold',
-      body: `Scrub through ${yearsOfHistory ? yearsOfHistory.toLocaleString() : 'the'} years and watch ${formatNumber(counts.site ?? 0)} sites rise, change hands and fall to ruin.`,
-      cta: 'Open the map',
-    },
-    {
-      to: '/legends/history' as const,
-      icon: HourglassIcon,
-      title: 'Read an age',
-      body: 'Pick any stretch of years and read its chronicle: who died, what was won, and whose names filled the records.',
-      cta: 'Open the chronicle',
-    },
-    {
-      to: '/legends/stories' as const,
-      icon: SparklesIcon,
-      title: 'Follow a story',
-      body: 'The bloodiest battles, the deadliest beasts, the cursed and the strange ends, picked out of the records for you.',
-      cta: 'Browse stories',
-    },
-    {
-      to: '/legends/archive' as const,
-      icon: LibraryIcon,
-      title: 'Look someone up',
-      body: `Search ${formatNumber(counts.historical_figure ?? 0)} figures and ${formatNumber(counts.historical_event ?? 0)} events by name, race, civilization or years. Press ⌘K from any legends page.`,
-      cta: 'Search the archive',
-    },
-    {
-      to: '/legends/journal' as const,
-      icon: NotebookPenIcon,
-      title: 'Keep a journal',
-      body: 'Pin figures, places and years as you read, and leave notes for your own saga or campaign.',
-      cta: 'Open your journal',
-    },
-  ]
+function WaysIn({ worldId }: { worldId: number }) {
   return (
-    <ul className="grid gap-3 md:grid-cols-2">
-      {ways.map((way, i) => {
+    <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
+      {WAYS_IN.map((way) => {
         const Icon = way.icon
         return (
-          <li key={way.to} className={cn(i === ways.length - 1 && 'md:col-span-2')}>
-            <Link
-              to={way.to}
-              search={{ world: worldId }}
-              className="group flex h-full gap-3 rounded-lg border p-4 transition-colors hover:border-primary/50 hover:bg-accent/40"
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <Icon className="size-5" />
-              </span>
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="font-medium">{way.title}</span>
-                <span className="text-sm text-muted-foreground">{way.body}</span>
-                <span className="mt-1 inline-flex items-center gap-1 text-sm text-primary">
-                  {way.cta}
-                  <ArrowRightIcon className="size-3.5 transition-transform group-hover:translate-x-0.5" />
+          <li key={way.to}>
+            <Link to={way.to} search={{ world: worldId }} className="group flex gap-2.5">
+              <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+              <span className="min-w-0">
+                <span className="flex items-center gap-1 font-medium group-hover:underline">
+                  {way.title}
+                  <ArrowRightIcon className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </span>
+                <span className="block text-sm text-muted-foreground">{way.body}</span>
               </span>
             </Link>
           </li>
@@ -297,6 +308,7 @@ function YourFortress({
     enabled: matchesLive && (refs.entity.length > 0 || refs.site.length > 0),
     staleTime: 10 * 60_000,
   })
+  const tie = useFortressInLegends(worldId, matchesLive)
   const fortName = live.fortName ? titleCase(live.fortName) : 'Your fortress'
 
   if (!matchesLive) {
@@ -320,13 +332,11 @@ function YourFortress({
   const civName = live.civId !== null ? names.data?.entity?.[live.civId] : undefined
   const groupName = live.groupId !== null ? names.data?.entity?.[live.groupId] : undefined
   const siteName = live.siteId !== null ? names.data?.site?.[live.siteId] : undefined
-  const wars = (summary?.wars ?? [])
-    .filter((w) => w.aggressor?.id === live.civId || w.defender?.id === live.civId)
-    .slice(0, 4)
+  const told = tie.data
 
   return (
     <Section
-      title="Your fortress in this world"
+      title="Your people in this world"
       description={`Where ${fortName} and its people stand in the legends.`}
     >
       <div className="flex flex-col gap-4 text-sm">
@@ -375,30 +385,48 @@ function YourFortress({
             </>
           ) : null}
         </dl>
-        {wars.length ? (
+        {told?.civ.length ? (
+          <p className="leading-relaxed">
+            <Fragments fragments={told.civ} worldId={worldId} />
+          </p>
+        ) : null}
+        {told?.storied.length ? (
           <div>
-            <div className="mb-1.5 text-muted-foreground">Wars your people fought</div>
-            <ul className="flex flex-col gap-1.5">
-              {wars.map((war) => {
-                const foe = war.aggressor?.id === live.civId ? war.defender : war.aggressor
-                return (
-                  <li key={war.id}>
+            <div className="mb-1.5 flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground">Your dwarves in history</span>
+              <span className="text-muted-foreground tabular-nums">
+                {told.living.length} of {told.dwellers} in the record
+              </span>
+            </div>
+            <ul className="flex flex-col gap-2.5">
+              {told.storied.map((dweller) => (
+                <li key={dweller.figureId} className="min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
                     <RecordLink
-                      kind="historical_event_collection"
-                      id={war.id}
-                      name={war.name}
+                      kind="historical_figure"
+                      id={dweller.figureId}
+                      name={told.names.historical_figure?.[dweller.figureId]}
                       worldId={worldId}
                     />
-                    <span className="text-muted-foreground">
-                      {' '}
-                      against {foe?.name ? titleCase(foe.name) : 'unknown foes'}
-                      {yearSpan(war.startYear, war.endYear)
-                        ? ` · ${yearSpan(war.startYear, war.endYear)}`
-                        : ''}
-                    </span>
-                  </li>
-                )
-              })}
+                    <Link
+                      to="/fortress/dwarves/$id"
+                      params={{ id: String(dweller.unitId) }}
+                      className="shrink-0 text-primary underline-offset-4 hover:underline"
+                    >
+                      In your fortress
+                    </Link>
+                  </div>
+                  <div className="text-muted-foreground">
+                    <Fragments fragments={dweller.line} worldId={worldId} />
+                    {dweller.kin ? (
+                      <>
+                        {' '}
+                        <Fragments fragments={dweller.kin} worldId={worldId} />
+                      </>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
         ) : null}
@@ -457,70 +485,6 @@ function PickUp({ worldId }: { worldId: number }) {
           </div>
         ) : null}
       </div>
-    </Section>
-  )
-}
-
-/** One story from the whole record, re-rolled on demand. */
-function StoryToStart({ worldId }: { worldId: number }) {
-  const navigate = useNavigate()
-  const stories = useStories(worldId)
-  const all = React.useMemo(
-    () => (stories.data?.groups ?? []).flatMap((g) => g.stories.filter((s) => leadRef(s))),
-    [stories.data],
-  )
-  const [pick, setPick] = React.useState<Story | null>(null)
-  const roll = React.useCallback(() => {
-    if (!all.length) return
-    setPick((prev) => {
-      const pool = all.length > 1 ? all.filter((s) => s.key !== prev?.key) : all
-      return pool[Math.floor(Math.random() * pool.length)]
-    })
-  }, [all])
-  React.useEffect(() => {
-    if (!pick && all.length) roll()
-  }, [pick, all, roll])
-
-  if (!stories.data || !pick) {
-    return stories.isLoading ? (
-      <Section title="A story to start with">
-        <p className="text-sm text-muted-foreground">Sifting the chronicles for a story…</p>
-      </Section>
-    ) : null
-  }
-  return (
-    <Section
-      title="A story to start with"
-      description="Picked at random from the stories the records keep returning to."
-      action={
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={roll}>
-            <DicesIcon className="size-4" />
-            Another
-          </Button>
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/legends/stories" search={{ world: worldId }}>
-              All stories
-            </Link>
-          </Button>
-        </div>
-      }
-    >
-      <StoryCard
-        story={pick}
-        names={stories.data.names}
-        worldId={worldId}
-        featured
-        onOpen={() => {
-          const ref = leadRef(pick)
-          if (ref)
-            navigate({
-              to: '/legends/$kind/$id',
-              params: { kind: ref.kind, id: String(ref.id) },
-              search: { world: worldId },
-            })
-        }}
-      />
     </Section>
   )
 }

@@ -35,6 +35,7 @@ import { Route as AuthenticatedAppFortressMapIndexRouteImport } from './routes/_
 import { Route as AuthenticatedAppFortressItemsIndexRouteImport } from './routes/_authenticated/_app/fortress/items/index'
 import { Route as AuthenticatedAppFortressDwarvesIndexRouteImport } from './routes/_authenticated/_app/fortress/dwarves/index'
 import { Route as AuthenticatedAppFortressChronicleIndexRouteImport } from './routes/_authenticated/_app/fortress/chronicle/index'
+import { Route as AuthenticatedAppLegendsStoriesKeyRouteImport } from './routes/_authenticated/_app/legends/stories/$key'
 import { Route as AuthenticatedAppLegendsKindIdRouteImport } from './routes/_authenticated/_app/legends/$kind/$id'
 import { Route as AuthenticatedAppFortressItemsIdRouteImport } from './routes/_authenticated/_app/fortress/items/$id'
 import { Route as AuthenticatedAppFortressDwarvesIdRouteImport } from './routes/_authenticated/_app/fortress/dwarves/$id'
@@ -187,6 +188,12 @@ const AuthenticatedAppFortressChronicleIndexRoute =
     path: '/fortress/chronicle/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppLegendsStoriesKeyRoute =
+  AuthenticatedAppLegendsStoriesKeyRouteImport.update({
+    id: '/legends/stories/$key',
+    path: '/legends/stories/$key',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppLegendsKindIdRoute =
   AuthenticatedAppLegendsKindIdRouteImport.update({
     id: '/legends/$kind/$id',
@@ -220,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
+  '/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/fortress/items/': typeof AuthenticatedAppFortressItemsIndexRoute
@@ -248,6 +256,7 @@ export interface FileRoutesByTo {
   '/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
+  '/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/fortress/chronicle': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/fortress/dwarves': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/fortress/items': typeof AuthenticatedAppFortressItemsIndexRoute
@@ -280,6 +289,7 @@ export interface FileRoutesById {
   '/_authenticated/_app/fortress/dwarves/$id': typeof AuthenticatedAppFortressDwarvesIdRoute
   '/_authenticated/_app/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/_authenticated/_app/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
+  '/_authenticated/_app/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/_authenticated/_app/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
   '/_authenticated/_app/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
   '/_authenticated/_app/fortress/items/': typeof AuthenticatedAppFortressItemsIndexRoute
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/fortress/dwarves/$id'
     | '/fortress/items/$id'
     | '/legends/$kind/$id'
+    | '/legends/stories/$key'
     | '/fortress/chronicle/'
     | '/fortress/dwarves/'
     | '/fortress/items/'
@@ -339,6 +350,7 @@ export interface FileRouteTypes {
     | '/fortress/dwarves/$id'
     | '/fortress/items/$id'
     | '/legends/$kind/$id'
+    | '/legends/stories/$key'
     | '/fortress/chronicle'
     | '/fortress/dwarves'
     | '/fortress/items'
@@ -370,6 +382,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/fortress/dwarves/$id'
     | '/_authenticated/_app/fortress/items/$id'
     | '/_authenticated/_app/legends/$kind/$id'
+    | '/_authenticated/_app/legends/stories/$key'
     | '/_authenticated/_app/fortress/chronicle/'
     | '/_authenticated/_app/fortress/dwarves/'
     | '/_authenticated/_app/fortress/items/'
@@ -577,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFortressChronicleIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/_app/legends/stories/$key': {
+      id: '/_authenticated/_app/legends/stories/$key'
+      path: '/legends/stories/$key'
+      fullPath: '/legends/stories/$key'
+      preLoaderRoute: typeof AuthenticatedAppLegendsStoriesKeyRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/_app/legends/$kind/$id': {
       id: '/_authenticated/_app/legends/$kind/$id'
       path: '/legends/$kind/$id'
@@ -637,6 +657,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFortressDwarvesIdRoute: typeof AuthenticatedAppFortressDwarvesIdRoute
   AuthenticatedAppFortressItemsIdRoute: typeof AuthenticatedAppFortressItemsIdRoute
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
+  AuthenticatedAppLegendsStoriesKeyRoute: typeof AuthenticatedAppLegendsStoriesKeyRoute
   AuthenticatedAppFortressChronicleIndexRoute: typeof AuthenticatedAppFortressChronicleIndexRoute
   AuthenticatedAppFortressDwarvesIndexRoute: typeof AuthenticatedAppFortressDwarvesIndexRoute
   AuthenticatedAppFortressItemsIndexRoute: typeof AuthenticatedAppFortressItemsIndexRoute
@@ -663,6 +684,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppFortressDwarvesIdRoute,
   AuthenticatedAppFortressItemsIdRoute: AuthenticatedAppFortressItemsIdRoute,
   AuthenticatedAppLegendsKindIdRoute: AuthenticatedAppLegendsKindIdRoute,
+  AuthenticatedAppLegendsStoriesKeyRoute:
+    AuthenticatedAppLegendsStoriesKeyRoute,
   AuthenticatedAppFortressChronicleIndexRoute:
     AuthenticatedAppFortressChronicleIndexRoute,
   AuthenticatedAppFortressDwarvesIndexRoute:

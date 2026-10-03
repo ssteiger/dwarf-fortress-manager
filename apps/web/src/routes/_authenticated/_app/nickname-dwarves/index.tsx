@@ -15,6 +15,7 @@ import {
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  BookmarkIcon,
   ChevronDownIcon,
   Loader2Icon,
   SearchIcon,
@@ -26,29 +27,34 @@ import * as React from 'react'
 import { toast } from 'sonner'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
+import { alliterate, alliterateAll, alliterationKey } from '~/lib/fortress/alliteration'
+import type { DwarfName } from '~/lib/fortress/dossier'
 import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortUnits } from '~/lib/fortress/server'
 import { EmptyState, PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
+import { NameList } from './-components/NameList'
 import {
   type DossierFact,
   MAX_NICKNAME_LENGTH,
   type NicknameAssignment,
   type NicknameIdea,
+  type RememberedNickname,
   WRITE_BATCH_SIZE,
   getNicknameIdeas,
   queueDwarfNicknames,
   writeNicknames,
 } from './-server'
-import { alliterate, alliterateAll, alliterationKey, livingCitizens } from './-utils'
+import { livingCitizens } from './-utils'
 
 export const Route = createFileRoute('/_authenticated/_app/nickname-dwarves/')({
   component: RouteComponent,
 })
 
-const MAX_IDEAS = 5
+const MAX_IDEAS = 6
 const MAX_QUEUE = 250
 const PARALLEL_WRITES = 3
 const ALLITERATE_KEY = 'nickname-dwarves-alliterate'
+const FLASH_MS = 1600
 
 /** What the player put in a dwarf's box: their own words, or one of the ideas as offered. */
 type Draft = { typed: string } | { idea: string }
@@ -67,6 +73,13 @@ function useAlliteration(): [boolean, (on: boolean) => void] {
   ]
 }
 
+function prefersReducedMotion(): boolean {
+  return (
+    document.documentElement.dataset.motion === 'reduce' ||
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+}
+
 function RouteComponent() {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useQuery({
@@ -82,11 +95,13 @@ function RouteComponent() {
     refetchOnWindowFocus: false,
   })
   const [search, setSearch] = React.useState('')
+  const [unnamedOnly, setUnnamedOnly] = React.useState(false)
   const [drafts, setDrafts] = React.useState<Record<number, Draft>>({})
   const [alliterative, setAlliterative] = useAlliteration()
   const [written, setWritten] = React.useState<Record<number, NicknameIdea[]>>({})
   const [writing, setWriting] = React.useState<{ done: number; total: number } | null>(null)
   const [asking, setAsking] = React.useState<ReadonlySet<number>>(new Set())
+  const [flash, setFlash] = React.useState<number | null>(null)
 
   const mutation = useMutation({
     mutationFn: (assignments: NicknameAssignment[]) =>
@@ -106,20 +121,39 @@ function RouteComponent() {
     [ideasQuery.data],
   )
   const writer = ideasQuery.data?.writer
+  const list = ideasQuery.data?.list ?? []
   const citizens = React.useMemo(() => livingCitizens(data?.units ?? []), [data?.units])
+  const withoutNickname = citizens.filter((unit) => !unit.nickname?.trim()).length
   const query = search.trim().toLowerCase()
   const visibleCitizens = React.useMemo(
     () =>
-      query
-        ? citizens.filter((unit) =>
+      citizens.filter(
+        (unit) =>
+          (!unnamedOnly || !unit.nickname?.trim()) &&
+          (!query ||
             [unit.readable, unit.name, unit.name_english, unit.nickname, unit.profession]
               .filter(Boolean)
-              .some((value) => value?.toLowerCase().includes(query)),
-          )
-        : citizens,
-    [citizens, query],
+              .some((value) => value?.toLowerCase().includes(query))),
+      ),
+    [citizens, query, unnamedOnly],
+  )
+  const calledBy = React.useMemo(
+    () =>
+      new Map(
+        citizens.map((unit) => [
+          unit.id,
+          unit.nickname?.trim() || dossiers.get(unit.id)?.name?.given || unit.readable,
+        ]),
+      ),
+    [citizens, dossiers],
   )
   const isLive = overview.data?.state?.status === 'live'
+
+  React.useEffect(() => {
+    if (flash === null) return
+    const timer = setTimeout(() => setFlash(null), FLASH_MS)
+    return () => clearTimeout(timer)
+  }, [flash])
 
   function ideasFor(unit: FortUnit): NicknameIdea[] {
     const seen = new Set<string>()
@@ -163,6 +197,15 @@ function RouteComponent() {
     return unit.nickname?.trim() || ideasFor(unit)[0]?.nickname || ''
   }
 
+  /** The idea behind what is in the box, so its reason travels with it into the game. */
+  function originOf(unit: FortUnit, nickname: string): Pick<NicknameAssignment, 'why' | 'source'> {
+    const key = nickname.trim().toLowerCase()
+    const idea = ideasFor(unit).find(
+      (i) => i.nickname.toLowerCase() === key || present(unit, i.nickname).toLowerCase() === key,
+    )
+    return idea ? { why: idea.why, source: idea.source } : { why: null, source: 'typed' }
+  }
+
   const changes = visibleCitizens.filter(
     (unit) => draftFor(unit).trim() !== (unit.nickname?.trim() ?? ''),
   )
@@ -170,7 +213,11 @@ function RouteComponent() {
 
   function queue(units: FortUnit[]) {
     mutation.mutate(
-      units.slice(0, MAX_QUEUE).map((unit) => ({ unitId: unit.id, nickname: draftFor(unit) })),
+      units.slice(0, MAX_QUEUE).map((unit) => {
+        const nickname = draftFor(unit)
+        return { unitId: unit.id, nickname, ...originOf(unit, nickname) }
+      }),
+      { onSuccess: () => void ideasQuery.refetch() },
     )
   }
 
@@ -182,6 +229,23 @@ function RouteComponent() {
         if (first) next[unit.id] = { idea: first.nickname }
       }
       return next
+    })
+  }
+
+  /** Brings a dwarf's row into view, clearing filters that hide it. */
+  function show(unitId: number) {
+    const unit = citizens.find((u) => u.id === unitId)
+    if (!unit) return
+    setSearch('')
+    if (unit.nickname?.trim()) setUnnamedOnly(false)
+    setFlash(unitId)
+    requestAnimationFrame(() => {
+      const row = document.getElementById(`dwarf-${unitId}`)
+      row?.scrollIntoView({
+        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
+        block: 'center',
+      })
+      row?.querySelector('input')?.focus({ preventScroll: true })
     })
   }
 
@@ -249,7 +313,7 @@ function RouteComponent() {
             </Badge>
           </span>
         }
-        description="Nicknames that could only belong to one dwarf, built on what sets each citizen apart from the rest of the fortress. The worker applies queued names to the running game through DFHack on its next poll."
+        description="Names worth shouting across the dining hall, each pinned on something only that dwarf has eaten, lost, loved, botched or survived. The worker applies queued names to the running game through DFHack on its next poll."
         updatedAt={data?.capturedAt}
         isFetching={isFetching || ideasQuery.isFetching}
         onRefresh={() => {
@@ -305,13 +369,22 @@ function RouteComponent() {
       />
       <StatusBanner state={overview.data?.state} />
 
+      {ideasQuery.data ? (
+        <NameList
+          list={list}
+          calledBy={calledBy}
+          onChanged={() => void ideasQuery.refetch()}
+          onShow={show}
+        />
+      ) : null}
+
       <Card>
         <CardHeader>
           <CardTitle>Living citizens</CardTitle>
-          <CardDescription>
-            Each idea rests on something that sets the dwarf apart: an odd best skill, a habit, a
-            mishap from the chronicle. Pick one, edit it or type your own; an empty box clears the
-            nickname.{' '}
+          <CardDescription className="max-w-3xl">
+            Each idea rests on something real: a favourite food that is somebody's brain, a missing
+            toe, a parent's nickname, a job they are hopeless at, a mishap from the chronicle. Pick
+            one, edit it or type your own; an empty box clears the nickname.{' '}
             {writer?.enabled
               ? `${writer.model} can write more from the same facts.`
               : 'Set LEGENDS_NARRATOR_PROVIDER and LEGENDS_NARRATOR_API_KEY to have a language model write them too.'}
@@ -325,8 +398,20 @@ function RouteComponent() {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search citizens"
+                aria-label="Search citizens"
                 className="pl-9"
               />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="nickname-unnamed"
+                checked={unnamedOnly}
+                onCheckedChange={setUnnamedOnly}
+              />
+              <Label htmlFor="nickname-unnamed" className="font-normal">
+                No nickname yet
+                <span className="text-muted-foreground tabular-nums">({withoutNickname})</span>
+              </Label>
             </div>
             <div className="flex items-center gap-2">
               <Switch
@@ -342,33 +427,51 @@ function RouteComponent() {
           </div>
 
           {visibleCitizens.length === 0 ? (
-            <EmptyState title={citizens.length === 0 ? 'No living citizens found' : 'No matches'}>
+            <EmptyState
+              title={
+                citizens.length === 0
+                  ? 'No living citizens found'
+                  : unnamedOnly && !query
+                    ? 'Everyone has a nickname'
+                    : 'No matches'
+              }
+            >
               {citizens.length === 0
                 ? 'Wait for the worker to capture a loaded fortress.'
-                : 'Try a different search.'}
+                : unnamedOnly && !query
+                  ? 'Turn off "No nickname yet" to rename someone.'
+                  : 'Try a different search.'}
             </EmptyState>
           ) : (
             <div className="divide-y rounded-lg border">
-              {visibleCitizens.map((unit) => (
-                <NicknameRow
-                  key={unit.id}
-                  unit={unit}
-                  draft={draftFor(unit)}
-                  ideas={ideasFor(unit).map((idea) => ({
-                    ...idea,
-                    label: present(unit, idea.nickname),
-                  }))}
-                  facts={dossiers.get(unit.id)?.facts ?? []}
-                  loadingIdeas={ideasQuery.isPending}
-                  disabled={!isLive || mutation.isPending}
-                  canAsk={Boolean(writer?.enabled)}
-                  asking={asking.has(unit.id)}
-                  onType={(typed) => setDrafts((current) => ({ ...current, [unit.id]: { typed } }))}
-                  onPick={(idea) => setDrafts((current) => ({ ...current, [unit.id]: { idea } }))}
-                  onQueue={() => queue([unit])}
-                  onAsk={() => write([unit], true)}
-                />
-              ))}
+              {visibleCitizens.map((unit) => {
+                const dossier = dossiers.get(unit.id)
+                return (
+                  <NicknameRow
+                    key={unit.id}
+                    unit={unit}
+                    draft={draftFor(unit)}
+                    ideas={ideasFor(unit).map((idea) => ({
+                      ...idea,
+                      label: present(unit, idea.nickname),
+                    }))}
+                    name={dossier?.name ?? null}
+                    facts={dossier?.facts ?? []}
+                    remembered={dossier?.remembered ?? null}
+                    flash={flash === unit.id}
+                    loadingIdeas={ideasQuery.isPending}
+                    disabled={!isLive || mutation.isPending}
+                    canAsk={Boolean(writer?.enabled)}
+                    asking={asking.has(unit.id)}
+                    onType={(typed) =>
+                      setDrafts((current) => ({ ...current, [unit.id]: { typed } }))
+                    }
+                    onPick={(idea) => setDrafts((current) => ({ ...current, [unit.id]: { idea } }))}
+                    onQueue={() => queue([unit])}
+                    onAsk={() => write([unit], true)}
+                  />
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -377,11 +480,47 @@ function RouteComponent() {
   )
 }
 
+const SOURCE_LABEL: Record<NicknameIdea['source'], string> = {
+  facts: 'From their story',
+  model: 'Written by the AI',
+  list: 'From your list',
+}
+
+function SourceIcon({ source }: { source: NicknameIdea['source'] }) {
+  if (source === 'model') return <SparklesIcon className="size-3" aria-hidden />
+  if (source === 'list') return <BookmarkIcon className="size-3" aria-hidden />
+  return null
+}
+
+/** How the game prints it: `Nickname' Surname, then the surname in plain words. */
+function InGame({ nickname, name }: { nickname: string; name: DwarfName | null }) {
+  const text = nickname.trim()
+  if (!text || !name?.surname) return null
+  const meaning = name.meaning && name.meaning !== name.surname ? name.meaning : null
+  return (
+    <p className="text-sm text-muted-foreground">
+      In the game:{' '}
+      <span className="font-medium text-foreground">
+        `{text}' {name.surname}
+      </span>
+      {meaning ? (
+        <>
+          {' '}
+          · {text} {meaning}
+        </>
+      ) : null}
+    </p>
+  )
+}
+
 function NicknameRow({
   unit,
   draft,
   ideas,
+  name,
   facts,
+  remembered,
+  flash,
   loadingIdeas,
   disabled,
   canAsk,
@@ -395,7 +534,10 @@ function NicknameRow({
   draft: string
   /** `label` is the idea as it would go into the game. */
   ideas: (NicknameIdea & { label: string })[]
+  name: DwarfName | null
   facts: DossierFact[]
+  remembered: RememberedNickname | null
+  flash: boolean
   loadingIdeas: boolean
   disabled: boolean
   canAsk: boolean
@@ -409,13 +551,17 @@ function NicknameRow({
   const chosen = ideas.find((idea) => idea.label.toLowerCase() === draft.trim().toLowerCase())
   return (
     <form
-      className="grid gap-3 p-3 md:grid-cols-[minmax(220px,1fr)_minmax(260px,420px)_auto] md:items-start"
+      id={`dwarf-${unit.id}`}
+      className={cn(
+        'grid scroll-mt-24 gap-3 p-3 transition-colors duration-700 md:grid-cols-[minmax(220px,1fr)_minmax(260px,440px)_auto] md:items-start',
+        flash && 'bg-primary/10',
+      )}
       onSubmit={(event) => {
         event.preventDefault()
         onQueue()
       }}
     >
-      <div className="flex min-w-0 items-center gap-3 md:pt-1">
+      <div className="flex min-w-0 items-start gap-3 md:pt-1">
         <CreatureSprite unit={unit} size={36} className="shrink-0" />
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -425,6 +571,11 @@ function NicknameRow({
           <div className="truncate text-sm text-muted-foreground">
             {unit.profession} · unit {unit.id}
           </div>
+          {remembered?.why ? (
+            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground" title={remembered.why}>
+              {remembered.source === 'list' ? remembered.why : `Named for: ${remembered.why}`}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -437,6 +588,7 @@ function NicknameRow({
           onChange={(event) => onType(event.target.value)}
           disabled={disabled}
         />
+        <InGame nickname={draft} name={name} />
         {ideas.length ? (
           <div className="flex flex-wrap gap-1.5">
             {ideas.map((idea) => {
@@ -447,21 +599,22 @@ function NicknameRow({
                   type="button"
                   onClick={() => onPick(idea.nickname)}
                   disabled={disabled}
-                  title={idea.why}
+                  title={`${SOURCE_LABEL[idea.source]}. ${idea.why}`}
                   aria-pressed={active}
                   className={cn(
                     'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
+                    idea.source === 'list' && !active && 'border-dashed',
                     active && 'border-primary bg-primary/10 text-primary',
                   )}
                 >
-                  {idea.source === 'model' ? <SparklesIcon className="size-3" aria-hidden /> : null}
+                  <SourceIcon source={idea.source} />
                   {idea.label}
                 </button>
               )
             })}
           </div>
         ) : loadingIdeas ? (
-          <p className="text-sm text-muted-foreground">Looking for what sets them apart…</p>
+          <p className="text-sm text-muted-foreground">Digging through their story…</p>
         ) : null}
         {chosen?.why ? <p className="text-sm text-muted-foreground">{chosen.why}</p> : null}
         {facts.length ? (

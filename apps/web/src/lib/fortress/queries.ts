@@ -5,6 +5,7 @@ import {
   getFortConcerns,
   getFortItem,
   getFortOverview,
+  getFortPeople,
   getFortSupplies,
   getFortUnit,
   getFortUnits,
@@ -59,6 +60,15 @@ export function useFortSupplies() {
   return useQuery({
     queryKey: ['fort', 'supplies'],
     queryFn: () => getFortSupplies(),
+    refetchInterval: FORT_SLOW_REFRESH_MS,
+  })
+}
+
+/** Bonds between citizens and the talents they may not use, read from every sheet. */
+export function useFortPeople() {
+  return useQuery({
+    queryKey: ['fort', 'people'],
+    queryFn: () => getFortPeople(),
     refetchInterval: FORT_SLOW_REFRESH_MS,
   })
 }

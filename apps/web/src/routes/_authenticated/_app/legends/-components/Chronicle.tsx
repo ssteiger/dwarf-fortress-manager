@@ -8,10 +8,10 @@ import { LegendsSprite } from '~/lib/df-assets/legends'
 import { type SpanDigest, getSpanDigest } from '~/lib/legends/chronicle'
 import { yearSpan } from '~/lib/legends/events'
 import { titleCase, words } from '~/lib/legends/model'
-import { spanLabel, summarizeSpan } from '~/lib/legends/prose'
+import { spanLabel, tellSpan } from '~/lib/legends/prose'
 import type { YearSpan } from './HistoryChart'
 import { PinButton } from './Journal'
-import { EventLine, RecordLink, Section } from './LegendsChrome'
+import { EventLine, RecordLink, Section, Telling } from './LegendsChrome'
 import { NarrateButton } from './Narrator'
 
 export function useSpanDigest(worldId: number, span: YearSpan | null) {
@@ -151,6 +151,9 @@ export function ChroniclePanel({
   )
 }
 
+/** Defining moments shown before "Show all". */
+const MOMENTS_PREVIEW = 12
+
 function ChronicleBody({
   worldId,
   digest,
@@ -165,10 +168,11 @@ function ChronicleBody({
   stale: boolean
 }) {
   const [showAll, setShowAll] = React.useState(false)
-  const moments = showAll ? digest.moments : digest.moments.slice(0, compact ? 12 : 25)
+  const moments = showAll ? digest.moments : digest.moments.slice(0, MOMENTS_PREVIEW)
+  const told = React.useMemo(() => tellSpan(digest), [digest])
   return (
     <div className={cn('flex flex-col gap-6', stale && 'opacity-60 transition-opacity')}>
-      <p className="max-w-[70ch] text-base">{summarizeSpan(digest)}</p>
+      <Telling paragraphs={told} worldId={worldId} />
 
       <div
         className={cn('grid gap-6', compact ? 'grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_280px]')}

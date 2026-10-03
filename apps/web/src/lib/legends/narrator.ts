@@ -3,11 +3,12 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 
 import { type ModelConfig, type ModelProvider, complete, readModelConfig } from '~/lib/ai/model'
-import { getSpanDigest, getStories } from './chronicle'
+import { getSpanDigest } from './chronicle'
 import { eventSentence, legendsDate, yearSpan } from './events'
 import { kindLabel, titleCase, words } from './model'
-import { spanLabel, summarizeSpan } from './prose'
+import { plainText, spanLabel, summarizeSpan } from './prose'
 import { R, type RefSet, addRefs, describeRows, eventsWhere, lookupNames } from './records'
+import { tellStory } from './tales'
 
 /**
  * An optional AI narrator. Configured through environment variables only;
@@ -175,12 +176,12 @@ async function spanFacts(worldId: number, from: number, to: number): Promise<Fac
 }
 
 async function storyFacts(worldId: number, key: string): Promise<Facts | null> {
-  const stories = await getStories({ data: { worldId } })
-  const story = stories.groups.flatMap((g) => g.stories).find((s) => s.key === key)
+  const story = await tellStory(worldId, key)
   if (!story) return null
-  const lines: string[] = [story.blurb]
-  if (story.events?.length) lines.push(...(await eventLines(worldId, story.events)))
-  const lead = story.refs[0]
+  const lines: string[] = story.paragraphs.map(plainText)
+  if (story.events.length)
+    lines.push(...(await eventLines(worldId, story.events.slice(0, MAX_FACTS / 2))))
+  const lead = story.cast[0]
   if (lead) {
     const more = await recordFacts(
       worldId,

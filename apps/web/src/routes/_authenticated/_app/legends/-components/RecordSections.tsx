@@ -593,7 +593,6 @@ export function FigureSections({
       </div>
 
       <div className="flex flex-col gap-4 lg:col-span-2">
-        {timeline}
         {skills.length ? (
           <Section title="Skills" count={skills.length}>
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
@@ -758,6 +757,7 @@ export function FigureSections({
             </div>
           </Section>
         ) : null}
+        {timeline}
       </div>
     </>
   )
@@ -1257,10 +1257,7 @@ export function EntitySections({
                   return `${words(str(s.type))}${features.length ? ` with ${features.join(', ')}` : ''}`
                 })
                 return (
-                  <li
-                    key={num(occasion.id) ?? str(occasion.name)}
-                    className="text-sm"
-                  >
+                  <li key={num(occasion.id) ?? str(occasion.name)} className="text-sm">
                     <span className="font-medium">{str(occasion.name) ?? 'A festival'}</span>
                     {parts.length ? (
                       <span className="text-muted-foreground"> · {parts.join('; ')}</span>

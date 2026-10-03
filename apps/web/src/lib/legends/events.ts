@@ -256,7 +256,7 @@ function ref(ctx: Ctx, kind: string, id: number | null, fallback: string) {
     return
   }
   const name = ctx.names[kind]?.[id]
-  ctx.out.push({ link: { kind, id }, text: name ? titleCase(name) : `${fallback} #${id}` })
+  ctx.out.push({ link: { kind, id }, text: name ? titleCase(name) : fallback })
 }
 
 function hf(ctx: Ctx, key: string, fallback = 'someone') {
@@ -501,9 +501,13 @@ const TEMPLATES: Record<string, (ctx: Ctx) => void> = {
     text(ctx, '.')
   },
   'hf does interaction': (ctx) => {
+    // The export words it "bit passing on …" or "cursed to assume …": verb, then the rest.
+    const action = str(ctx.plus.interaction_action) ?? 'affected'
+    const [verb, ...rest] = action.split(' ')
     hf(ctx, 'doer_hfid')
-    text(ctx, ` ${str(ctx.plus.interaction_action) ?? 'affected'} `)
+    text(ctx, ` ${verb} `)
     hf(ctx, 'target_hfid')
+    if (rest.length) text(ctx, verb === 'bit' ? `, ${rest.join(' ')}` : ` ${rest.join(' ')}`)
     place(ctx)
     text(ctx, '.')
   },

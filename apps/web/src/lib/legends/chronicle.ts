@@ -3,6 +3,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { type SQL, and, asc, desc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-orm'
 
 import { EVENT_CATEGORIES, eventCategory, num, numList, plusOf, str } from './events'
+import { figureEventCounts, remember } from './memo'
 import { racePlural, raceToken, titleCase, words } from './model'
 import { list, sentence } from './prose'
 import {
@@ -26,51 +27,6 @@ const R = schema.legends_records
 
 function eventsOf(worldId: number): SQL {
   return and(eq(R.world_id, worldId), eq(R.kind, 'historical_event')) as SQL
-}
-
-// ---------------------------------------------------------------------------
-// Per-world memo
-
-const memo = new Map<string, { version: string; value: Promise<unknown> }>()
-
-async function worldVersion(worldId: number): Promise<string> {
-  const [world, imports] = await Promise.all([
-    postgres_db
-      .select({ at: schema.legends_worlds.imported_at })
-      .from(schema.legends_worlds)
-      .where(eq(schema.legends_worlds.id, worldId))
-      .limit(1),
-    postgres_db
-      .select({ at: sql<string | null>`max(${schema.legends_imports.imported_at})` })
-      .from(schema.legends_imports)
-      .where(eq(schema.legends_imports.world_id, worldId)),
-  ])
-  return `${world[0]?.at ?? ''}|${imports[0]?.at ?? ''}`
-}
-
-async function remember<T>(worldId: number, key: string, compute: () => Promise<T>): Promise<T> {
-  const version = await worldVersion(worldId)
-  const cacheKey = `${worldId}:${key}`
-  const hit = memo.get(cacheKey)
-  if (hit && hit.version === version) return hit.value as Promise<T>
-  const value = compute().catch((error) => {
-    memo.delete(cacheKey)
-    throw error
-  })
-  memo.set(cacheKey, { version, value })
-  return value
-}
-
-/** Historical events that mention each figure, for weighing people and deaths. */
-function figureEventCounts(worldId: number): Promise<Map<number, number>> {
-  return remember(worldId, 'figure-counts', async () => {
-    const rows = await postgres_db.execute<{ hf: number; c: number }>(sql`
-      select hf, count(*)::int as c
-      from (select unnest(${R.hfids}) as hf from ${R} where ${eventsOf(worldId)}) s
-      group by hf
-    `)
-    return new Map([...rows].map((row) => [Number(row.hf), Number(row.c)]))
-  })
 }
 
 // ---------------------------------------------------------------------------
@@ -330,9 +286,13 @@ export interface SpanDigest {
   }
   /** The events worth reading, in order. */
   moments: LegendsRecord[]
+  /** The deaths most worth telling, the weightiest first. */
+  deaths: LegendsRecord[]
   battles: SpanBattle[]
   wars: SpanWar[]
   people: SpanPerson[]
+  /** The civilizations these years' events name most often. */
+  powers: { id: number; name: string | null; race: string | null; events: number }[]
   pins: SpanPin[]
   names: NameIndex
 }
@@ -403,7 +363,7 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
       .filter(([, m]) => span <= m.maxSpan)
       .map(([type]) => type)
 
-    const [countRows, typed, deathRows, people, warRows, battleRows, figureCounts] =
+    const [countRows, typed, deathRows, people, warRows, battleRows, figureCounts, groupRows] =
       await Promise.all([
         postgres_db
           .select({ type: R.type, count: sql<number>`count(*)::int` })
@@ -453,7 +413,51 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
             ),
           ),
         figureEventCounts(data.worldId),
+        postgres_db.execute<{ en: number; c: number }>(sql`
+        select en, count(*)::int as c
+        from (select unnest(${R.entity_ids}) as en from ${R} where ${inSpan}) s
+        group by en order by c desc limit 40
+      `),
       ])
+    const groupIds = [...groupRows].map((row) => Number(row.en))
+    const civRows = groupIds.length
+      ? await postgres_db
+          .select({
+            id: R.id,
+            name: R.name,
+            race: sql<string | null>`${R.payload}->'plus'->>'race'`,
+          })
+          .from(R)
+          .where(
+            and(
+              W,
+              eq(R.kind, 'entity'),
+              inArray(R.id, groupIds),
+              sql`${R.payload}->'plus'->>'type' = 'civilization'`,
+            ),
+          )
+      : []
+    const civById = new Map(civRows.map((c) => [c.id, c]))
+    const powers = [...groupRows]
+      .filter((row) => civById.has(Number(row.en)))
+      .slice(0, 3)
+      .map((row) => {
+        const civ = civById.get(Number(row.en))
+        return {
+          id: Number(row.en),
+          name: civ?.name ?? null,
+          race: civ?.race ?? null,
+          events: Number(row.c),
+        }
+      })
+    const warById = new Map(warRows.map((w) => [w.id, w.payload as LegendsPayload]))
+    const battleSide = (p: LegendsPayload, own: string, fromWar: string) => {
+      const id = num(p[own])
+      if (id !== null && id >= 0) return id
+      const war = warById.get(num(p.war_eventcol) ?? -1)
+      const other = war ? num(war[fromWar]) : null
+      return other !== null && other >= 0 ? other : null
+    }
 
     // Deaths weigh by how much history the dead had; a famous slayer adds to it.
     const deaths = deathRows
@@ -498,13 +502,18 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
     const refs: RefSet = {}
     for (const event of scored) addRefs(refs, event.payload)
     for (const war of warRows) addRefs(refs, war.payload)
+    for (const war of warRows) addRef(refs, 'historical_event_collection', war.id)
     for (const battle of battleRows) {
       const p = battle.payload as LegendsPayload
+      addRef(refs, 'historical_event_collection', battle.id)
       addRef(refs, 'site', p.site_id)
-      addRef(refs, 'entity', p.attacking_enid)
-      addRef(refs, 'entity', p.defending_enid)
+      addRef(refs, 'entity', battleSide(p, 'attacking_enid', 'aggressor_ent_id'))
+      addRef(refs, 'entity', battleSide(p, 'defending_enid', 'defender_ent_id'))
     }
+    for (const power of powers) addRef(refs, 'entity', power.id)
+    for (const event of deathEvents) addRefs(refs, event.payload)
     const peopleIds = [...people].map((row) => Number(row.hf))
+    for (const id of peopleIds) addRef(refs, 'historical_figure', id)
     const peopleRecords = peopleIds.length
       ? await postgres_db
           .select({ id: R.id, name: R.name, type: R.type, payload: R.payload })
@@ -584,6 +593,9 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
         battles: battleRows.length + typeCount('field battle'),
       },
       moments: scored,
+      deaths: [...deathEvents]
+        .sort((a, b) => (deathScore.get(b.id) ?? 0) - (deathScore.get(a.id) ?? 0))
+        .slice(0, 5),
       battles: battleRows
         .map((battle) => {
           const p = battle.payload as LegendsPayload
@@ -594,8 +606,8 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
             casualties: squadDeaths(p),
             outcome: str(p.outcome),
             site: refOf(names, 'site', p.site_id),
-            attacker: refOf(names, 'entity', p.attacking_enid),
-            defender: refOf(names, 'entity', p.defending_enid),
+            attacker: refOf(names, 'entity', battleSide(p, 'attacking_enid', 'aggressor_ent_id')),
+            defender: refOf(names, 'entity', battleSide(p, 'defending_enid', 'defender_ent_id')),
           }
         })
         .sort((a, b) => b.casualties - a.casualties),
@@ -623,6 +635,7 @@ export const getSpanDigest = createServerFn({ method: 'GET' })
           events: Number(row.c),
         }
       }),
+      powers,
       pins,
       names,
     }
@@ -664,7 +677,7 @@ export interface Stories {
 
 const PLAIN_DEATHS = ['struck', 'murdered', 'old age', 'shot']
 
-function curseFamily(token: string): { key: string; label: string } {
+export function curseFamily(token: string): { key: string; label: string } {
   if (token.startsWith('DEITY_CURSE_WEREBEAST')) {
     const animal = token
       .replace('DEITY_CURSE_WEREBEAST_', '')
@@ -693,128 +706,122 @@ function plural(n: number, one: string, many = `${one}s`): string {
 
 export const getStories = createServerFn({ method: 'GET' })
   .inputValidator((input: { worldId: number }) => input)
-  .handler(
-    async ({ data }): Promise<Stories> =>
-      remember(data.worldId, 'stories', async () => {
-        const worldId = data.worldId
-        const W = eq(R.world_id, worldId)
-        const E = eventsOf(worldId)
-        const refs: RefSet = {}
-        const groups: StoryGroup[] = []
+  .handler(async ({ data }): Promise<Stories> => worldStories(data.worldId))
 
-        const [
-          battleRows,
-          slayerRows,
-          eaterRows,
-          longLived,
-          figureCounts,
-          cursedRows,
-          civRows,
-          siteCivRows,
-          lossRows,
-          lastSeenRows,
-          contestedRows,
-          artifactRows,
-          loverRows,
-          grudgeRows,
-          strangeRows,
-          authorRows,
-          warRows,
-        ] = await Promise.all([
-          postgres_db
-            .select({ id: R.id, name: R.name, payload: R.payload })
-            .from(R)
-            .where(and(W, eq(R.kind, 'historical_event_collection'), eq(R.type, 'battle'))),
-          postgres_db.execute<{ hf: number; c: number; first: number; last: number }>(sql`
+function worldStories(worldId: number): Promise<Stories> {
+  return remember(worldId, 'stories', async () => {
+    const W = eq(R.world_id, worldId)
+    const E = eventsOf(worldId)
+    const refs: RefSet = {}
+    const groups: StoryGroup[] = []
+
+    const [
+      battleRows,
+      slayerRows,
+      eaterRows,
+      longLived,
+      figureCounts,
+      cursedRows,
+      civRows,
+      siteCivRows,
+      lossRows,
+      lastSeenRows,
+      contestedRows,
+      artifactRows,
+      loverRows,
+      grudgeRows,
+      strangeRows,
+      authorRows,
+      warRows,
+    ] = await Promise.all([
+      postgres_db
+        .select({ id: R.id, name: R.name, payload: R.payload })
+        .from(R)
+        .where(and(W, eq(R.kind, 'historical_event_collection'), eq(R.type, 'battle'))),
+      postgres_db.execute<{ hf: number; c: number; first: number; last: number }>(sql`
           select (${R.payload}->>'slayer_hfid')::int as hf, count(*)::int as c, min(${R.year}) as first, max(${R.year}) as last
           from ${R} where ${E} and ${R.type} = 'hf died' and (${R.payload}->>'slayer_hfid')::int >= 0
           group by 1 order by c desc limit 8
         `),
-          postgres_db.execute<{ hf: number; c: number; first: number; last: number }>(sql`
+      postgres_db.execute<{ hf: number; c: number; first: number; last: number }>(sql`
           select (${R.payload}->'plus'->>'eater')::int as hf, count(*)::int as c, min(${R.year}) as first, max(${R.year}) as last
           from ${R} where ${E} and ${R.type} = 'creature devoured' and (${R.payload}->'plus'->>'eater')::int >= 0
           group by 1 order by c desc limit 6
         `),
-          postgres_db
-            .select({ id: R.id, name: R.name, type: R.type, payload: R.payload })
-            .from(R)
-            .where(
-              and(
-                W,
-                eq(R.kind, 'historical_figure'),
-                sql`not (${R.payload} ? 'deity') and not (${R.payload} ? 'force')`,
-                sql`(${R.payload}->>'birth_year')::int >= 0 and (${R.payload}->>'death_year')::int >= 0`,
-              ),
-            )
-            .orderBy(
-              desc(sql`(${R.payload}->>'death_year')::int - (${R.payload}->>'birth_year')::int`),
-            )
-            .limit(6),
-          figureEventCounts(worldId),
-          postgres_db
-            .select({
-              id: R.id,
-              name: R.name,
-              type: R.type,
-              curses: sql<unknown>`${R.payload}->'active_interaction'`,
-            })
-            .from(R)
-            .where(
-              and(W, eq(R.kind, 'historical_figure'), sql`${R.payload} ? 'active_interaction'`),
-            ),
-          postgres_db
-            .select({
-              id: R.id,
-              name: R.name,
-              race: sql<string | null>`${R.payload}->'plus'->>'race'`,
-            })
-            .from(R)
-            .where(
-              and(W, eq(R.kind, 'entity'), sql`${R.payload}->'plus'->>'type' = 'civilization'`),
-            ),
-          postgres_db
-            .select({
-              civ: sql<number>`(${R.payload}->'plus'->>'civ_id')::int`,
-              count: sql<number>`count(*)::int`,
-            })
-            .from(R)
-            .where(and(W, eq(R.kind, 'site'), sql`(${R.payload}->'plus'->>'civ_id')::int >= 0`))
-            .groupBy(sql`1`),
-          postgres_db.execute<{ civ: number; c: number; last: number }>(sql`
+      postgres_db
+        .select({ id: R.id, name: R.name, type: R.type, payload: R.payload })
+        .from(R)
+        .where(
+          and(
+            W,
+            eq(R.kind, 'historical_figure'),
+            sql`not (${R.payload} ? 'deity') and not (${R.payload} ? 'force')`,
+            sql`(${R.payload}->>'birth_year')::int >= 0 and (${R.payload}->>'death_year')::int >= 0`,
+          ),
+        )
+        .orderBy(desc(sql`(${R.payload}->>'death_year')::int - (${R.payload}->>'birth_year')::int`))
+        .limit(6),
+      figureEventCounts(worldId),
+      postgres_db
+        .select({
+          id: R.id,
+          name: R.name,
+          type: R.type,
+          curses: sql<unknown>`${R.payload}->'active_interaction'`,
+        })
+        .from(R)
+        .where(and(W, eq(R.kind, 'historical_figure'), sql`${R.payload} ? 'active_interaction'`)),
+      postgres_db
+        .select({
+          id: R.id,
+          name: R.name,
+          race: sql<string | null>`${R.payload}->'plus'->>'race'`,
+        })
+        .from(R)
+        .where(and(W, eq(R.kind, 'entity'), sql`${R.payload}->'plus'->>'type' = 'civilization'`)),
+      postgres_db
+        .select({
+          civ: sql<number>`(${R.payload}->'plus'->>'civ_id')::int`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(R)
+        .where(and(W, eq(R.kind, 'site'), sql`(${R.payload}->'plus'->>'civ_id')::int >= 0`))
+        .groupBy(sql`1`),
+      postgres_db.execute<{ civ: number; c: number; last: number }>(sql`
           select (${R.payload}->>'defender_civ_id')::int as civ, count(*)::int as c, max(${R.year}) as last
           from ${R} where ${E} and ${R.type} in ('site taken over', 'hf destroyed site')
           group by 1
         `),
-          postgres_db.execute<{ en: number; last: number }>(sql`
+      postgres_db.execute<{ en: number; last: number }>(sql`
           select en, max(year) as last
           from (select unnest(${R.entity_ids}) as en, ${R.year} as year from ${R} where ${E}) s
           group by en
         `),
-          postgres_db.execute<{ site: number; c: number; first: number; last: number }>(sql`
+      postgres_db.execute<{ site: number; c: number; first: number; last: number }>(sql`
           select (${R.payload}->>'site_id')::int as site, count(*)::int as c, min(${R.year}) as first, max(${R.year}) as last
           from ${R}
           where ${E} and ${R.type} in ('site taken over', 'attacked site', 'hf destroyed site', 'plundered site', 'new site leader')
             and (${R.payload}->>'site_id')::int >= 0
           group by 1 order by c desc limit 6
         `),
-          postgres_db.execute<{ a: number; c: number; first: number }>(sql`
+      postgres_db.execute<{ a: number; c: number; first: number }>(sql`
           select a, count(*)::int as c, min(year) as first
           from (select unnest(${R.artifact_ids}) as a, ${R.year} as year from ${R} where ${E}) s
           group by a order by c desc limit 8
         `),
-          postgres_db.execute<{ hf: number; c: number }>(sql`
+      postgres_db.execute<{ hf: number; c: number }>(sql`
           select (${R.payload}->'plus'->>'source_hf')::int as hf, count(*)::int as c
           from ${R}
           where ${W} and ${R.kind} = 'historical_event_relationship'
             and ${R.payload}->'plus'->>'relationship' in ('lover', 'former_lover')
           group by 1 order by c desc limit 5
         `),
-          postgres_db.execute<{
-            source: number
-            target: number
-            relationship: string
-            year: number | null
-          }>(sql`
+      postgres_db.execute<{
+        source: number
+        target: number
+        relationship: string
+        year: number | null
+      }>(sql`
           select (${R.payload}->'plus'->>'source_hf')::int as source, (${R.payload}->'plus'->>'target_hf')::int as target,
                  ${R.payload}->'plus'->>'relationship' as relationship, (${R.payload}->'plus'->>'year')::int as year
           from ${R}
@@ -822,434 +829,426 @@ export const getStories = createServerFn({ method: 'GET' })
             and ${R.payload}->'plus'->>'relationship' in ('grudge', 'jealous_obsession', 'religious_persecution_grudge')
           order by year asc limit 6
         `),
-          postgres_db
-            .select()
-            .from(R)
-            .where(
-              and(
-                E,
-                eq(R.type, 'hf died'),
-                sql`${R.payload} ? 'cause'`,
-                sql`not (${R.payload}->>'cause' = any(${sql`array[${sql.join(
-                  PLAIN_DEATHS.map((c) => sql`${c}`),
-                  sql`, `,
-                )}]::text[]`}))`,
-              ),
-            )
-            .orderBy(asc(R.year))
-            .limit(10),
-          postgres_db.execute<{ hf: number; c: number }>(sql`
+      postgres_db
+        .select()
+        .from(R)
+        .where(
+          and(
+            E,
+            eq(R.type, 'hf died'),
+            sql`${R.payload} ? 'cause'`,
+            sql`not (${R.payload}->>'cause' = any(${sql`array[${sql.join(
+              PLAIN_DEATHS.map((c) => sql`${c}`),
+              sql`, `,
+            )}]::text[]`}))`,
+          ),
+        )
+        .orderBy(asc(R.year))
+        .limit(10),
+      postgres_db.execute<{ hf: number; c: number }>(sql`
           select (${R.payload}->>'author_hfid')::int as hf, count(*)::int as c
           from ${R} where ${W} and ${R.kind} = 'written_content' and (${R.payload}->>'author_hfid')::int >= 0
           group by 1 order by c desc limit 6
         `),
-          postgres_db
+      postgres_db
+        .select({
+          id: R.id,
+          aggressor: sql<number | null>`(${R.payload}->>'aggressor_ent_id')::int`,
+          defender: sql<number | null>`(${R.payload}->>'defender_ent_id')::int`,
+        })
+        .from(R)
+        .where(and(W, eq(R.kind, 'historical_event_collection'), eq(R.type, 'war'))),
+    ])
+
+    // Battles name no civilizations; the war they belong to does.
+    const wars = new Map(warRows.map((w) => [w.id, w]))
+    const battleSides = (p: LegendsPayload) => {
+      const war = wars.get(num(p.war_eventcol) ?? -1)
+      const attacker = num(p.attacking_enid) ?? war?.aggressor ?? null
+      const defender = num(p.defending_enid) ?? war?.defender ?? null
+      return {
+        attacker: attacker !== null && attacker >= 0 ? attacker : null,
+        defender: defender !== null && defender >= 0 ? defender : null,
+      }
+    }
+
+    // Everyone and everything the stories will name.
+    for (const b of battleRows) {
+      const p = b.payload as LegendsPayload
+      const sides = battleSides(p)
+      addRef(refs, 'site', p.site_id)
+      addRef(refs, 'entity', sides.attacker)
+      addRef(refs, 'entity', sides.defender)
+    }
+    for (const row of [...slayerRows, ...eaterRows, ...loverRows, ...authorRows])
+      addRef(refs, 'historical_figure', Number(row.hf))
+    for (const row of grudgeRows) {
+      addRef(refs, 'historical_figure', Number(row.source))
+      addRef(refs, 'historical_figure', Number(row.target))
+    }
+    for (const row of contestedRows) addRef(refs, 'site', Number(row.site))
+    for (const row of artifactRows) addRef(refs, 'artifact', Number(row.a))
+    for (const event of strangeRows) addRefs(refs, event.payload)
+    const eventful = [...figureCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    for (const [hf] of eventful) addRef(refs, 'historical_figure', hf)
+
+    // Cursed: group by curse family, keep the most storied of each.
+    const families = new Map<
+      string,
+      {
+        label: string
+        count: number
+        members: { id: number; name: string | null; events: number }[]
+      }
+    >()
+    for (const row of cursedRows) {
+      const tokens = Array.isArray(row.curses) ? row.curses.map(String) : []
+      const seen = new Set<string>()
+      for (const token of tokens) {
+        const family = curseFamily(token)
+        if (seen.has(family.key)) continue
+        seen.add(family.key)
+        const entry = families.get(family.key) ?? { label: family.label, count: 0, members: [] }
+        entry.count++
+        entry.members.push({
+          id: row.id,
+          name: row.name,
+          events: figureCounts.get(row.id) ?? 0,
+        })
+        families.set(family.key, entry)
+      }
+    }
+    for (const family of families.values()) {
+      family.members.sort((a, b) => b.events - a.events)
+      family.members = family.members.slice(0, 3)
+      for (const member of family.members) addRef(refs, 'historical_figure', member.id)
+    }
+
+    const names = await lookupNames(worldId, refs)
+    const figureRecords = await postgres_db
+      .select({ id: R.id, name: R.name, type: R.type, payload: R.payload })
+      .from(R)
+      .where(
+        and(
+          W,
+          eq(R.kind, 'historical_figure'),
+          inArray(R.id, [...new Set([...(refs.historical_figure ?? [])])].slice(0, 500)),
+        ),
+      )
+    const figure = new Map(figureRecords.map((r) => [r.id, r]))
+    const raceOf = (id: number) => {
+      const r = figure.get(id)
+      const p = (r?.payload ?? {}) as LegendsPayload
+      return str(plusOf(p).race) ?? (r?.type ? words(r.type) : null)
+    }
+    const life = (id: number) => {
+      const p = (figure.get(id)?.payload ?? {}) as LegendsPayload
+      const birth = num(p.birth_year)
+      const death = num(p.death_year)
+      if (birth === null || birth < 0) return death !== null && death >= 0 ? `died ${death}` : ''
+      return death !== null && death >= 0 ? `${birth}–${death}` : `born ${birth}, still alive`
+    }
+    const hfRef = (id: number): StoryRef => ({
+      kind: 'historical_figure',
+      id,
+      name: names.historical_figure?.[id] ?? null,
+      race: figure.get(id)?.type ?? null,
+    })
+    const hfName = (id: number) =>
+      nameOr(names, 'historical_figure', id, raceOf(id) ? `an unnamed ${raceOf(id)}` : 'someone')
+
+    // Great battles.
+    const battles = battleRows
+      .map((b) => ({
+        b,
+        p: b.payload as LegendsPayload,
+        deaths: squadDeaths(b.payload as LegendsPayload),
+      }))
+      .filter((x) => x.deaths > 0)
+      .sort((a, b) => b.deaths - a.deaths)
+      .slice(0, 8)
+    groups.push({
+      key: 'battles',
+      title: 'Great battles',
+      description: 'Where the most fell.',
+      stories: battles.map(({ b, p, deaths }) => {
+        const { attacker, defender } = battleSides(p)
+        const site = num(p.site_id)
+        const year = num(p.start_year)
+        const races = (key: 'attacking_squad_race' | 'defending_squad_race') => {
+          const raw = p[key]
+          const tokens = Array.isArray(raw) ? [...new Set(raw.map(String))] : []
+          return tokens.length
+            ? list(tokens.slice(0, 3).map((t) => `${words(t)}s`)) +
+                (tokens.length > 3 ? ' and others' : '')
+            : null
+        }
+        const side = (
+          id: number | null,
+          key: 'attacking_squad_race' | 'defending_squad_race',
+          fallback: string,
+        ) => (id !== null ? nameOr(names, 'entity', id, fallback) : (races(key) ?? fallback))
+        return {
+          key: `battle-${b.id}`,
+          title: b.name ? titleCase(b.name) : `Battle #${b.id}`,
+          blurb: `${sentence(side(attacker, 'attacking_squad_race', 'unknown forces'))} fell upon ${side(defender, 'defending_squad_race', 'unknown defenders')}${site !== null && site >= 0 ? ` at ${nameOr(names, 'site', site, 'an unnamed site')}` : ''}${year !== null ? ` in ${year}` : ''}. ${plural(deaths, 'soldier')} fell${str(p.outcome) ? `; ${str(p.outcome)}` : ''}.`,
+          year,
+          refs: [
+            { kind: 'historical_event_collection', id: b.id, name: b.name },
+            ...(site !== null && site >= 0
+              ? [{ kind: 'site', id: site, name: names.site?.[site] ?? null }]
+              : []),
+            ...[attacker, defender]
+              .filter((id): id is number => id !== null)
+              .map((id) => ({ kind: 'entity', id, name: names.entity?.[id] ?? null })),
+          ],
+          score: deaths,
+        }
+      }),
+    })
+
+    // Monsters and slayers.
+    const slayerStories: Story[] = [...slayerRows].map((row) => {
+      const id = Number(row.hf)
+      return {
+        key: `slayer-${id}`,
+        title: hfName(id),
+        blurb: `${raceOf(id) ? `A ${raceOf(id)}. ` : ''}${plural(Number(row.c), 'recorded kill')} between ${row.first} and ${row.last}.${life(id) ? ` ${sentence(life(id))}.` : ''}`,
+        year: Number(row.first),
+        refs: [hfRef(id)],
+        score: Number(row.c),
+      }
+    })
+    const eaterStories: Story[] = [...eaterRows]
+      .filter((row) => !slayerRows.some((s) => Number(s.hf) === Number(row.hf)))
+      .map((row) => {
+        const id = Number(row.hf)
+        return {
+          key: `eater-${id}`,
+          title: hfName(id),
+          blurb: `${raceOf(id) ? `A ${raceOf(id)} that ` : 'A beast that '}devoured ${plural(Number(row.c), 'creature')} between ${row.first} and ${row.last}.`,
+          year: Number(row.first),
+          refs: [hfRef(id)],
+          score: Number(row.c) / 4,
+        }
+      })
+    groups.push({
+      key: 'slayers',
+      title: 'Monsters and slayers',
+      description: 'The deadliest names in the records.',
+      stories: [...slayerStories, ...eaterStories].sort((a, b) => b.score - a.score).slice(0, 10),
+    })
+
+    // Lives worth reading.
+    const lives: Story[] = eventful.map(([id, count]) => ({
+      key: `eventful-${id}`,
+      title: hfName(id),
+      blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}` : 'Figure'}${life(id) ? `, ${life(id)}` : ''}. Named in ${plural(count, 'event')}.`,
+      year: num((figure.get(id)?.payload as LegendsPayload | undefined)?.birth_year),
+      refs: [hfRef(id)],
+      score: count,
+    }))
+    for (const row of longLived) {
+      const p = row.payload as LegendsPayload
+      const birth = num(p.birth_year) ?? 0
+      const death = num(p.death_year) ?? 0
+      const race = str(plusOf(p).race) ?? words(row.type)
+      lives.push({
+        key: `longlived-${row.id}`,
+        title: row.name ? titleCase(row.name) : `An unnamed ${race}`,
+        blurb: `${titleCase(race)} who lived ${death - birth} years, from ${birth} to ${death}.`,
+        year: birth,
+        refs: [{ kind: 'historical_figure', id: row.id, name: row.name, race: row.type }],
+        score: death - birth,
+      })
+    }
+    groups.push({
+      key: 'lives',
+      title: 'Lives worth reading',
+      description: 'The most storied and the longest-lived.',
+      stories: lives,
+    })
+
+    // The cursed.
+    const cursed: Story[] = [...families.entries()]
+      .sort((a, b) => b[1].count - a[1].count)
+      .map(([key, family]) => {
+        const lead = family.members[0]
+        return {
+          key: `curse-${key}`,
+          title: `${titleCase(family.label)}`,
+          blurb: `${plural(family.count, 'soul')} carry ${family.label}${lead ? `; the most storied is ${lead.name ? titleCase(lead.name) : 'an unnamed one'}, named in ${plural(lead.events, 'event')}` : ''}.`,
+          year: null,
+          refs: family.members.map((m) => hfRef(m.id)),
+          score: family.count,
+        }
+      })
+    groups.push({
+      key: 'cursed',
+      title: 'The cursed',
+      description: 'Werebeasts, necromancers and the undead.',
+      stories: cursed,
+    })
+
+    // Fallen civilizations.
+    const held = new Map(siteCivRows.map((r) => [Number(r.civ), Number(r.count)]))
+    const losses = new Map(
+      [...lossRows].map((r) => [Number(r.civ), { c: Number(r.c), last: Number(r.last) }]),
+    )
+    const lastSeen = new Map([...lastSeenRows].map((r) => [Number(r.en), Number(r.last)]))
+    // Named peoples first: the unnamed are mostly animal-folk bands with no story to tell.
+    const fallen: Story[] = civRows
+      .filter((civ) => !held.get(civ.id))
+      .map((civ) => {
+        const loss = losses.get(civ.id)
+        const last = lastSeen.get(civ.id) ?? null
+        return {
+          key: `fallen-${civ.id}`,
+          title: civ.name
+            ? titleCase(civ.name)
+            : `An unnamed ${civ.race ? `${words(civ.race)} ` : ''}people`,
+          blurb: `${civ.race ? `A civilization of ${racePlural(civ.race)}. ` : ''}Holds no sites today${loss ? `; lost ${plural(loss.c, 'site')} to conquest or ruin, the last in ${loss.last}` : ''}.${last !== null ? ` Last heard of in ${last}.` : ''}`,
+          year: last,
+          refs: [{ kind: 'entity', id: civ.id, name: civ.name, race: raceToken(civ.race) }],
+          score: (civ.name ? 1000 : 0) + (loss?.c ?? 0) * 10 + (last ?? 0) / 1000,
+        }
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+    groups.push({
+      key: 'fallen',
+      title: 'Fallen civilizations',
+      description: 'Peoples who hold nothing now.',
+      stories: fallen,
+    })
+
+    // Contested sites.
+    groups.push({
+      key: 'contested',
+      title: 'Contested ground',
+      description: 'Sites attacked and taken again and again.',
+      stories: [...contestedRows].map((row) => {
+        const id = Number(row.site)
+        return {
+          key: `contested-${id}`,
+          title: nameOr(names, 'site', id, `Site #${id}`),
+          blurb: `Fought over ${plural(Number(row.c), 'time')} between ${row.first} and ${row.last}.`,
+          year: Number(row.first),
+          refs: [{ kind: 'site', id, name: names.site?.[id] ?? null }],
+          score: Number(row.c),
+        }
+      }),
+    })
+
+    // Legendary artifacts.
+    const artifactIds = [...artifactRows].map((r) => Number(r.a))
+    const artifactHits: LegendsHit[] = artifactIds.length
+      ? await describeRows(
+          worldId,
+          await postgres_db
             .select({
+              kind: R.kind,
               id: R.id,
-              aggressor: sql<number | null>`(${R.payload}->>'aggressor_ent_id')::int`,
-              defender: sql<number | null>`(${R.payload}->>'defender_ent_id')::int`,
+              name: R.name,
+              type: R.type,
+              year: R.year,
+              payload: R.payload,
             })
             .from(R)
-            .where(and(W, eq(R.kind, 'historical_event_collection'), eq(R.type, 'war'))),
-        ])
-
-        // Battles name no civilizations; the war they belong to does.
-        const wars = new Map(warRows.map((w) => [w.id, w]))
-        const battleSides = (p: LegendsPayload) => {
-          const war = wars.get(num(p.war_eventcol) ?? -1)
-          const attacker = num(p.attacking_enid) ?? war?.aggressor ?? null
-          const defender = num(p.defending_enid) ?? war?.defender ?? null
-          return {
-            attacker: attacker !== null && attacker >= 0 ? attacker : null,
-            defender: defender !== null && defender >= 0 ? defender : null,
-          }
-        }
-
-        // Everyone and everything the stories will name.
-        for (const b of battleRows) {
-          const p = b.payload as LegendsPayload
-          const sides = battleSides(p)
-          addRef(refs, 'site', p.site_id)
-          addRef(refs, 'entity', sides.attacker)
-          addRef(refs, 'entity', sides.defender)
-        }
-        for (const row of [...slayerRows, ...eaterRows, ...loverRows, ...authorRows])
-          addRef(refs, 'historical_figure', Number(row.hf))
-        for (const row of grudgeRows) {
-          addRef(refs, 'historical_figure', Number(row.source))
-          addRef(refs, 'historical_figure', Number(row.target))
-        }
-        for (const row of contestedRows) addRef(refs, 'site', Number(row.site))
-        for (const row of artifactRows) addRef(refs, 'artifact', Number(row.a))
-        for (const event of strangeRows) addRefs(refs, event.payload)
-        const eventful = [...figureCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
-        for (const [hf] of eventful) addRef(refs, 'historical_figure', hf)
-
-        // Cursed: group by curse family, keep the most storied of each.
-        const families = new Map<
-          string,
-          {
-            label: string
-            count: number
-            members: { id: number; name: string | null; events: number }[]
-          }
-        >()
-        for (const row of cursedRows) {
-          const tokens = Array.isArray(row.curses) ? row.curses.map(String) : []
-          const seen = new Set<string>()
-          for (const token of tokens) {
-            const family = curseFamily(token)
-            if (seen.has(family.key)) continue
-            seen.add(family.key)
-            const entry = families.get(family.key) ?? { label: family.label, count: 0, members: [] }
-            entry.count++
-            entry.members.push({
-              id: row.id,
-              name: row.name,
-              events: figureCounts.get(row.id) ?? 0,
-            })
-            families.set(family.key, entry)
-          }
-        }
-        for (const family of families.values()) {
-          family.members.sort((a, b) => b.events - a.events)
-          family.members = family.members.slice(0, 3)
-          for (const member of family.members) addRef(refs, 'historical_figure', member.id)
-        }
-
-        const names = await lookupNames(worldId, refs)
-        const figureRecords = await postgres_db
-          .select({ id: R.id, name: R.name, type: R.type, payload: R.payload })
-          .from(R)
-          .where(
-            and(
-              W,
-              eq(R.kind, 'historical_figure'),
-              inArray(R.id, [...new Set([...(refs.historical_figure ?? [])])].slice(0, 500)),
-            ),
-          )
-        const figure = new Map(figureRecords.map((r) => [r.id, r]))
-        const raceOf = (id: number) => {
-          const r = figure.get(id)
-          const p = (r?.payload ?? {}) as LegendsPayload
-          return str(plusOf(p).race) ?? (r?.type ? words(r.type) : null)
-        }
-        const life = (id: number) => {
-          const p = (figure.get(id)?.payload ?? {}) as LegendsPayload
-          const birth = num(p.birth_year)
-          const death = num(p.death_year)
-          if (birth === null || birth < 0)
-            return death !== null && death >= 0 ? `died ${death}` : ''
-          return death !== null && death >= 0 ? `${birth}–${death}` : `born ${birth}, still alive`
-        }
-        const hfRef = (id: number): StoryRef => ({
-          kind: 'historical_figure',
-          id,
-          name: names.historical_figure?.[id] ?? null,
-          race: figure.get(id)?.type ?? null,
-        })
-        const hfName = (id: number) =>
-          nameOr(
-            names,
-            'historical_figure',
-            id,
-            raceOf(id) ? `an unnamed ${raceOf(id)}` : 'someone',
-          )
-
-        // Great battles.
-        const battles = battleRows
-          .map((b) => ({
-            b,
-            p: b.payload as LegendsPayload,
-            deaths: squadDeaths(b.payload as LegendsPayload),
-          }))
-          .filter((x) => x.deaths > 0)
-          .sort((a, b) => b.deaths - a.deaths)
-          .slice(0, 8)
-        groups.push({
-          key: 'battles',
-          title: 'Great battles',
-          description: 'Where the most fell.',
-          stories: battles.map(({ b, p, deaths }) => {
-            const { attacker, defender } = battleSides(p)
-            const site = num(p.site_id)
-            const year = num(p.start_year)
-            const races = (key: 'attacking_squad_race' | 'defending_squad_race') => {
-              const raw = p[key]
-              const tokens = Array.isArray(raw) ? [...new Set(raw.map(String))] : []
-              return tokens.length
-                ? list(tokens.slice(0, 3).map((t) => `${words(t)}s`)) +
-                    (tokens.length > 3 ? ' and others' : '')
-                : null
-            }
-            const side = (
-              id: number | null,
-              key: 'attacking_squad_race' | 'defending_squad_race',
-              fallback: string,
-            ) => (id !== null ? nameOr(names, 'entity', id, fallback) : (races(key) ?? fallback))
-            return {
-              key: `battle-${b.id}`,
-              title: b.name ? titleCase(b.name) : `Battle #${b.id}`,
-              blurb: `${sentence(side(attacker, 'attacking_squad_race', 'unknown forces'))} fell upon ${side(defender, 'defending_squad_race', 'unknown defenders')}${site !== null && site >= 0 ? ` at ${nameOr(names, 'site', site, 'an unnamed site')}` : ''}${year !== null ? ` in ${year}` : ''}. ${plural(deaths, 'soldier')} fell${str(p.outcome) ? `; ${str(p.outcome)}` : ''}.`,
-              year,
-              refs: [
-                { kind: 'historical_event_collection', id: b.id, name: b.name },
-                ...(site !== null && site >= 0
-                  ? [{ kind: 'site', id: site, name: names.site?.[site] ?? null }]
-                  : []),
-                ...[attacker, defender]
-                  .filter((id): id is number => id !== null)
-                  .map((id) => ({ kind: 'entity', id, name: names.entity?.[id] ?? null })),
-              ],
-              score: deaths,
-            }
-          }),
-        })
-
-        // Monsters and slayers.
-        const slayerStories: Story[] = [...slayerRows].map((row) => {
-          const id = Number(row.hf)
-          return {
-            key: `slayer-${id}`,
-            title: hfName(id),
-            blurb: `${raceOf(id) ? `A ${raceOf(id)}. ` : ''}${plural(Number(row.c), 'recorded kill')} between ${row.first} and ${row.last}.${life(id) ? ` ${sentence(life(id))}.` : ''}`,
-            year: Number(row.first),
-            refs: [hfRef(id)],
-            score: Number(row.c),
-          }
-        })
-        const eaterStories: Story[] = [...eaterRows]
-          .filter((row) => !slayerRows.some((s) => Number(s.hf) === Number(row.hf)))
-          .map((row) => {
-            const id = Number(row.hf)
-            return {
-              key: `eater-${id}`,
-              title: hfName(id),
-              blurb: `${raceOf(id) ? `A ${raceOf(id)} that ` : 'A beast that '}devoured ${plural(Number(row.c), 'creature')} between ${row.first} and ${row.last}.`,
-              year: Number(row.first),
-              refs: [hfRef(id)],
-              score: Number(row.c) / 4,
-            }
-          })
-        groups.push({
-          key: 'slayers',
-          title: 'Monsters and slayers',
-          description: 'The deadliest names in the records.',
-          stories: [...slayerStories, ...eaterStories]
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 10),
-        })
-
-        // Lives worth reading.
-        const lives: Story[] = eventful.map(([id, count]) => ({
-          key: `eventful-${id}`,
-          title: hfName(id),
-          blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}` : 'Figure'}${life(id) ? `, ${life(id)}` : ''}. Named in ${plural(count, 'event')}.`,
-          year: num((figure.get(id)?.payload as LegendsPayload | undefined)?.birth_year),
-          refs: [hfRef(id)],
-          score: count,
-        }))
-        for (const row of longLived) {
-          const p = row.payload as LegendsPayload
-          const birth = num(p.birth_year) ?? 0
-          const death = num(p.death_year) ?? 0
-          const race = str(plusOf(p).race) ?? words(row.type)
-          lives.push({
-            key: `longlived-${row.id}`,
-            title: row.name ? titleCase(row.name) : `An unnamed ${race}`,
-            blurb: `${titleCase(race)} who lived ${death - birth} years, from ${birth} to ${death}.`,
-            year: birth,
-            refs: [{ kind: 'historical_figure', id: row.id, name: row.name, race: row.type }],
-            score: death - birth,
-          })
-        }
-        groups.push({
-          key: 'lives',
-          title: 'Lives worth reading',
-          description: 'The most storied and the longest-lived.',
-          stories: lives,
-        })
-
-        // The cursed.
-        const cursed: Story[] = [...families.entries()]
-          .sort((a, b) => b[1].count - a[1].count)
-          .map(([key, family]) => {
-            const lead = family.members[0]
-            return {
-              key: `curse-${key}`,
-              title: `${titleCase(family.label)}`,
-              blurb: `${plural(family.count, 'soul')} carry ${family.label}${lead ? `; the most storied is ${lead.name ? titleCase(lead.name) : 'an unnamed one'}, named in ${plural(lead.events, 'event')}` : ''}.`,
-              year: null,
-              refs: family.members.map((m) => hfRef(m.id)),
-              score: family.count,
-            }
-          })
-        groups.push({
-          key: 'cursed',
-          title: 'The cursed',
-          description: 'Werebeasts, necromancers and the undead.',
-          stories: cursed,
-        })
-
-        // Fallen civilizations.
-        const held = new Map(siteCivRows.map((r) => [Number(r.civ), Number(r.count)]))
-        const losses = new Map(
-          [...lossRows].map((r) => [Number(r.civ), { c: Number(r.c), last: Number(r.last) }]),
+            .where(and(W, eq(R.kind, 'artifact'), inArray(R.id, artifactIds))),
         )
-        const lastSeen = new Map([...lastSeenRows].map((r) => [Number(r.en), Number(r.last)]))
-        // Named peoples first: the unnamed are mostly animal-folk bands with no story to tell.
-        const fallen: Story[] = civRows
-          .filter((civ) => !held.get(civ.id))
-          .map((civ) => {
-            const loss = losses.get(civ.id)
-            const last = lastSeen.get(civ.id) ?? null
-            return {
-              key: `fallen-${civ.id}`,
-              title: civ.name
-                ? titleCase(civ.name)
-                : `An unnamed ${civ.race ? `${words(civ.race)} ` : ''}people`,
-              blurb: `${civ.race ? `A civilization of ${racePlural(civ.race)}. ` : ''}Holds no sites today${loss ? `; lost ${plural(loss.c, 'site')} to conquest or ruin, the last in ${loss.last}` : ''}.${last !== null ? ` Last heard of in ${last}.` : ''}`,
-              year: last,
-              refs: [{ kind: 'entity', id: civ.id, name: civ.name, race: raceToken(civ.race) }],
-              score: (civ.name ? 1000 : 0) + (loss?.c ?? 0) * 10 + (last ?? 0) / 1000,
-            }
-          })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 8)
-        groups.push({
-          key: 'fallen',
-          title: 'Fallen civilizations',
-          description: 'Peoples who hold nothing now.',
-          stories: fallen,
-        })
-
-        // Contested sites.
-        groups.push({
-          key: 'contested',
-          title: 'Contested ground',
-          description: 'Sites attacked and taken again and again.',
-          stories: [...contestedRows].map((row) => {
-            const id = Number(row.site)
-            return {
-              key: `contested-${id}`,
-              title: nameOr(names, 'site', id, `Site #${id}`),
-              blurb: `Fought over ${plural(Number(row.c), 'time')} between ${row.first} and ${row.last}.`,
-              year: Number(row.first),
-              refs: [{ kind: 'site', id, name: names.site?.[id] ?? null }],
-              score: Number(row.c),
-            }
-          }),
-        })
-
-        // Legendary artifacts.
-        const artifactIds = [...artifactRows].map((r) => Number(r.a))
-        const artifactHits: LegendsHit[] = artifactIds.length
-          ? await describeRows(
-              worldId,
-              await postgres_db
-                .select({
-                  kind: R.kind,
-                  id: R.id,
-                  name: R.name,
-                  type: R.type,
-                  year: R.year,
-                  payload: R.payload,
-                })
-                .from(R)
-                .where(and(W, eq(R.kind, 'artifact'), inArray(R.id, artifactIds))),
-            )
-          : []
-        const artifactById = new Map(artifactHits.map((h) => [h.id, h]))
-        groups.push({
-          key: 'artifacts',
-          title: 'Legendary artifacts',
-          description: 'Made, stolen, lost and found.',
-          stories: [...artifactRows].map((row) => {
-            const id = Number(row.a)
-            const hit = artifactById.get(id)
-            return {
-              key: `artifact-${id}`,
-              title: nameOr(names, 'artifact', id, `Artifact #${id}`),
-              blurb: `${hit?.detail ? `${titleCase(hit.detail.charAt(0)) + hit.detail.slice(1)}. ` : ''}Named in ${plural(Number(row.c), 'event')} since ${row.first}.`,
-              year: Number(row.first),
-              refs: [{ kind: 'artifact', id, name: names.artifact?.[id] ?? null }],
-              score: Number(row.c),
-            }
-          }),
-        })
-
-        // Loves and feuds.
-        const hearts: Story[] = [...loverRows].map((row) => {
-          const id = Number(row.hf)
-          return {
-            key: `lover-${id}`,
-            title: hfName(id),
-            blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}${life(id) ? `, ${life(id)}` : ''}. ` : ''}Took ${plural(Number(row.c), 'lover')} over a lifetime.`,
-            year: null,
-            refs: [hfRef(id)],
-            score: Number(row.c),
-          }
-        })
-        for (const row of grudgeRows) {
-          const source = Number(row.source)
-          const target = Number(row.target)
-          hearts.push({
-            key: `grudge-${source}-${target}`,
-            title: `${hfName(source)} and ${hfName(target)}`,
-            blurb: `${hfName(source)} formed ${words(row.relationship).replace('grudge', 'a grudge').replace('jealous obsession', 'a jealous obsession')} against ${hfName(target)}${row.year !== null ? ` in ${row.year}` : ''}.`,
-            year: row.year,
-            refs: [hfRef(source), hfRef(target)],
-            score: 1,
-          })
+      : []
+    const artifactById = new Map(artifactHits.map((h) => [h.id, h]))
+    groups.push({
+      key: 'artifacts',
+      title: 'Legendary artifacts',
+      description: 'Made, stolen, lost and found.',
+      stories: [...artifactRows].map((row) => {
+        const id = Number(row.a)
+        const hit = artifactById.get(id)
+        return {
+          key: `artifact-${id}`,
+          title: nameOr(names, 'artifact', id, `Artifact #${id}`),
+          blurb: `${hit?.detail ? `${titleCase(hit.detail.charAt(0)) + hit.detail.slice(1)}. ` : ''}Named in ${plural(Number(row.c), 'event')} since ${row.first}.`,
+          year: Number(row.first),
+          refs: [{ kind: 'artifact', id, name: names.artifact?.[id] ?? null }],
+          score: Number(row.c),
         }
-        groups.push({
-          key: 'hearts',
-          title: 'Loves and feuds',
-          description: 'Hearts given, and grudges kept.',
-          stories: hearts,
-        })
-
-        // Strange ends.
-        groups.push({
-          key: 'ends',
-          title: 'Strange ends',
-          description: 'Deaths the chroniclers thought worth a word.',
-          stories: strangeRows.length
-            ? [
-                {
-                  key: 'strange-ends',
-                  title: `${plural(strangeRows.length, 'unusual death')}`,
-                  blurb: 'Executions, drownings and burnings, as the records tell them.',
-                  year: strangeRows[0]?.year ?? null,
-                  refs: [],
-                  events: strangeRows,
-                  score: strangeRows.length,
-                },
-              ]
-            : [],
-        })
-
-        // Prolific authors.
-        groups.push({
-          key: 'authors',
-          title: 'Written words',
-          description: 'Those who wrote the most.',
-          stories: [...authorRows].map((row) => {
-            const id = Number(row.hf)
-            return {
-              key: `author-${id}`,
-              title: hfName(id),
-              blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}${life(id) ? `, ${life(id)}` : ''}. ` : ''}Wrote ${plural(Number(row.c), 'work')}.`,
-              year: null,
-              refs: [hfRef(id)],
-              score: Number(row.c),
-            }
-          }),
-        })
-
-        return { groups: groups.filter((g) => g.stories.length), names }
       }),
-  )
+    })
+
+    // Loves and feuds.
+    const hearts: Story[] = [...loverRows].map((row) => {
+      const id = Number(row.hf)
+      return {
+        key: `lover-${id}`,
+        title: hfName(id),
+        blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}${life(id) ? `, ${life(id)}` : ''}. ` : ''}Took ${plural(Number(row.c), 'lover')} over a lifetime.`,
+        year: null,
+        refs: [hfRef(id)],
+        score: Number(row.c),
+      }
+    })
+    for (const row of grudgeRows) {
+      const source = Number(row.source)
+      const target = Number(row.target)
+      hearts.push({
+        key: `grudge-${source}-${target}`,
+        title: `${hfName(source)} and ${hfName(target)}`,
+        blurb: `${hfName(source)} formed ${words(row.relationship).replace('grudge', 'a grudge').replace('jealous obsession', 'a jealous obsession')} against ${hfName(target)}${row.year !== null ? ` in ${row.year}` : ''}.`,
+        year: row.year,
+        refs: [hfRef(source), hfRef(target)],
+        score: 1,
+      })
+    }
+    groups.push({
+      key: 'hearts',
+      title: 'Loves and feuds',
+      description: 'Hearts given, and grudges kept.',
+      stories: hearts,
+    })
+
+    // Strange ends.
+    groups.push({
+      key: 'ends',
+      title: 'Strange ends',
+      description: 'Deaths the chroniclers thought worth a word.',
+      stories: strangeRows.length
+        ? [
+            {
+              key: 'strange-ends',
+              title: 'Unusual deaths',
+              blurb: 'Executions, drownings and burnings, as the records tell them.',
+              year: strangeRows[0]?.year ?? null,
+              refs: [],
+              events: strangeRows,
+              score: strangeRows.length,
+            },
+          ]
+        : [],
+    })
+
+    // Prolific authors.
+    groups.push({
+      key: 'authors',
+      title: 'Written words',
+      description: 'Those who wrote the most.',
+      stories: [...authorRows].map((row) => {
+        const id = Number(row.hf)
+        return {
+          key: `author-${id}`,
+          title: hfName(id),
+          blurb: `${raceOf(id) ? `${titleCase(raceOf(id) ?? '')}${life(id) ? `, ${life(id)}` : ''}. ` : ''}Wrote ${plural(Number(row.c), 'work')}.`,
+          year: null,
+          refs: [hfRef(id)],
+          score: Number(row.c),
+        }
+      }),
+    })
+
+    return { groups: groups.filter((g) => g.stories.length), names }
+  })
+}
 
 // ---------------------------------------------------------------------------
 // Searching events

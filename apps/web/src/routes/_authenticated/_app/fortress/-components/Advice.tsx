@@ -46,26 +46,23 @@ export const AREA_ICON: Record<AdviceArea, typeof ShieldIcon> = {
 
 const STATUS_STYLE: Record<
   AdviceStatus,
-  { Icon: typeof ShieldIcon; icon: string; box: string; disc: string; label: string }
+  { Icon: typeof ShieldIcon; icon: string; disc: string; label: string }
 > = {
   problem: {
     Icon: CircleAlertIcon,
     icon: 'text-red-600 dark:text-red-400',
-    box: 'border-red-500/40 bg-red-500/5',
     disc: 'bg-red-500/15 text-red-600 dark:text-red-400',
     label: 'Problem',
   },
   attention: {
     Icon: TriangleAlertIcon,
     icon: 'text-amber-600 dark:text-amber-400',
-    box: 'border-amber-500/40 bg-amber-500/5',
     disc: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
     label: 'Needs attention',
   },
   good: {
     Icon: CircleCheckIcon,
     icon: 'text-emerald-600 dark:text-emerald-400',
-    box: 'border-border',
     disc: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400',
     label: 'Fine',
   },
@@ -174,88 +171,35 @@ export function NextSteps({ advice, max = 8 }: { advice: Advice[]; max?: number 
   )
 }
 
-/** Every check, by area, good ones included: what a thriving fortress has. */
-export function Checklist({ advice }: { advice: Advice[] }) {
+/** The checks that already pass, by area, one line each. */
+export function FineChecks({ advice }: { advice: Advice[] }) {
   const open = useOpenGuide()
+  const fine = advice
+    .filter((a) => a.status === 'good')
+    .sort((a, b) => AREA_ORDER.indexOf(a.area) - AREA_ORDER.indexOf(b.area))
+  if (!fine.length) return <p className="text-sm text-muted-foreground">No check passes yet.</p>
   return (
-    <div className="flex flex-col gap-4">
-      {AREA_ORDER.map((area) => {
-        const checks = advice.filter((a) => a.area === area)
-        if (!checks.length) return null
-        const Icon = AREA_ICON[area]
-        const fine = checks.filter((a) => a.status === 'good').length
+    <ul className="grid gap-x-6 sm:grid-cols-2">
+      {fine.map((a) => {
+        const Icon = AREA_ICON[a.area]
         return (
-          <section key={area} id={`area-${area}`} className="scroll-mt-4">
-            <div className="mb-1 flex items-center justify-between gap-2 text-sm">
-              <span className="flex items-center gap-2 font-medium">
-                <Icon className="size-4 text-muted-foreground" />
-                {AREAS[area].label}
+          <li key={a.key}>
+            <button
+              type="button"
+              onClick={() => open(adviceGuide(a))}
+              className="-mx-2 flex w-[calc(100%+1rem)] items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-accent"
+            >
+              <StatusIcon status="good" />
+              <span className="min-w-0 flex-1 truncate">{a.title}</span>
+              <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                <Icon className="size-3" />
+                {AREAS[a.area].label}
               </span>
-              <span className="text-muted-foreground tabular-nums">
-                {fine}/{checks.length} fine
-              </span>
-            </div>
-            <ul className="flex flex-col">
-              {checks.map((a) => (
-                <li key={a.key} className="border-b last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => open(adviceGuide(a))}
-                    className="group flex w-full items-start gap-2 rounded-sm py-1.5 text-left text-sm hover:bg-accent/40"
-                  >
-                    <StatusIcon status={a.status} className="mt-0.5" />
-                    <span className="min-w-0 flex-1">{a.title}</span>
-                    {a.actions?.length ? (
-                      <ZapIcon className="mt-0.5 size-3.5 text-primary" />
-                    ) : null}
-                    <ChevronRightIcon className="mt-0.5 size-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
+            </button>
+          </li>
         )
       })}
-    </div>
-  )
-}
-
-/** Summary tiles across the top: how each area of the fortress is doing. */
-export function AreaStrip({ advice }: { advice: Advice[] }) {
-  return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
-      {AREA_ORDER.map((area) => {
-        const checks = advice.filter((a) => a.area === area)
-        if (!checks.length) return null
-        const worst: AdviceStatus = checks.some((a) => a.status === 'problem')
-          ? 'problem'
-          : checks.some((a) => a.status === 'attention')
-            ? 'attention'
-            : 'good'
-        const Icon = AREA_ICON[area]
-        const open = checks.filter((a) => a.status !== 'good').length
-        return (
-          <a
-            key={area}
-            href={`#area-${area}`}
-            title={AREAS[area].blurb}
-            className={cn(
-              'rounded-xl border px-3 py-2.5 transition-colors hover:bg-accent/40',
-              STATUS_STYLE[worst].box,
-            )}
-          >
-            <div className="flex items-center justify-between gap-2">
-              <Icon className="size-4 text-muted-foreground" />
-              <StatusIcon status={worst} />
-            </div>
-            <div className="mt-1.5 text-sm font-medium">{AREAS[area].label}</div>
-            <div className="text-xs text-muted-foreground">
-              {open ? `${open} to see to` : 'All fine'}
-            </div>
-          </a>
-        )
-      })}
-    </div>
+    </ul>
   )
 }
 
@@ -268,11 +212,18 @@ export function SituationList({ situations }: { situations: Situation[] }) {
   return (
     <div className="flex flex-col gap-4">
       {active.length ? (
-        <ul className="flex flex-col divide-y">
-          {active.map((s) => (
-            <SituationRow key={s.key} situation={s} />
-          ))}
-        </ul>
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-sm font-medium">
+            <span className="inline-block size-2 rounded-full bg-amber-500" />
+            Happening now
+            <span className="font-normal text-muted-foreground tabular-nums">{active.length}</span>
+          </div>
+          <ul className="flex flex-col divide-y">
+            {active.map((s) => (
+              <SituationRow key={s.key} situation={s} />
+            ))}
+          </ul>
+        </div>
       ) : (
         <p className="text-sm text-muted-foreground">Nothing out of the ordinary right now.</p>
       )}
@@ -308,11 +259,6 @@ function SituationRow({ situation }: { situation: Situation }) {
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className={cn(active ? 'font-medium' : 'text-sm')}>{situation.title}</span>
-            {active ? (
-              <Badge className="bg-amber-500 text-[10px] tracking-wide text-black uppercase hover:bg-amber-500">
-                happening now
-              </Badge>
-            ) : null}
             {situation.actions?.length ? <ZapIcon className="size-3.5 text-primary" /> : null}
           </span>
           {active ? (
@@ -333,64 +279,96 @@ function SituationRow({ situation }: { situation: Situation }) {
 // ---------------------------------------------------------------------------
 // The queue and the workshops
 
+const QUEUE_COLUMNS =
+  'grid grid-cols-[minmax(0,1fr)_3rem_3rem_4.5rem] items-center gap-x-3 sm:grid-cols-[minmax(0,1fr)_7rem_3rem_3rem_4.5rem_minmax(0,11rem)]'
+const QUEUE_WORKERS_SHOWN = 6
+
+/** Every kind of queued job in one row: how many, how many being worked or stuck, and by whom. */
 export function JobQueueList({ groups, advice }: { groups: JobGroup[]; advice: Advice[] }) {
   const open = useOpenGuide()
   const max = Math.max(1, ...groups.map((g) => g.total))
   if (!groups.length) return <p className="text-sm text-muted-foreground">Nothing is queued.</p>
   return (
-    <ul className="flex flex-col gap-3">
-      {groups.map((group) => {
-        const waiting = group.total - group.working.length - group.suspended
-        const guide = jobGroupGuide(group, advice)
-        const heading = (
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm">
-            <span className={cn('font-medium', guide && 'text-primary group-hover:underline')}>
-              {group.name}
-            </span>
-            <span className="text-muted-foreground tabular-nums">
-              {group.total.toLocaleString()}
-              {group.working.length ? ` · ${group.working.length} at it` : ''}
-              {group.suspended ? ` · ${group.suspended} suspended` : ''}
-              {group.repeat ? ` · ${group.repeat} repeating` : ''}
-            </span>
-          </div>
-        )
-        return (
-          <li key={group.name} className="flex flex-col gap-1.5">
-            {guide ? (
-              <button type="button" className="group text-left" onClick={() => open(guide)}>
-                {heading}
-              </button>
-            ) : (
-              heading
-            )}
-            <div
-              className="flex h-2 overflow-hidden rounded-full bg-muted"
-              style={{ width: `${Math.max(6, (group.total / max) * 100)}%` }}
-            >
-              <span className="bg-emerald-500" style={{ flexGrow: group.working.length }} />
-              <span className="bg-sky-500/60" style={{ flexGrow: Math.max(0, waiting) }} />
-              <span className="bg-red-500/70" style={{ flexGrow: group.suspended }} />
-            </div>
-            {group.working.length ? (
-              <div className="flex flex-wrap gap-1">
-                {group.working.slice(0, 16).map((unit) => (
-                  <Link
-                    key={unit.id}
-                    to="/fortress/dwarves/$id"
-                    params={{ id: String(unit.id) }}
-                    title={unit.readable}
-                    className="rounded-md border bg-muted/40 p-0.5 hover:border-primary/60"
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col">
+        <div
+          className={cn(QUEUE_COLUMNS, 'border-b pb-2 text-xs font-medium text-muted-foreground')}
+        >
+          <span>Kind</span>
+          <span className="hidden sm:block" />
+          <span className="text-right">Jobs</span>
+          <span className="text-right">At it</span>
+          <span className="text-right">Suspended</span>
+          <span className="hidden sm:block">Who</span>
+        </div>
+        <ul className="divide-y">
+          {groups.map((group) => {
+            const waiting = group.total - group.working.length - group.suspended
+            const guide = jobGroupGuide(group, advice)
+            return (
+              <li key={group.name} className={cn(QUEUE_COLUMNS, 'py-2 text-sm')}>
+                <span className="min-w-0 truncate">
+                  {guide ? (
+                    <button
+                      type="button"
+                      onClick={() => open(guide)}
+                      className="font-medium underline-offset-4 hover:underline"
+                    >
+                      {group.name}
+                    </button>
+                  ) : (
+                    <span className="font-medium">{group.name}</span>
+                  )}
+                  {group.repeat ? (
+                    <span className="text-muted-foreground"> · {group.repeat} repeating</span>
+                  ) : null}
+                </span>
+                <span className="hidden sm:block">
+                  <span
+                    className="flex h-1.5 gap-px overflow-hidden rounded-full"
+                    style={{ width: `${Math.max(8, (group.total / max) * 100)}%` }}
                   >
-                    <CreatureSprite unit={unit} size={20} />
-                  </Link>
-                ))}
-              </div>
-            ) : null}
-          </li>
-        )
-      })}
-      <li className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <span className="bg-emerald-500" style={{ flexGrow: group.working.length }} />
+                    <span className="bg-sky-500/60" style={{ flexGrow: Math.max(0, waiting) }} />
+                    <span className="bg-red-500/70" style={{ flexGrow: group.suspended }} />
+                  </span>
+                </span>
+                <span className="text-right tabular-nums">{group.total.toLocaleString()}</span>
+                <span className="text-right text-muted-foreground tabular-nums">
+                  {group.working.length || '–'}
+                </span>
+                <span
+                  className={cn(
+                    'text-right tabular-nums',
+                    group.suspended ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground',
+                  )}
+                >
+                  {group.suspended || '–'}
+                </span>
+                <span className="hidden min-w-0 items-center gap-0.5 sm:flex">
+                  {group.working.slice(0, QUEUE_WORKERS_SHOWN).map((unit) => (
+                    <Link
+                      key={unit.id}
+                      to="/fortress/dwarves/$id"
+                      params={{ id: String(unit.id) }}
+                      title={unit.readable}
+                      className="rounded-md p-0.5 hover:bg-accent"
+                    >
+                      <CreatureSprite unit={unit} size={20} />
+                    </Link>
+                  ))}
+                  {group.working.length > QUEUE_WORKERS_SHOWN ? (
+                    <span className="pl-1 text-xs text-muted-foreground">
+                      +{group.working.length - QUEUE_WORKERS_SHOWN}
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-emerald-500" /> being worked
         </span>
@@ -400,8 +378,8 @@ export function JobQueueList({ groups, advice }: { groups: JobGroup[]; advice: A
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2 rounded-full bg-red-500/70" /> suspended
         </span>
-      </li>
-    </ul>
+      </div>
+    </div>
   )
 }
 

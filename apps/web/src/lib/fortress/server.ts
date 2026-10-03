@@ -14,6 +14,7 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { type SQL, desc, eq, sql } from 'drizzle-orm'
 
+import { relationOf } from './character'
 import { isLiving, mentionNeedles } from './format'
 import { type SortDirection, type SortValue, compareSortValues } from './sort'
 import {
@@ -144,6 +145,82 @@ export const getFortUnits = createServerFn({ method: 'GET' }).handler(
       // The sheet is for one unit's page; the lists poll every few seconds.
       units: decodeTable<FortUnit>(row?.units).map(({ sheet: _sheet, ...unit }) => unit),
     }
+  },
+)
+
+/** One citizen's tie to someone else on the map, as the citizen's own sheet records it. */
+export interface FortBond {
+  from: number
+  to: number
+  group: 'family' | 'friends' | 'foes'
+  /** How `to` stands to `from`: "Wife", "Close friend", "Grudge". */
+  label: string
+  /** The special bond, when the game records one: "childhood friend", "lover". */
+  detail: string | null
+}
+
+/** A skill a citizen is good at while its labor is off. */
+export interface FortWastedTalent {
+  unitId: number
+  skill: string
+  rating: number
+}
+
+export interface FortPeopleResult {
+  capturedAt: string | null
+  bonds: FortBond[]
+  wasted: FortWastedTalent[]
+}
+
+/** Proficient: the level from which a disabled labor reads as a waste. */
+const WASTED_RATING = 5
+/** Trades and medicine; weapon skills and hunting stealth are not work a labor switches on. */
+const WORK_SKILL_CLASSES = new Set(['Normal', 'Medical'])
+const NOT_WORK_SKILLS = new Set(['SNEAK', 'TRACKING'])
+
+/**
+ * What the dwarf list needs from the sheets without shipping them: the family,
+ * friends and foes each citizen has on the map, and the talents they may not use.
+ */
+export const getFortPeople = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<FortPeopleResult> => {
+    const rows = await postgres_db
+      .select({ captured_at: schema.fort_dump.captured_at, units: schema.fort_dump.units })
+      .from(schema.fort_dump)
+      .where(eq(schema.fort_dump.id, SINGLETON_ID))
+      .limit(1)
+    const row = rows[0]
+    const units = decodeTable<FortUnit>(row?.units)
+    const onMap = new Set(units.filter(isLiving).map((unit) => unit.id))
+    const bonds: FortBond[] = []
+    const wasted: FortWastedTalent[] = []
+    for (const unit of units) {
+      if (!isLiving(unit) || !unit.flags.includes('citizen')) continue
+      const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
+      if (!sheet) continue
+      for (const [skill, rating, , , skillClass, enabled] of sheet.skills)
+        if (
+          enabled === false &&
+          rating >= WASTED_RATING &&
+          skillClass !== null &&
+          WORK_SKILL_CLASSES.has(skillClass) &&
+          !NOT_WORK_SKILLS.has(skill)
+        )
+          wasted.push({ unitId: unit.id, skill, rating })
+      for (const person of sheet.people) {
+        if (person.unit === null || person.unit === unit.id || !onMap.has(person.unit)) continue
+        const relation = relationOf(person)
+        if (relation.group === 'acquaintances') continue
+        bonds.push({
+          from: unit.id,
+          to: person.unit,
+          group: relation.group,
+          label: relation.label,
+          detail: relation.detail,
+        })
+      }
+    }
+    return { capturedAt: row?.captured_at ?? null, bonds, wasted }
   },
 )
 

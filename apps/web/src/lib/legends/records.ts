@@ -9,7 +9,7 @@ import { type SQL, and, asc, eq, ilike, inArray, isNotNull, sql } from 'drizzle-
 
 import { num, numList, objList, plusOf, str } from './events'
 import { entityTypeLabel, racePlural, raceToken, words } from './model'
-import type { LegendsHit, NameIndex } from './server'
+import type { HeldPosition, LegendsHit, NameIndex } from './server'
 
 /*
  * Server-only helpers shared by the legends server functions: resolving the
@@ -427,6 +427,55 @@ export async function searchRecordsByName(
     )
     .limit(Math.min(limit, 50))
   return describeRows(worldId, rows)
+}
+
+/** Offices a figure holds or held, titled the way their own group titles them. */
+export async function resolvePositions(
+  worldId: number,
+  payload: LegendsPayload,
+): Promise<HeldPosition[]> {
+  const current = objList(payload.entity_position_link).map((l) => ({ link: l, current: true }))
+  const former = objList(payload.entity_former_position_link).map((l) => ({
+    link: l,
+    current: false,
+  }))
+  const links = [...current, ...former]
+  if (!links.length) return []
+  const entityIds = [
+    ...new Set(
+      links.map((l) => num(l.link.entity_id)).filter((v): v is number => v !== null && v >= 0),
+    ),
+  ]
+  const entities = await postgres_db
+    .select({ id: R.id, name: R.name, payload: R.payload })
+    .from(R)
+    .where(and(eq(R.world_id, worldId), eq(R.kind, 'entity'), inArray(R.id, entityIds)))
+  const byId = new Map(entities.map((e) => [e.id, e]))
+  const sex = num(plusOf(payload).sex)
+  const out: HeldPosition[] = []
+  for (const { link, current: isCurrent } of links) {
+    const entityId = num(link.entity_id)
+    if (entityId === null) continue
+    const entity = byId.get(entityId)
+    const plus = entity ? plusOf(entity.payload as LegendsPayload) : {}
+    const assignment = objList(plus.entity_position_assignment).find(
+      (a) => num(a.id) === num(link.position_profile_id),
+    )
+    const position = objList(plus.entity_position).find(
+      (p) => num(p.id) === num(assignment?.position_id),
+    )
+    const title =
+      (sex === 0 ? str(position?.name_female) : sex === 1 ? str(position?.name_male) : null) ??
+      str(position?.name) ??
+      'an office'
+    out.push({
+      entity: { id: entityId, name: entity?.name ?? null },
+      title,
+      startYear: num(link.start_year),
+      endYear: isCurrent ? null : num(link.end_year),
+    })
+  }
+  return out.sort((a, b) => (a.startYear ?? 0) - (b.startYear ?? 0))
 }
 
 export function eventsWhere(

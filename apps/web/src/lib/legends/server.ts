@@ -1,8 +1,10 @@
 import {
+  type FortUnit,
   type JsonObject,
   type LegendsPayload,
   type LegendsRecord,
   type LegendsWorld,
+  decodeTable,
   postgres_db,
   schema,
 } from '@fortress/db-drizzle'
@@ -22,8 +24,10 @@ import {
   sql,
 } from 'drizzle-orm'
 
+import { isLiving, unitGroup } from '../fortress/format'
 import { EVENT_CATEGORIES, num, numList, objList, plusOf, str } from './events'
-import { raceToken, words } from './model'
+import { type FortressTie, fortressInLegends } from './lives'
+import { matchLegendsWorld, raceToken, words } from './model'
 import {
   type Decorate,
   REF_COLUMN,
@@ -37,6 +41,7 @@ import {
   eventsWhere,
   lookupNames,
   nameOf,
+  resolvePositions,
 } from './records'
 
 const R = schema.legends_records
@@ -1130,51 +1135,6 @@ async function hitsByIds(worldId: number, kind: string, ids: number[]): Promise<
   return describeRows(worldId, ordered)
 }
 
-async function resolvePositions(worldId: number, payload: LegendsPayload): Promise<HeldPosition[]> {
-  const current = objList(payload.entity_position_link).map((l) => ({ link: l, current: true }))
-  const former = objList(payload.entity_former_position_link).map((l) => ({
-    link: l,
-    current: false,
-  }))
-  const links = [...current, ...former]
-  if (!links.length) return []
-  const entityIds = [
-    ...new Set(
-      links.map((l) => num(l.link.entity_id)).filter((v): v is number => v !== null && v >= 0),
-    ),
-  ]
-  const entities = await postgres_db
-    .select({ id: R.id, name: R.name, payload: R.payload })
-    .from(R)
-    .where(and(eq(R.world_id, worldId), eq(R.kind, 'entity'), inArray(R.id, entityIds)))
-  const byId = new Map(entities.map((e) => [e.id, e]))
-  const sex = num(plusOf(payload).sex)
-  const out: HeldPosition[] = []
-  for (const { link, current: isCurrent } of links) {
-    const entityId = num(link.entity_id)
-    if (entityId === null) continue
-    const entity = byId.get(entityId)
-    const plus = entity ? plusOf(entity.payload as LegendsPayload) : {}
-    const assignment = objList(plus.entity_position_assignment).find(
-      (a) => num(a.id) === num(link.position_profile_id),
-    )
-    const position = objList(plus.entity_position).find(
-      (p) => num(p.id) === num(assignment?.position_id),
-    )
-    const title =
-      (sex === 0 ? str(position?.name_female) : sex === 1 ? str(position?.name_male) : null) ??
-      str(position?.name) ??
-      'an office'
-    out.push({
-      entity: { id: entityId, name: entity?.name ?? null },
-      title,
-      startYear: num(link.start_year),
-      endYear: isCurrent ? null : num(link.end_year),
-    })
-  }
-  return out.sort((a, b) => (a.startYear ?? 0) - (b.startYear ?? 0))
-}
-
 export const getLegendsRecord = createServerFn({ method: 'GET' })
   .inputValidator((input: LegendsRecordQuery) => input)
   .handler(async ({ data }): Promise<LegendsRecordDetail> => {
@@ -1632,6 +1592,37 @@ export const getKnownFigures = createServerFn({ method: 'GET' })
       .from(R)
       .where(and(eq(R.world_id, data.worldId), eq(R.kind, 'historical_figure'), inArray(R.id, ids)))
     return rows.map((r) => r.id)
+  })
+
+/**
+ * The running fortress's people in this world's record: who the export knows,
+ * their kin, the storied few and their civilization. Null when the fortress
+ * stands in another world.
+ */
+export const getFortressInLegends = createServerFn({ method: 'GET' })
+  .inputValidator((input: { worldId: number }) => input)
+  .handler(async ({ data }): Promise<FortressTie | null> => {
+    const [worlds, states, dumps] = await Promise.all([
+      postgres_db
+        .select()
+        .from(schema.legends_worlds)
+        .where(eq(schema.legends_worlds.id, data.worldId))
+        .limit(1),
+      postgres_db
+        .select({ world_name: schema.fort_state.world_name, world: schema.fort_state.world })
+        .from(schema.fort_state)
+        .limit(1),
+      postgres_db.select({ units: schema.fort_dump.units }).from(schema.fort_dump).limit(1),
+    ])
+    const state = states[0]
+    const world = (state?.world && typeof state.world === 'object' ? state.world : {}) as JsonObject
+    const names = [state?.world_name, str(world.name), str(world.name_native)]
+    if (!worlds[0] || !matchLegendsWorld(worlds, names)) return null
+    const dwellers = decodeTable<FortUnit>(dumps[0]?.units)
+      .filter((u) => isLiving(u) && ['citizen', 'resident'].includes(unitGroup(u)))
+      .map((u) => ({ figureId: u.hist_figure_id, unitId: u.id }))
+    const civ = num(world.civ_id)
+    return fortressInLegends(data.worldId, dwellers, civ !== null && civ >= 0 ? civ : null)
   })
 
 /** How many historical events mention each figure. Figures with none are omitted. */

@@ -12,15 +12,20 @@ import {
   TabsTrigger,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import {
+  CircleCheckIcon,
+  CirclePauseIcon,
+  HammerIcon,
   LeafIcon,
   LifeBuoyIcon,
   ListChecksIcon,
+  ListTodoIcon,
   SnowflakeIcon,
   SproutIcon,
   SunIcon,
+  WarehouseIcon,
 } from 'lucide-react'
 import * as React from 'react'
 
@@ -42,8 +47,7 @@ import {
 } from '~/lib/fortress/queries'
 import { getFortWork } from '~/lib/fortress/server'
 import {
-  AreaStrip,
-  Checklist,
+  FineChecks,
   JobQueueList,
   NextSteps,
   SituationList,
@@ -51,8 +55,23 @@ import {
 } from '../-components/Advice'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
+import { FailingJobs, IdleHands, SuspendedJobs, UnworkableWork } from './-components/Stuck'
 
 const WORKSHOP_TYPES = new Set(['Workshop', 'Furnace', 'TradeDepot'])
+
+const TABS = [
+  { key: 'checklist', label: 'Checklist', icon: ListChecksIcon },
+  { key: 'stuck', label: 'Stuck', icon: CirclePauseIcon },
+  { key: 'queue', label: 'Queue', icon: ListTodoIcon },
+  { key: 'workshops', label: 'Workshops', icon: HammerIcon },
+  { key: 'buildings', label: 'Buildings', icon: WarehouseIcon },
+] as const
+
+type WorkTab = (typeof TABS)[number]['key']
+
+function isWorkTab(value: unknown): value is WorkTab {
+  return TABS.some((tab) => tab.key === value)
+}
 
 interface BuildingGroup {
   label: string
@@ -76,6 +95,8 @@ function buildingLabel(b: FortBuilding): string {
 }
 
 function WorkPage() {
+  const { tab = 'checklist' } = Route.useSearch()
+  const navigate = useNavigate({ from: Route.fullPath })
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'work'],
@@ -119,6 +140,17 @@ function WorkPage() {
     attention: advice.filter((a) => a.status === 'attention').length,
     good: advice.filter((a) => a.status === 'good').length,
   }
+  const adviceByKey = (key: string) => advice.find((a) => a.key === key)
+  const alerts = state?.summary?.alerts ?? []
+  const working = jobs.filter((job) => job.worker_id !== null).length
+  const suspended = jobs.filter((job) => job.suspended).length
+  const failing = alerts.filter((alert) => alert.kind === 'cancellation').length
+  const blocked = shops.filter(
+    (row) =>
+      (row.info.essential && row.count === 0) ||
+      (row.count > 0 && row.info.skills.length > 0 && row.skilled.length === 0),
+  ).length
+
   const unitNames = React.useMemo(
     () => new Map((data?.units ?? []).map((u) => [u.id, u.name])),
     [data?.units],
@@ -133,16 +165,22 @@ function WorkPage() {
     const stockpiles: FortBuilding[] = []
     const zones: FortBuilding[] = []
     const furniture: FortBuilding[] = []
-    const unfinished: FortBuilding[] = []
     for (const b of buildings) {
-      if (b.max_stage > 0 && b.stage < b.max_stage) unfinished.push(b)
       if (WORKSHOP_TYPES.has(b.type)) workshops.push(b)
       else if (b.type === 'Stockpile') stockpiles.push(b)
       else if (b.type === 'Civzone') zones.push(b)
       else furniture.push(b)
     }
-    return { workshops, stockpiles, zones, furniture, unfinished }
+    return { workshops, stockpiles, zones, furniture }
   }, [buildings])
+
+  const tabCounts: Record<WorkTab, number> = {
+    checklist: counts.problem + counts.attention,
+    stuck: suspended + failing + blocked,
+    queue: jobs.length,
+    workshops: groups.workshops.length,
+    buildings: groups.stockpiles.length + groups.zones.length + groups.furniture.length,
+  }
 
   const jobColumns = React.useMemo<ColumnDef<FortJob>[]>(
     () => [
@@ -159,7 +197,6 @@ function WorkPage() {
           job.worker_id !== null ? (unitNames.get(job.worker_id) ?? null) : null,
         sortUndefined: 'last',
         meta: {
-          cellClassName: 'text-sm',
           searchText: (job) =>
             job.worker_id !== null ? (unitNames.get(job.worker_id) ?? 'unassigned') : 'unassigned',
         },
@@ -172,7 +209,7 @@ function WorkPage() {
         accessorFn: (job) =>
           job.building_id !== null ? (buildingNames.get(job.building_id) ?? null) : null,
         sortUndefined: 'last',
-        meta: { cellClassName: 'text-sm text-muted-foreground' },
+        meta: { cellClassName: 'text-muted-foreground' },
         cell: ({ getValue }) => getValue<string | null>() ?? '—',
       },
       {
@@ -201,7 +238,7 @@ function WorkPage() {
         id: 'where',
         header: 'Where',
         accessorFn: (job) => `${job.z} ${job.y} ${job.x}`,
-        meta: { align: 'right', cellClassName: 'font-mono text-sm text-muted-foreground' },
+        meta: { align: 'right', cellClassName: 'font-mono text-muted-foreground' },
         cell: ({ row }) => `${row.original.x},${row.original.y} z${row.original.z}`,
       },
     ],
@@ -213,7 +250,11 @@ function WorkPage() {
       <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
         <PageHeader
           title="Work and advice"
-          description="What the fortress needs to thrive, what to do about it in the game, and who is doing what."
+          description={
+            ready
+              ? `${formatNumber(jobs.length)} jobs queued · ${formatNumber(working)} being worked · ${formatNumber(suspended)} suspended · ${idle.length} with nothing to do · ${counts.problem + counts.attention} things to see to`
+              : 'What the fortress needs to thrive, what is stuck, and who is doing what.'
+          }
           updatedAt={data?.capturedAt}
           isFetching={isFetching}
           onRefresh={() => refetch()}
@@ -221,132 +262,154 @@ function WorkPage() {
         <StatusBanner state={overview.data?.state} />
 
         {ready ? (
-          <>
-            <AreaStrip advice={advice} />
+          <Tabs
+            value={tab}
+            onValueChange={(next) => {
+              if (!isWorkTab(next)) return
+              navigate({
+                search: next === 'checklist' ? {} : { tab: next },
+                replace: true,
+                resetScroll: false,
+              })
+            }}
+            className="gap-4"
+          >
+            <TabsList className="h-auto flex-wrap">
+              {TABS.map(({ key, label, icon: Icon }) => (
+                <TabsTrigger key={key} value={key} className="gap-1.5">
+                  <Icon className="size-3.5" />
+                  {label}
+                  {tabCounts[key] ? (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {formatNumber(tabCounts[key])}
+                    </span>
+                  ) : null}
+                </TabsTrigger>
+              ))}
+            </TabsList>
 
-            <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-              <div className="flex min-w-0 flex-col gap-4">
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <ListChecksIcon className="size-4 text-primary" />
-                      Do these next
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {counts.problem
-                        ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'}, `
-                        : ''}
-                      {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, and{' '}
-                      {counts.good} check{counts.good === 1 ? '' : 's'} already fine. Open one for
-                      the steps in the game.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <NextSteps advice={advice} />
-                  </CardContent>
-                </Card>
-
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <LifeBuoyIcon className="size-4 text-primary" />
-                      When things go wrong
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      What to do when trouble comes. What seems to be happening now is on top.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <SituationList situations={playbook} />
-                  </CardContent>
-                </Card>
-              </div>
-
-              <div className="flex min-w-0 flex-col gap-4">
-                {season ? (
-                  <Card className="gap-3">
+            <TabsContent value="checklist">
+              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+                <div className="flex min-w-0 flex-col gap-4">
+                  <Card className="gap-4">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <SeasonIcon season={season.season} />
-                        {season.season.charAt(0).toUpperCase()}
-                        {season.season.slice(1)}
-                        {state?.world ? ` of ${state.world.year}` : ''}
+                        <ListChecksIcon className="size-4 text-primary" />
+                        To see to
                       </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {counts.problem
+                          ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'} and `
+                          : ''}
+                        {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, the
+                        worst first. Open one for the steps in the game.
+                      </p>
                     </CardHeader>
                     <CardContent>
-                      <ul className="flex flex-col gap-1.5 text-sm">
-                        {season.notes.map((note) => (
-                          <li key={note} className="flex gap-2">
-                            <span className="mt-2 size-1.5 shrink-0 rounded-full bg-primary" />
-                            {note}
-                          </li>
-                        ))}
-                      </ul>
+                      <NextSteps advice={advice} max={advice.length} />
                     </CardContent>
                   </Card>
-                ) : null}
+                  <Card className="gap-4">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <CircleCheckIcon className="size-4 text-primary" />
+                        Already fine
+                        <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                          {counts.good}
+                        </span>
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        What a thriving fortress has that yours has too.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <FineChecks advice={advice} />
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="flex min-w-0 flex-col gap-4">
+                  {season ? (
+                    <Card className="gap-3">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <SeasonIcon season={season.season} />
+                          {season.season.charAt(0).toUpperCase()}
+                          {season.season.slice(1)}
+                          {state?.world ? ` of ${state.world.year}` : ''}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ul className="flex flex-col gap-1.5 text-sm">
+                          {season.notes.map((note) => (
+                            <li key={note} className="flex gap-2">
+                              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
+                              {note}
+                            </li>
+                          ))}
+                        </ul>
+                      </CardContent>
+                    </Card>
+                  ) : null}
+                  <Card className="gap-4">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <LifeBuoyIcon className="size-4 text-primary" />
+                        When things go wrong
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        What to do when trouble comes. What seems to be happening now is on top.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <SituationList situations={playbook} />
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="stuck" className="flex flex-col gap-4">
+              <div className="grid items-start gap-4 xl:grid-cols-2">
+                <SuspendedJobs
+                  jobs={jobs}
+                  buildingNames={buildingNames}
+                  advice={adviceByKey('suspended')}
+                />
+                <FailingJobs alerts={alerts} advice={adviceByKey('failing')} />
+              </div>
+              <UnworkableWork rows={shops} idle={idle} />
+            </TabsContent>
+
+            <TabsContent value="queue" className="flex flex-col gap-4">
+              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <Card className="gap-4">
                   <CardHeader>
-                    <CardTitle className="text-base">What a thriving fortress has</CardTitle>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ListTodoIcon className="size-4 text-primary" />
+                      The work queue
+                    </CardTitle>
                     <p className="text-sm text-muted-foreground">
-                      Every check, the good ones too. Click one for the details.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <Checklist advice={advice} />
-                  </CardContent>
-                </Card>
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="text-base">The work queue</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {formatNumber(jobs.length)} jobs, by kind.
+                      {formatNumber(jobs.length)} jobs in {queue.length} kinds:{' '}
+                      {formatNumber(working)} being worked,{' '}
+                      {formatNumber(jobs.length - working - suspended)} waiting and{' '}
+                      {formatNumber(suspended)} suspended. Open a kind for what to do about it.
                     </p>
                   </CardHeader>
                   <CardContent>
                     <JobQueueList groups={queue} advice={advice} />
                   </CardContent>
                 </Card>
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="text-base">Workshops and who can work them</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      The best hands at each, by skill. Enable the matching labor to put them to
-                      work.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <WorkshopList rows={shops} idle={idle} />
-                  </CardContent>
-                </Card>
+                <IdleHands idle={idle} advice={adviceByKey('idle')} />
               </div>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-muted-foreground">Reading the fortress…</p>
-        )}
-
-        <div>
-          <h2 className="mb-3 text-lg font-medium">Every job and building</h2>
-          <Tabs defaultValue="jobs">
-            <TabsList>
-              <TabsTrigger value="jobs">Jobs ({jobs.length})</TabsTrigger>
-              <TabsTrigger value="workshops">Workshops ({groups.workshops.length})</TabsTrigger>
-              <TabsTrigger value="stockpiles">Stockpiles ({groups.stockpiles.length})</TabsTrigger>
-              <TabsTrigger value="zones">Zones ({groups.zones.length})</TabsTrigger>
-              <TabsTrigger value="furniture">
-                Furniture &amp; other ({groups.furniture.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="jobs">
-              <Card className="overflow-hidden p-0">
+              <Card className="gap-0 overflow-hidden p-0">
+                <CardHeader className="px-4 pt-4">
+                  <CardTitle className="text-base">Every job</CardTitle>
+                </CardHeader>
                 {jobs.length === 0 ? (
                   <div className="p-6">
                     <EmptyState title="No jobs">
-                      {jobs.length
-                        ? 'Nothing matches.'
-                        : 'Nothing is queued, or no dump has been taken.'}
+                      Nothing is queued, or no dump has been taken.
                     </EmptyState>
                   </div>
                 ) : (
@@ -365,18 +428,70 @@ function WorkPage() {
               </Card>
             </TabsContent>
 
-            {(['workshops', 'stockpiles', 'zones', 'furniture'] as const).map((key) => (
-              <TabsContent key={key} value={key}>
-                <BuildingTable
-                  buildings={groups[key]}
-                  showJobs={key === 'workshops'}
-                  showItems={key === 'stockpiles'}
-                  unitNames={unitNames}
-                />
-              </TabsContent>
-            ))}
+            <TabsContent value="workshops" className="flex flex-col gap-4">
+              <Card className="gap-4">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <HammerIcon className="size-4 text-primary" />
+                    Workshops and who can work them
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Missing essentials first, then the ones nobody can work, then the busy ones. The
+                    best hands at each, by skill.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <WorkshopList rows={shops} idle={idle} max={shops.length} />
+                </CardContent>
+              </Card>
+              <BuildingTable
+                title="Every workshop"
+                buildings={groups.workshops}
+                showJobs
+                showItems={false}
+                unitNames={unitNames}
+              />
+            </TabsContent>
+
+            <TabsContent value="buildings">
+              <Tabs defaultValue="stockpiles" className="gap-3">
+                <TabsList>
+                  <TabsTrigger value="stockpiles" className="gap-1.5">
+                    Stockpiles
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {groups.stockpiles.length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="zones" className="gap-1.5">
+                    Zones
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {groups.zones.length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="furniture" className="gap-1.5">
+                    Furniture and other
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {groups.furniture.length}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
+                {(['stockpiles', 'zones', 'furniture'] as const).map((key) => (
+                  <TabsContent key={key} value={key}>
+                    <BuildingTable
+                      buildings={groups[key]}
+                      showJobs={false}
+                      showItems={key === 'stockpiles'}
+                      unitNames={unitNames}
+                      labelOf={key === 'stockpiles' ? stockpileLabel : undefined}
+                    />
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </TabsContent>
           </Tabs>
-        </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Reading the fortress…</p>
+        )}
       </div>
     </GuideProvider>
   )
@@ -394,27 +509,36 @@ function SeasonIcon({ season }: { season: string }) {
   return <Icon className="size-4 text-primary" />
 }
 
+/** Stockpiles all share one type, so their own names are what tells them apart. */
+function stockpileLabel(b: FortBuilding): string {
+  return b.name || b.custom || 'Unnamed stockpile'
+}
+
 function BuildingTable({
+  title,
   buildings,
   showJobs,
   showItems,
   unitNames,
+  labelOf = buildingLabel,
 }: {
+  title?: string
   buildings: FortBuilding[]
   showJobs: boolean
   showItems: boolean
   unitNames: Map<number, string>
+  labelOf?: (building: FortBuilding) => string
 }) {
   const grouped = React.useMemo<BuildingGroup[]>(() => {
     const m = new Map<string, FortBuilding[]>()
     for (const b of buildings) {
-      const label = buildingLabel(b)
+      const label = labelOf(b)
       const list = m.get(label) ?? []
       list.push(b)
       m.set(label, list)
     }
     return [...m.entries()].map(([label, list]) => ({ label, buildings: list }))
-  }, [buildings])
+  }, [buildings, labelOf])
   const columns = React.useMemo<ColumnDef<BuildingGroup>[]>(
     () => [
       {
@@ -440,15 +564,17 @@ function BuildingTable({
                 .join(' '),
             )
             .join(' | '),
-        meta: { cellClassName: 'text-sm text-muted-foreground' },
+        meta: { cellClassName: 'text-muted-foreground' },
         cell: ({ row }) => (
           <div className="flex flex-wrap gap-x-3 gap-y-1">
             {row.original.buildings.slice(0, 12).map((b) => (
               <span key={b.id} className="inline-flex items-center gap-1">
-                <span className="font-mono text-sm">
+                <span className="font-mono">
                   {b.cx},{b.cy} z{b.z}
                 </span>
-                {b.name ? <span className="text-foreground">“{b.name}”</span> : null}
+                {b.name && b.name !== row.original.label ? (
+                  <span className="text-foreground">“{b.name}”</span>
+                ) : null}
                 {b.room ? <span>{b.room}</span> : null}
                 {showJobs && b.jobs.length ? (
                   <Badge variant="secondary">{b.jobs.length} jobs</Badge>
@@ -484,7 +610,12 @@ function BuildingTable({
     )
   }
   return (
-    <Card className="overflow-hidden p-0">
+    <Card className="gap-0 overflow-hidden p-0">
+      {title ? (
+        <CardHeader className="px-4 pt-4">
+          <CardTitle className="text-base">{title}</CardTitle>
+        </CardHeader>
+      ) : null}
       <DataTable
         data={grouped}
         columns={columns}
@@ -499,6 +630,12 @@ function BuildingTable({
   )
 }
 
+interface WorkSearch {
+  tab?: Exclude<WorkTab, 'checklist'>
+}
+
 export const Route = createFileRoute('/_authenticated/_app/fortress/work/')({
+  validateSearch: (raw: Record<string, unknown>): WorkSearch =>
+    isWorkTab(raw.tab) && raw.tab !== 'checklist' ? { tab: raw.tab } : {},
   component: WorkPage,
 })

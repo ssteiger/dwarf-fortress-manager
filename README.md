@@ -1,6 +1,8 @@
 # Dwarf Fortress Manager
 
-A companion app for a running Dwarf Fortress game. A worker next to the game reads the loaded fortress through DFHack on a timer and stores it in Postgres; a web app turns that into pages a player can use: what needs attention and how to fix it in the game, every dwarf with a full character sheet and role-play tools, the stores, the work queue, the map, the announcement chronicle, and a browser for the world's exported legends.
+A companion app for a running Dwarf Fortress game, with two halves that matter equally. One makes the dwarves feel like people and the fortress and its world feel like a story worth following: a full character sheet and role-play tools for every dwarf, nicknames worth shouting across the dining hall, the fortress's chronicle and a reader for the world's legends. The other helps keep the fortress alive, so the story can go on: what needs attention and how to fix it in the game, the stores, the work, the map.
+
+A worker next to the game reads the loaded fortress through DFHack on a timer and stores it in Postgres; a web app turns that into pages a player can use, on a second screen while playing or on its own between sessions.
 
 One search box in the header (⌘K / Ctrl+K) looks across all of it at once: pages, dwarves and other creatures, items, buildings and zones, chronicle entries, and legends records such as figures, sites, civilizations and artifacts.
 
@@ -20,9 +22,13 @@ flowchart LR
   Worker -->|"set-nickname.lua, unit-action.lua, whitelisted commands"| DF
 ```
 
-![The legends world map for Ngutegoram](apps/web/public/screenshot-1.jpg)
+![Search (⌘K) open over the fortress overview: pages, dwarves, items, places and legends from one box](apps/web/public/screenshot-search.jpg)
 
-![Gods, peoples, wars, and chronicle figures in legends](apps/web/public/screenshot-2.jpg)
+![Work and advice: a checklist of what needs seeing to, worst first, each with the steps to fix it in the game](apps/web/public/screenshot-work.jpg)
+
+!["Ask how to…" (⌘J): the assistant answers how to make steel and offers the DFHack command to run](apps/web/public/screenshot-assistant.jpg)
+
+![Legends for the world Ngutegoram: other ways in, the size of the world, and a story to start with](apps/web/public/screenshot-legends.jpg)
 
 ## What's in the app
 
@@ -33,10 +39,10 @@ flowchart LR
 | **Overview** `/fortress` | Citizens, who is at work, created wealth and dangers on the map; what needs your attention, how the fortress feels, and the story so far, with entries since your last visit marked. |
 | **Dwarves** `/fortress/dwarves` | Everyone on the map as cards or a table, split into citizens, residents, visitors, animals and hostiles, with a "could use your help" strip on top. Click anyone for a drawer, or open their full page. |
 | **Items** `/fortress/items` | What the fortress keeps, what it is running short of and what to do about it, then every item on the map. Each item has its own page. |
-| **Work** `/fortress/work` | What a thriving fortress has and what yours is missing, the work queue, and every workshop with who can work it. |
+| **Work** `/fortress/work` | A checklist of what needs seeing to, worst first, each with the steps to fix it; what is stuck (suspended jobs, jobs the game keeps cancelling and why, missing workshops, idle dwarves); the job queue; every workshop with who can work it; stockpiles, zones and furniture. Alongside: what the season brings and what to do when things go wrong. |
 | **Map** `/fortress/map` | One z-level at a time from the last map dump, with dwarves, creatures and hostiles marked. Zoom, pan, `<` / `>` to change level, and show unrevealed rock if you want to. |
 | **Chronicle** `/fortress/chronicle` | Every announcement since the worker started, filterable to notable events, cancellations or combat. Announcements undone by loading an earlier save are left out. |
-| **Nickname dwarves** `/nickname-dwarves` | Nickname ideas built on what sets each citizen apart from the rest of the fortress, optionally written by a language model, queued into the game in one go. |
+| **Nickname dwarves** `/nickname-dwarves` | Nickname ideas built on what only that dwarf has: what they eat, drink, love or detest, what they are missing, a mishap from the chronicle, an odd best skill, a parent's or partner's nickname ("Kettle Jr."), the dead dwarf whose trade they took over ("Hums II"). The ideas come in mixed forms (titles, "Hatch Cover Enjoyer", sequels, plain phrases) so a roster doesn't all sound alike, and a language model can write more. Keep your own list of favourite names and each goes to the dwarf it fits best. Shows how a name reads in the game, queues names into the game in one go, and keeps the reason behind each one for the dwarf's page. |
 
 Advice comes with step-by-step guides you can tick off. Where DFHack can do the fix (resume suspended jobs, turn on `tailor` or `autofarm`, import standard work orders, and so on), the guide offers it as a one-click command.
 
@@ -46,7 +52,7 @@ The drawer and the full page `/fortress/dwarves/$id` share the same tabs; the fu
 
 | Tab | What it shows |
 | --- | --- |
-| **Overview** | A few sentences on who they are and what troubles them, with a guide for each trouble; bodily needs, the needs they most long to meet, best skills, recent thoughts, the chronicle entries that name them, their rooms and workshops. |
+| **Overview** | A few sentences on who they are and what troubles them, with a guide for each trouble; why they got their nickname, when it was given from the nickname page; bodily needs, the needs they most long to meet, best skills, recent thoughts, the chronicle entries that name them, their rooms and workshops. |
 | **Mind** | Every need with the game's own words for how well it is met (unfettered to badly distracted) and their overall focus; personality and beliefs in plain sentences; dreams and gods; likes and dislikes; thoughts; long-term and core memories. |
 | **Skills & body** | Every skill grouped by kind, with progress to the next level, rust, and a warning when they are good at something their labors do not allow; attributes compared with a typical member of their race; injuries by body part, syndromes (drink shows up here, not as a wound); work details, squad and offices. |
 | **People** | Family and bonds, friends, grudges and acquaintances as the game records them, with links to anyone on the map; the civilizations, faiths and groups they belong to. |
@@ -56,7 +62,7 @@ The drawer and the full page `/fortress/dwarves/$id` share the same tabs; the fu
 
 ### Legends
 
-Import a world's exports and `/legends` becomes a reader for its history: a world map drawn with the game's world sprites, a chart of the ages you can drag across to read a span's chronicle, stories worth reading (the bloodiest battles, the deadliest beasts, the lives most written about), the figures and races in history, an archive of every record and event, and a page per record with every raw field. You can pin anything to a private journal with notes, and a "recently read" trail picks up where you left off. An optional narrator retells a record, a span or a story in a chosen voice.
+Import a world's exports and `/legends` becomes a reader for its history: an overview with a story to start with and where your own fortress stands in that world; a world map drawn with the game's world sprites; a chart of the ages you can drag across to read a span's chronicle; stories worth reading, each on its own page (the bloodiest battles, the deadliest beasts, the lives most written about); the figures and races in history; an archive of every record and event; and a page per record that tells a figure's life from the record, notes any tie to your fortress, and keeps every raw field below. You can pin anything to a private journal with notes, and a "recently read" trail picks up where you left off. An optional narrator retells a record, a span or a story in a chosen voice.
 
 ### Everywhere
 
@@ -142,8 +148,9 @@ fortress/
 │   │       ├── routes/     File routes; `-components/` folders are route-private.
 │   │       └── lib/
 │   │           ├── fortress/   Server reads, advice, guides, insights, dwarf
-│   │           │               readings (character.ts, dossier.ts), role play
-│   │           │               and command queueing.
+│   │           │               readings and nickname ideas (character.ts,
+│   │           │               dossier.ts, nameList.ts), role play and
+│   │           │               command queueing.
 │   │           ├── legends/    Legends reads, chronicle, stories, narrator, journal.
 │   │           ├── df-assets/  Sprite lookup and dwarf compositing from the
 │   │           │               extracted layer rules.
@@ -175,6 +182,8 @@ fortress/
 | `fort_commands` | web, then worker | The command queue described above. |
 | `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers, the progress of the latest read and a heartbeat (worker). |
 | `fort_unit_notes` | web | Each player's role-play notes per fortress and unit. |
+| `fort_nicknames` | web | Every nickname given from the nickname page and the reason behind it; a unit's newest row is theirs. |
+| `nickname_list` | web | Each player's own list of nicknames waiting for a dwarf to fit them, kept across fortresses. |
 | `legends_worlds`, `legends_imports`, `legends_records` | worker | Imported legends exports, one generic JSON record per element. |
 | `legends_notes` | web | Each player's legends journal. |
 | `logs` | worker | The worker's log lines. |

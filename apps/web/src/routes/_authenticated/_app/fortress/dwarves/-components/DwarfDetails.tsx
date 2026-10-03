@@ -57,6 +57,7 @@ import {
   unitConcerns,
   unitStory,
 } from '~/lib/fortress/insights'
+import { getNicknameReason } from '~/lib/fortress/nicknames'
 import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/queries'
 import { type CarriedItem, type FortUnitDetail, getFortEvents } from '~/lib/fortress/server'
 import { EmptyState, StatCard, UnitConditionBadges } from '../../-components/FortChrome'
@@ -414,6 +415,17 @@ function OverviewTab({
     ? sheet.skills.filter(([, r]) => r > 0).map(([t, r]) => [t, r])
     : unit.skills
   const civ = sheet?.groups.find(([, type, link]) => type === 'Civilization' && link === 'MEMBER')
+  const nickname = unit.nickname?.trim() ?? ''
+  const reason = useQuery({
+    queryKey: ['fort', 'nickname-reason', unit.id],
+    queryFn: () => getNicknameReason({ data: { unitId: unit.id } }),
+    enabled: Boolean(nickname),
+    staleTime: 60_000,
+  })
+  const named =
+    reason.data && reason.data.nickname.toLowerCase() === nickname.toLowerCase()
+      ? reason.data
+      : null
   const tabLink = (tab: DwarfTab, label: string) => (
     <button
       type="button"
@@ -437,6 +449,17 @@ function OverviewTab({
           <Facts
             items={[
               { label: 'Name', value: unit.readable },
+              {
+                label: 'Why the nickname',
+                value: named?.why ? (
+                  <>
+                    {named.why}{' '}
+                    <Link to="/nickname-dwarves" className="text-muted-foreground hover:underline">
+                      Rename
+                    </Link>
+                  </>
+                ) : null,
+              },
               {
                 label: 'In plain words',
                 value:

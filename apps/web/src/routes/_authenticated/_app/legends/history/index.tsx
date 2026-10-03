@@ -80,50 +80,11 @@ function HistoryBody({
 
   return (
     <div className="flex flex-col gap-4">
-      <Section
-        title={
-          years ? `${(years.max - years.min + 1).toLocaleString()} years of history` : 'History'
-        }
-        description={
-          summary.eras.length
-            ? `Eras: ${summary.eras.map((e) => `${e.name} (from ${e.startYear < 0 ? 'the beginning' : `year ${e.startYear}`})`).join(', ')}. Click a bar, drag across several, or click an era to read those years.`
-            : 'Click a bar, drag across several, or click an era to read those years.'
-        }
-        action={
-          years && current && (current.from !== years.min || current.to !== years.max) ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onSpan({ from: years.min, to: years.max })}
-            >
-              Read all {(years.max - years.min + 1).toLocaleString()} years
-            </Button>
-          ) : null
-        }
-      >
-        <HistoryChart
-          bins={summary.timeline}
-          binYears={summary.binYears}
-          eras={summary.eras}
-          selection={current}
-          onSelect={(next) =>
-            onSpan(
-              years
-                ? { from: Math.max(next.from, years.min), to: Math.min(next.to, years.max) }
-                : next,
-            )
-          }
-        />
-      </Section>
-
-      {years && current ? (
-        <ChroniclePanel worldId={worldId} span={current} years={years} onSpan={onSpan} />
-      ) : null}
-
       <StoriesStrip worldId={worldId} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
         <Section
+          collapsed
           title="Names that fill the chronicles"
           description="The figures mentioned in the most recorded events."
         >
@@ -167,6 +128,7 @@ function HistoryBody({
         </Section>
 
         <Section
+          collapsed
           title="Peoples and beasts"
           description="Everyone with a place in history, by race. Click a race to browse its figures."
         >
@@ -199,6 +161,7 @@ function HistoryBody({
         </Section>
 
         <Section
+          collapsed
           title="Wars"
           count={summary.wars.length}
           description="Declared wars between civilizations. Click the years to read them."
@@ -272,6 +235,7 @@ function HistoryBody({
         </Section>
 
         <Section
+          collapsed
           title="Gods and forces"
           count={summary.deitiesTotal}
           description="Deities worshipped by the civilizations, and the spheres they hold."
@@ -308,6 +272,46 @@ function HistoryBody({
           </ul>
         </Section>
       </div>
+
+      <Section
+        title={
+          years ? `${(years.max - years.min + 1).toLocaleString()} years of history` : 'History'
+        }
+        description={
+          summary.eras.length
+            ? `Eras: ${summary.eras.map((e) => `${e.name} (from ${e.startYear < 0 ? 'the beginning' : `year ${e.startYear}`})`).join(', ')}. Click a bar, drag across several, or click an era to read those years.`
+            : 'Click a bar, drag across several, or click an era to read those years.'
+        }
+        action={
+          years && current && (current.from !== years.min || current.to !== years.max) ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSpan({ from: years.min, to: years.max })}
+            >
+              Read all {(years.max - years.min + 1).toLocaleString()} years
+            </Button>
+          ) : null
+        }
+      >
+        <HistoryChart
+          bins={summary.timeline}
+          binYears={summary.binYears}
+          eras={summary.eras}
+          selection={current}
+          onSelect={(next) =>
+            onSpan(
+              years
+                ? { from: Math.max(next.from, years.min), to: Math.min(next.to, years.max) }
+                : next,
+            )
+          }
+        />
+      </Section>
+
+      {years && current ? (
+        <ChroniclePanel worldId={worldId} span={current} years={years} onSpan={onSpan} />
+      ) : null}
     </div>
   )
 }

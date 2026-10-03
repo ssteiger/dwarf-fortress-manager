@@ -21,6 +21,8 @@ export type NewFortEvent = InferInsertModel<typeof schema.fort_events>;
 export type FortCommand = InferSelectModel<typeof schema.fort_commands>;
 export type NewFortCommand = InferInsertModel<typeof schema.fort_commands>;
 export type FortUnitNote = InferSelectModel<typeof schema.fort_unit_notes>;
+export type FortNickname = InferSelectModel<typeof schema.fort_nicknames>;
+export type NicknameListEntry = InferSelectModel<typeof schema.nickname_list>;
 
 export type LegendsWorld = InferSelectModel<typeof schema.legends_worlds>;
 export type LegendsImport = InferSelectModel<typeof schema.legends_imports>;

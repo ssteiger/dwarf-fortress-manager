@@ -75,6 +75,7 @@ export function racePlural(race: string | null | undefined): string {
   const w = words(race)
   if (!w) return ''
   if (w === 'dwarf') return 'dwarves'
+  if (/(^|\s)(elf|wolf)$/.test(w)) return w.replace(/f$/, 'ves')
   if (/(^|\s)(wo)?man$/.test(w)) return w.replace(/man$/, 'men')
   if (/(s|x|ch|sh)$/.test(w)) return `${w}es`
   if (/[^aeiou]y$/.test(w)) return `${w.slice(0, -1)}ies`

@@ -51,6 +51,7 @@ export function NarrateButton({
   subject,
   title,
   size = 'sm',
+  label = 'Narrate',
   className,
 }: {
   worldId: number
@@ -58,6 +59,7 @@ export function NarrateButton({
   /** What the dialog calls the subject; also the journal title. */
   title: string
   size?: 'sm' | 'icon'
+  label?: string
   className?: string
 }) {
   const status = useNarratorStatus()
@@ -71,11 +73,11 @@ export function NarrateButton({
         size={size}
         className={cn(size === 'icon' ? 'size-8' : 'gap-1.5', className)}
         onClick={() => setOpen(true)}
-        aria-label={size === 'icon' ? 'Narrate' : undefined}
+        aria-label={size === 'icon' ? label : undefined}
         title="Have the narrator tell it"
       >
         <FeatherIcon className="size-4" />
-        {size === 'sm' ? 'Narrate' : null}
+        {size === 'sm' ? label : null}
       </Button>
       {open ? (
         <NarrationDialog

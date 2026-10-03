@@ -17,6 +17,7 @@ import {
 } from '~/lib/legends/model'
 import { getLegendsMap, getLegendsRecord } from '~/lib/legends/server'
 import { recordVisit } from '~/lib/legends/trail'
+import { FortressTieLine } from '../-components/FortressTie'
 import { PinButton } from '../-components/Journal'
 import {
   Breadcrumbs,
@@ -25,6 +26,7 @@ import {
   recordName,
   useLegendsWorlds,
 } from '../-components/LegendsChrome'
+import { TheirLife } from '../-components/Life'
 import { NarrateButton } from '../-components/Narrator'
 import { RawFacts } from '../-components/RawFacts'
 import {
@@ -211,7 +213,7 @@ function RecordPage() {
         </div>
         {record && worldId !== null ? (
           <div className="ml-auto flex shrink-0 items-center gap-2">
-            {NARRATED_KINDS.has(kind) ? (
+            {NARRATED_KINDS.has(kind) && kind !== 'historical_figure' ? (
               <NarrateButton
                 worldId={worldId}
                 subject={{ kind: 'record', recordKind: kind, id: numericId }}
@@ -239,6 +241,14 @@ function RecordPage() {
         </EmptyState>
       ) : (
         <>
+          {kind === 'historical_figure' ? (
+            <TheirLife
+              worldId={worldId}
+              id={numericId}
+              title={title}
+              before={<FortressTieLine worldId={worldId} figureId={numericId} />}
+            />
+          ) : null}
           <div className="grid gap-4 lg:grid-cols-3">
             <KindSections
               record={record}
@@ -255,10 +265,16 @@ function RecordPage() {
                     worldId={worldId}
                     kind={kind}
                     id={numericId}
-                    title={kind === 'historical_event_collection' ? 'What happened' : 'History'}
+                    title={
+                      kind === 'historical_event_collection'
+                        ? 'What happened'
+                        : kind === 'historical_figure'
+                          ? 'Every recorded event'
+                          : 'History'
+                    }
                     description={
                       kind === 'historical_figure'
-                        ? 'Everything the chronicles record about this figure, in order.'
+                        ? 'The record behind the life above, in order.'
                         : kind === 'historical_event_collection'
                           ? 'The events of this chapter, in order.'
                           : 'Everything that happened here or involved this, in order.'

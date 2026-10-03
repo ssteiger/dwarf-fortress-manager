@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
 	bigint,
 	boolean,
@@ -175,6 +176,43 @@ export const fort_unit_notes = pgTable(
 	(t) => [
 		uniqueIndex("fort_unit_notes_target_unique").on(t.user_id, t.fort_key, t.unit_id),
 	],
+);
+
+/** Every nickname given from the nickname page and why; a unit's newest row is theirs. */
+export const fort_nicknames = pgTable(
+	"fort_nicknames",
+	{
+		id: serial().primaryKey().notNull(),
+		user_id: uuid().notNull(),
+		/** "save_dir:site_id", as the chronicle keys the fortress. */
+		fort_key: text().notNull(),
+		unit_id: integer().notNull(),
+		nickname: text().notNull(),
+		/** The fact behind the name; null when the player typed their own. */
+		why: text(),
+		source: text()
+			.$type<"facts" | "model" | "list" | "typed">()
+			.notNull()
+			.default("typed"),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [index("fort_nicknames_unit_idx").on(t.fort_key, t.unit_id, t.created_at)],
+);
+
+/** The player's own nicknames waiting for a dwarf to fit them, across fortresses. */
+export const nickname_list = pgTable(
+	"nickname_list",
+	{
+		id: serial().primaryKey().notNull(),
+		user_id: uuid().notNull(),
+		name: text().notNull(),
+		created_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [uniqueIndex("nickname_list_name_unique").on(t.user_id, sql`lower(${t.name})`)],
 );
 
 /** One row per exported world (grouped by the legends file prefix). */

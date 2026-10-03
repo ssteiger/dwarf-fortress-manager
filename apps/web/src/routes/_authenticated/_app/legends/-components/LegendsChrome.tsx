@@ -553,6 +553,28 @@ export function Fragments({
   )
 }
 
+/** Told prose: paragraphs at reading measure, names kept as links. */
+export function Telling({
+  paragraphs,
+  worldId,
+  className,
+}: {
+  paragraphs: Fragment[][]
+  worldId: number | null
+  className?: string
+}) {
+  return (
+    <div className={cn('max-w-[70ch] space-y-3 text-base leading-relaxed', className)}>
+      {paragraphs.map((p, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: paragraphs are positional
+        <p key={i}>
+          <Fragments fragments={p} worldId={worldId} />
+        </p>
+      ))}
+    </div>
+  )
+}
+
 const CATEGORY_DOT: Record<string, string> = {
   war: 'bg-red-500',
   death: 'bg-stone-500',
@@ -610,12 +632,7 @@ export function EventLine({
           )}
           title={category?.label ?? (type ? words(type) : 'event')}
         />
-        <span
-          className={cn(
-            'min-w-0 flex-1',
-            !described.known && 'text-muted-foreground',
-          )}
-        >
+        <span className={cn('min-w-0 flex-1', !described.known && 'text-muted-foreground')}>
           <Fragments fragments={described.fragments} worldId={worldId} />
           {after}
         </span>

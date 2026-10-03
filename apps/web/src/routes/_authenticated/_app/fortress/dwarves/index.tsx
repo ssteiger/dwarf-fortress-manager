@@ -3,9 +3,6 @@ import {
   Badge,
   Button,
   Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   DataTable,
   Drawer,
   DrawerClose,
@@ -22,7 +19,7 @@ import {
 } from '@fortress/ui'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
-import { HandHelpingIcon, LayoutGridIcon, Maximize2Icon, TableIcon, XIcon } from 'lucide-react'
+import { LayoutGridIcon, Maximize2Icon, TableIcon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { CreatureSprite, UnitPortrait } from '~/lib/df-assets/components'
@@ -46,9 +43,8 @@ import {
   notableThought,
   thoughtPhrase,
   unitConcerns,
-  worstSeverity,
 } from '~/lib/fortress/insights'
-import { useFortOverview, useFortUnits } from '~/lib/fortress/queries'
+import { useFortOverview, useFortPeople, useFortUnits } from '~/lib/fortress/queries'
 import {
   EmptyState,
   MoodBadge,
@@ -59,6 +55,7 @@ import {
 import { ConcernBadges } from '../-components/Insights'
 import { ShowInGameButton } from './-components/ActionsTab'
 import { DwarfDetails, type DwarfTab } from './-components/DwarfDetails'
+import { Bonds, HelpList, SkillCoverage, WorkGroups } from './-components/PeoplePanels'
 import {
   UnitLinks,
   legendsRefFor,
@@ -69,6 +66,10 @@ import {
 } from './-components/UnitLinks'
 
 type Group = ReturnType<typeof unitGroup> | 'all'
+
+function count(n: number, one: string, many = `${one}s`): string {
+  return `${n.toLocaleString()} ${n === 1 ? one : many}`
+}
 
 function conditionScore(unit: FortUnit): number {
   const needs = unitNeeds(unit)
@@ -172,59 +173,6 @@ function DwarvesPage() {
                 </div>
               </div>
             </div>
-          )
-        },
-      },
-      {
-        id: 'legends',
-        header: 'Legends',
-        accessorFn: (unit) => {
-          const legends = legendsRefFor(unit, legendsWorldId, knownFigures)
-          return legends ? (legendCounts.get(legends.figureId) ?? 0) : null
-        },
-        sortUndefined: 'last',
-        meta: { align: 'right', cellClassName: 'tabular-nums' },
-        cell: ({ row }) => {
-          const legends = legendsRefFor(row.original, legendsWorldId, knownFigures)
-          if (!legends) return '—'
-          const count = legendCounts.get(legends.figureId) ?? 0
-          return (
-            <Link
-              to="/legends/$kind/$id"
-              params={{ kind: 'historical_figure', id: String(legends.figureId) }}
-              search={{ world: legends.worldId }}
-              className="hover:underline"
-              title="Their legends"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {count.toLocaleString()}
-            </Link>
-          )
-        },
-      },
-      {
-        id: 'chronicle',
-        header: 'Chronicle',
-        accessorFn: (unit) => {
-          const name = unit.name.trim()
-          return name ? (chronicleCounts.get(name) ?? 0) : null
-        },
-        sortUndefined: 'last',
-        meta: { align: 'right', cellClassName: 'tabular-nums' },
-        cell: ({ row }) => {
-          const name = row.original.name.trim()
-          if (!name) return '—'
-          const count = chronicleCounts.get(name) ?? 0
-          return (
-            <Link
-              to="/fortress/chronicle"
-              search={{ q: name, filter: 'all' }}
-              className="hover:underline"
-              title="Announcements that name them"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {count.toLocaleString()}
-            </Link>
           )
         },
       },
@@ -333,66 +281,123 @@ function DwarvesPage() {
           return unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '—'
         },
       },
+      {
+        id: 'chronicle',
+        header: 'Chronicle',
+        accessorFn: (unit) => {
+          const name = unit.name.trim()
+          return name ? (chronicleCounts.get(name) ?? 0) : null
+        },
+        sortUndefined: 'last',
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+        cell: ({ row }) => {
+          const name = row.original.name.trim()
+          if (!name) return '—'
+          const count = chronicleCounts.get(name) ?? 0
+          return (
+            <Link
+              to="/fortress/chronicle"
+              search={{ q: name, filter: 'all' }}
+              className="hover:underline"
+              title="Announcements that name them"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {count.toLocaleString()}
+            </Link>
+          )
+        },
+      },
+      {
+        id: 'legends',
+        header: 'Legends',
+        accessorFn: (unit) => {
+          const legends = legendsRefFor(unit, legendsWorldId, knownFigures)
+          return legends ? (legendCounts.get(legends.figureId) ?? 0) : null
+        },
+        sortUndefined: 'last',
+        meta: { align: 'right', cellClassName: 'tabular-nums' },
+        cell: ({ row }) => {
+          const legends = legendsRefFor(row.original, legendsWorldId, knownFigures)
+          if (!legends) return '—'
+          const count = legendCounts.get(legends.figureId) ?? 0
+          return (
+            <Link
+              to="/legends/$kind/$id"
+              params={{ kind: 'historical_figure', id: String(legends.figureId) }}
+              search={{ world: legends.worldId }}
+              className="hover:underline"
+              title="Their legends"
+              onClick={(event) => event.stopPropagation()}
+            >
+              {count.toLocaleString()}
+            </Link>
+          )
+        },
+      },
     ],
     [legendsWorldId, knownFigures, legendCounts, chronicleCounts, now],
   )
 
+  const citizens = React.useMemo(
+    () => units.filter((u) => isLiving(u) && unitGroup(u) === 'citizen'),
+    [units],
+  )
   const helpWanted = React.useMemo(
     () =>
-      units
-        .filter((u) => isLiving(u) && unitGroup(u) === 'citizen')
+      citizens
         .map((unit) => ({ unit, concerns: unitConcerns(unit, now) }))
         .filter((entry) => entry.concerns.length > 0)
         .sort((a, b) => concernScore(b.concerns) - concernScore(a.concerns)),
-    [units, now],
+    [citizens, now],
   )
+  const people = useFortPeople()
+  const summary = overview.data?.state?.summary ?? null
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
         title="Dwarves and creatures"
-        description="Who lives here, what they are doing, and how they feel. Click anyone for their skills, needs, thoughts and story."
+        description={
+          summary ? (
+            <>
+              {count(citizens.length, 'citizen')}: {count(summary.adults, 'adult')},{' '}
+              {count(summary.children, 'child', 'children')} and{' '}
+              {count(summary.babies, 'baby', 'babies')} · {summary.working} at work, {summary.idle}{' '}
+              idle · {summary.military} in squads
+              {helpWanted.length ? ` · ${helpWanted.length} could use your help` : ''}
+            </>
+          ) : (
+            'Who lives here, what they do, what they are good at and who they are to each other.'
+          )
+        }
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
-        onRefresh={() => refetch()}
+        onRefresh={() => {
+          void refetch()
+          void people.refetch()
+        }}
       />
       <StatusBanner state={overview.data?.state} />
 
-      {helpWanted.length ? (
-        <Card className="gap-3 py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <HandHelpingIcon className="size-4 text-primary" />
-              Could use your help
-              <Badge variant="secondary" className="tabular-nums">
-                {helpWanted.length}
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="px-4">
-            <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-              {helpWanted.map(({ unit, concerns }) => (
-                <li key={unit.id}>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(unit)}
-                    className={cn(
-                      'flex h-full w-full items-start gap-3 rounded-lg border p-2.5 text-left transition-colors hover:bg-accent',
-                      worstSeverity(concerns) === 'danger' && 'border-red-500/40 bg-red-500/5',
-                      worstSeverity(concerns) === 'warning' && 'border-amber-500/40 bg-amber-500/5',
-                    )}
-                  >
-                    <CreatureSprite unit={unit} size={32} className="shrink-0" />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{unitDisplayName(unit)}</span>
-                      <ConcernBadges concerns={concerns} className="mt-1" />
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+      {citizens.length ? (
+        <>
+          <HelpList entries={helpWanted} onOpen={setSelected} />
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <WorkGroups citizens={citizens} onOpen={setSelected} />
+            <SkillCoverage
+              citizens={citizens}
+              wasted={people.data?.wasted ?? []}
+              loading={people.isPending}
+              onOpen={setSelected}
+            />
+          </div>
+          <Bonds
+            citizens={citizens}
+            bonds={people.data?.bonds ?? []}
+            loading={people.isPending}
+            onOpen={setSelected}
+          />
+        </>
       ) : null}
 
       <Card className="overflow-hidden p-0">
@@ -612,7 +617,7 @@ function Grid({
         aria-label="Search the grid"
       />
       {entries.length ? (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {entries.map(({ unit, concerns }) => {
             const living = isLiving(unit)
             const activity = activityOf(unit)
@@ -622,13 +627,13 @@ function Grid({
                   type="button"
                   onClick={() => onOpen(unit)}
                   className={cn(
-                    'flex h-full w-full gap-3 rounded-xl border bg-card p-3 text-left transition-colors hover:border-primary/50 hover:bg-accent/40',
+                    'flex h-full w-full gap-3 rounded-lg border bg-card p-2.5 text-left transition-colors hover:bg-accent/40',
                     !living && 'opacity-60',
                   )}
                 >
                   <UnitPortrait
                     unit={unit}
-                    size={56}
+                    size={48}
                     fallbackToSprite
                     className="shrink-0 rounded-md border bg-muted/40"
                   />
@@ -654,7 +659,6 @@ function Grid({
                     >
                       {living ? (unit.job ?? activity.label) : 'Dead'}
                     </span>
-                    <LatelyText unit={unit} now={now} />
                     <ConcernBadges concerns={concerns} className="mt-0.5" />
                   </span>
                 </button>
