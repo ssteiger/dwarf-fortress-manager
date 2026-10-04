@@ -2,7 +2,7 @@
 
 The only process that talks to the game. It installs `src/dfhack/fortress-snapshot.lua` into the game's `dfhack-config/` folder, asks DFHack to write a dump of the loaded fortress on a timer, stores the result in Postgres, and imports any `*-legends.xml` exports it finds next to the game.
 
-The dump covers units (including what a dwarf in a strange mood demands, what they have brought, and how much of each the stores still hold, the same facts DFHack's `showmood` prints), items with their maker and owner, buildings, jobs with their requirements, manager work orders with their conditions, squads, artifacts, noble mandates and demands, caravans, and announcements. The map, on its slower cadence, adds the ore and gem vein each mineral tile belongs to.
+The dump covers units (including what a dwarf in a strange mood demands, what they have brought, and how much of each the stores still hold, the same facts DFHack's `showmood` prints), items with their maker and owner, buildings, jobs with their requirements, manager work orders with their conditions, squads, artifacts, noble mandates and demands, caravans, and announcements. From version 11 it also covers diplomacy: every civilization and independent group with settlements nearby or dealings with yours, how each stands with your civilization and with the others, their leaders, the wars they fight with recent battles and conquests, temple and guildhall petitions, armies on the move, and the progress levels at which each people takes notice of the fortress or can besiege it. The map, on its slower cadence, adds the ore and gem vein each mineral tile belongs to.
 
 ```bash
 bun run dev:worker   # from the repo root

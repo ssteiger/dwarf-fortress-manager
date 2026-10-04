@@ -57,7 +57,13 @@ import {
 } from '../-components/Advice'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
-import { FailingJobs, IdleHands, SuspendedJobs, UnworkableWork } from './-components/Stuck'
+import {
+  FailingJobs,
+  IdleHands,
+  StuckFixes,
+  SuspendedJobs,
+  UnworkableWork,
+} from './-components/Stuck'
 
 const WORKSHOP_TYPES = new Set(['Workshop', 'Furnace', 'TradeDepot'])
 
@@ -517,6 +523,7 @@ function WorkPage() {
             </TabsContent>
 
             <TabsContent value="stuck" className="flex flex-col gap-4">
+              <StuckFixes suspended={suspended} failing={failing} />
               <div className="grid items-start gap-4 xl:grid-cols-2">
                 <SuspendedJobs
                   jobs={jobs}

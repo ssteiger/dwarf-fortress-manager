@@ -85,6 +85,12 @@ export function situationGuide(situation: Situation, units?: FortUnit[]): Guide 
   }
 }
 
+/** A playbook entry ("siege", "caravan") as a guide, without what the fortress shows now. */
+export function playbookGuide(key: string): Guide | null {
+  const situation = playbook(key)
+  return situation ? situationGuide(situation) : null
+}
+
 /** The playbook entries on their own, for guides that need no fortress data. */
 function playbook(key: string): Situation | undefined {
   return situations({

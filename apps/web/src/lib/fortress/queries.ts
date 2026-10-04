@@ -3,6 +3,7 @@ import * as React from 'react'
 import { getDumpState } from './dump'
 import {
   getFortConcerns,
+  getFortDiplomacy,
   getFortItem,
   getFortOverview,
   getFortPeople,
@@ -69,6 +70,15 @@ export function useFortPeople() {
   return useQuery({
     queryKey: ['fort', 'people'],
     queryFn: () => getFortPeople(),
+    refetchInterval: FORT_SLOW_REFRESH_MS,
+  })
+}
+
+/** Neighbours, wars, petitions and invasion triggers; they change slowly. */
+export function useFortDiplomacy() {
+  return useQuery({
+    queryKey: ['fort', 'diplomacy'],
+    queryFn: () => getFortDiplomacy(),
     refetchInterval: FORT_SLOW_REFRESH_MS,
   })
 }

@@ -61,6 +61,7 @@ export async function storeLiveDump(
     squads: payload.squads ?? null,
     artifacts: payload.artifacts ?? null,
     figures: payload.figures ?? null,
+    diplomacy: payload.diplomacy ?? null,
   }
   await postgres_db
     .insert(schema.fort_dump)

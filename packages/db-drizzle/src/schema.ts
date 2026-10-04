@@ -16,6 +16,7 @@ import {
 import type {
 	DfhackAction,
 	DumpProgress,
+	FortDiplomacy,
 	FortMapPayload,
 	FortStatus,
 	FortSummary,
@@ -62,6 +63,7 @@ export const fort_dump = pgTable("fort_dump", {
 	squads: jsonb().$type<RowTable>(),
 	artifacts: jsonb().$type<RowTable>(),
 	figures: jsonb().$type<RowTable>(),
+	diplomacy: jsonb().$type<FortDiplomacy>(),
 });
 
 /** Single row (id = 1): the map, dumped on its own slower cadence. */
@@ -179,7 +181,11 @@ export const fort_unit_notes = pgTable(
 			.notNull(),
 	},
 	(t) => [
-		uniqueIndex("fort_unit_notes_target_unique").on(t.user_id, t.fort_key, t.unit_id),
+		uniqueIndex("fort_unit_notes_target_unique").on(
+			t.user_id,
+			t.fort_key,
+			t.unit_id,
+		),
 	],
 );
 
@@ -203,7 +209,9 @@ export const fort_nicknames = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [index("fort_nicknames_unit_idx").on(t.fort_key, t.unit_id, t.created_at)],
+	(t) => [
+		index("fort_nicknames_unit_idx").on(t.fort_key, t.unit_id, t.created_at),
+	],
 );
 
 /** The player's own nicknames waiting for a dwarf to fit them, across fortresses. */
@@ -217,7 +225,12 @@ export const nickname_list = pgTable(
 			.defaultNow()
 			.notNull(),
 	},
-	(t) => [uniqueIndex("nickname_list_name_unique").on(t.user_id, sql`lower(${t.name})`)],
+	(t) => [
+		uniqueIndex("nickname_list_name_unique").on(
+			t.user_id,
+			sql`lower(${t.name})`,
+		),
+	],
 );
 
 /** One row per exported world (grouped by the legends file prefix). */
@@ -311,6 +324,10 @@ export const legends_notes = pgTable(
 			t.target_kind,
 			t.target_id,
 		),
-		index("legends_notes_user_world_idx").on(t.user_id, t.world_id, t.updated_at),
+		index("legends_notes_user_world_idx").on(
+			t.user_id,
+			t.world_id,
+			t.updated_at,
+		),
 	],
 );

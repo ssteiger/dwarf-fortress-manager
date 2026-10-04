@@ -1,343 +1,27 @@
 import type { FortUnit } from '@fortress/db-drizzle'
-import {
-  Badge,
-  Button,
-  Card,
-  DataTable,
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  Input,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  cn,
-} from '@fortress/ui'
+import { Button } from '@fortress/ui'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import type { ColumnDef } from '@tanstack/react-table'
-import { LayoutGridIcon, Maximize2Icon, TableIcon, XIcon } from 'lucide-react'
+import { PawPrintIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { CreatureSprite, UnitPortrait } from '~/lib/df-assets/components'
-import {
-  humanize,
-  isLiving,
-  sexLabel,
-  stressLabel,
-  unitDisplayName,
-  unitGroup,
-  unitNeeds,
-} from '~/lib/fortress/format'
-import {
-  type GameTime,
-  activityOf,
-  concernScore,
-  emotionTone,
-  gameAgo,
-  gameTimeOf,
-  isCitizenish,
-  notableThought,
-  thoughtPhrase,
-  unitConcerns,
-} from '~/lib/fortress/insights'
+import { isLiving, unitGroup } from '~/lib/fortress/format'
+import { concernScore, gameTimeOf, unitConcerns } from '~/lib/fortress/insights'
 import { useFortOverview, useFortPeople, useFortUnits } from '~/lib/fortress/queries'
-import {
-  EmptyState,
-  MoodBadge,
-  PageHeader,
-  StatusBanner,
-  UnitConditionBadges,
-} from '../-components/FortChrome'
-import { ConcernBadges } from '../-components/Insights'
-import { ShowInGameButton } from './-components/ActionsTab'
-import { DwarfDetails, type DwarfTab } from './-components/DwarfDetails'
+import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { Bonds, HelpList, SkillCoverage, Squads, WorkGroups } from './-components/PeoplePanels'
-import {
-  UnitLinks,
-  legendsRefFor,
-  useChronicleMentionCounts,
-  useFigureEventCounts,
-  useFortLegendsWorldId,
-  useKnownHistFigures,
-} from './-components/UnitLinks'
-
-type Group = ReturnType<typeof unitGroup> | 'all'
+import { UnitDrawer } from './-components/UnitDrawer'
 
 function count(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`
 }
 
-function conditionScore(unit: FortUnit): number {
-  const needs = unitNeeds(unit)
-  let score = unit.wounds * 100
-  for (const need of needs) score += need.severity === 'danger' ? 10 : 1
-  if (unit.flags.includes('insane')) score += 50
-  if (unit.flags.includes('caged') || unit.flags.includes('chained')) score += 5
-  return score
-}
-
-const GROUP_LABELS: Record<Group, string> = {
-  citizen: 'Citizens',
-  resident: 'Residents',
-  visitor: 'Visitors',
-  animal: 'Animals',
-  hostile: 'Hostiles',
-  other: 'Others',
-  all: 'Everyone',
-}
-
-type View = 'grid' | 'table'
-const VIEW_KEY = 'fort-dwarves-view'
-
-function useView(): [View, (view: View) => void] {
-  const [view, setView] = React.useState<View>('grid')
-  React.useEffect(() => {
-    if (localStorage.getItem(VIEW_KEY) === 'table') setView('table')
-  }, [])
-  return [
-    view,
-    (next) => {
-      setView(next)
-      localStorage.setItem(VIEW_KEY, next)
-    },
-  ]
-}
-
 function DwarvesPage() {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortUnits()
-  const [group, setGroup] = React.useState<Group>('citizen')
-  const [showDead, setShowDead] = React.useState(false)
   const [selected, setSelected] = React.useState<FortUnit | null>(null)
-  const [drawerTab, setDrawerTab] = React.useState<DwarfTab>('overview')
-  const [view, setView] = useView()
   const now = gameTimeOf(overview.data?.state)
 
   const units = data?.units ?? []
-  const counts = React.useMemo(() => {
-    const c: Record<Group, number> = {
-      citizen: 0,
-      resident: 0,
-      visitor: 0,
-      animal: 0,
-      hostile: 0,
-      other: 0,
-      all: 0,
-    }
-    for (const u of units) {
-      if (!showDead && !isLiving(u)) continue
-      c[unitGroup(u)]++
-      c.all++
-    }
-    return c
-  }, [units, showDead])
-
-  const rows = React.useMemo(
-    () =>
-      units
-        .filter((u) => (showDead ? true : isLiving(u)))
-        .filter((u) => group === 'all' || unitGroup(u) === group),
-    [units, group, showDead],
-  )
-
-  const legendsWorldId = useFortLegendsWorldId()
-  const figureIds = rows.map((unit) => unit.hist_figure_id)
-  const knownFigures = useKnownHistFigures(legendsWorldId, figureIds)
-  const legendCounts = useFigureEventCounts(legendsWorldId, figureIds)
-  const chronicleCounts = useChronicleMentionCounts(rows.map((unit) => unit.name))
-
-  const columns = React.useMemo<ColumnDef<FortUnit>[]>(
-    () => [
-      {
-        id: 'name',
-        header: 'Name',
-        accessorFn: (unit) => unitDisplayName(unit),
-        meta: { cellClassName: 'max-w-[280px]' },
-        cell: ({ row }) => {
-          const unit = row.original
-          return (
-            <div className="flex items-center gap-3">
-              <CreatureSprite unit={unit} size={32} className="-my-1" />
-              <div className="min-w-0">
-                <div className="truncate font-medium">{unitDisplayName(unit)}</div>
-                <div className="truncate text-sm text-muted-foreground">
-                  {unit.name_english && unit.name_english !== unit.name
-                    ? `${unit.name_english} · `
-                    : ''}
-                  {unit.race}
-                  {unit.squad ? ` · ${unit.squad}` : ''}
-                </div>
-              </div>
-            </div>
-          )
-        },
-      },
-      {
-        id: 'profession',
-        header: 'Profession',
-        accessorFn: (unit) => unit.profession,
-        cell: ({ row }) => (
-          <>
-            <div>{row.original.profession}</div>
-            {row.original.positions.length ? (
-              <div className="text-sm text-muted-foreground">
-                {row.original.positions.join(', ')}
-              </div>
-            ) : null}
-          </>
-        ),
-      },
-      {
-        id: 'mood',
-        header: 'Mood',
-        accessorFn: (unit) => unit.stress_category,
-        meta: {
-          searchText: (unit) =>
-            [stressLabel(unit.stress_category), unit.mood ? `${humanize(unit.mood)} mood` : '']
-              .filter(Boolean)
-              .join(' '),
-        },
-        sortingFn: (a, b) => {
-          const category = a.original.stress_category - b.original.stress_category
-          if (category !== 0) return category
-          return b.original.stress - a.original.stress
-        },
-        cell: ({ row }) => {
-          const unit = row.original
-          const kind = unitGroup(unit)
-          return (
-            <>
-              {kind === 'citizen' || kind === 'resident' ? (
-                <MoodBadge category={unit.stress_category} />
-              ) : null}
-              {unit.mood ? (
-                <Badge variant="outline" className="ml-1">
-                  {humanize(unit.mood)} mood
-                </Badge>
-              ) : null}
-            </>
-          )
-        },
-      },
-      {
-        id: 'feeling',
-        header: 'Lately',
-        accessorFn: (unit) => {
-          const t = notableThought(unit, now)
-          return t ? thoughtPhrase(t[0], t[1]) : ''
-        },
-        enableSorting: false,
-        meta: { cellClassName: 'min-w-[13rem] max-w-[260px] text-sm' },
-        cell: ({ row }) => <LatelyText unit={row.original} now={now} />,
-      },
-      {
-        id: 'doing',
-        header: 'Doing',
-        accessorFn: (unit) => (isLiving(unit) ? (unit.job ?? 'Idle') : 'Dead'),
-        meta: { cellClassName: 'max-w-[260px] text-sm' },
-        cell: ({ row }) =>
-          isLiving(row.original) ? (
-            (row.original.job ?? <span className="text-muted-foreground">Idle</span>)
-          ) : (
-            <span className="text-muted-foreground">Dead</span>
-          ),
-      },
-      {
-        id: 'condition',
-        header: 'Condition',
-        accessorFn: (unit) => conditionScore(unit),
-        meta: {
-          searchText: (unit) =>
-            [
-              unit.wounds > 0 ? `${unit.wounds} wound${unit.wounds === 1 ? '' : 's'}` : '',
-              ...unitNeeds(unit).map((need) => need.label),
-              unit.flags.includes('insane') ? 'insane' : '',
-              unit.flags.includes('ghost') ? 'ghost' : '',
-            ]
-              .filter(Boolean)
-              .join(' '),
-        },
-        cell: ({ row }) => <UnitConditionBadges unit={row.original} />,
-      },
-      {
-        id: 'age',
-        header: 'Age',
-        accessorFn: (unit) => unit.age,
-        meta: { align: 'right' },
-        cell: ({ row }) => <span className="tabular-nums">{Math.floor(row.original.age)}</span>,
-      },
-      {
-        id: 'where',
-        header: 'Where',
-        accessorFn: (unit) => (unit.x === null ? null : `${unit.z} ${unit.y} ${unit.x}`),
-        sortUndefined: 'last',
-        meta: { align: 'right', cellClassName: 'font-mono text-sm text-muted-foreground' },
-        cell: ({ row }) => {
-          const unit = row.original
-          return unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '—'
-        },
-      },
-      {
-        id: 'chronicle',
-        header: 'Chronicle',
-        accessorFn: (unit) => {
-          const name = unit.name.trim()
-          return name ? (chronicleCounts.get(name) ?? 0) : null
-        },
-        sortUndefined: 'last',
-        meta: { align: 'right', cellClassName: 'tabular-nums' },
-        cell: ({ row }) => {
-          const name = row.original.name.trim()
-          if (!name) return '—'
-          const count = chronicleCounts.get(name) ?? 0
-          return (
-            <Link
-              to="/fortress/chronicle"
-              search={{ q: name, filter: 'all' }}
-              className="hover:underline"
-              title="Announcements that name them"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {count.toLocaleString()}
-            </Link>
-          )
-        },
-      },
-      {
-        id: 'legends',
-        header: 'Legends',
-        accessorFn: (unit) => {
-          const legends = legendsRefFor(unit, legendsWorldId, knownFigures)
-          return legends ? (legendCounts.get(legends.figureId) ?? 0) : null
-        },
-        sortUndefined: 'last',
-        meta: { align: 'right', cellClassName: 'tabular-nums' },
-        cell: ({ row }) => {
-          const legends = legendsRefFor(row.original, legendsWorldId, knownFigures)
-          if (!legends) return '—'
-          const count = legendCounts.get(legends.figureId) ?? 0
-          return (
-            <Link
-              to="/legends/$kind/$id"
-              params={{ kind: 'historical_figure', id: String(legends.figureId) }}
-              search={{ world: legends.worldId }}
-              className="hover:underline"
-              title="Their legends"
-              onClick={(event) => event.stopPropagation()}
-            >
-              {count.toLocaleString()}
-            </Link>
-          )
-        },
-      },
-    ],
-    [legendsWorldId, knownFigures, legendCounts, chronicleCounts, now],
-  )
-
   const citizens = React.useMemo(
     () => units.filter((u) => isLiving(u) && unitGroup(u) === 'citizen'),
     [units],
@@ -356,7 +40,7 @@ function DwarvesPage() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        title="Dwarves and creatures"
+        title="Dwarves"
         description={
           summary ? (
             <>
@@ -376,6 +60,14 @@ function DwarvesPage() {
           void refetch()
           void people.refetch()
         }}
+        actions={
+          <Button asChild variant="outline" size="sm">
+            <Link to="/fortress/dwarves-and-creatures">
+              <PawPrintIcon className="size-4" />
+              Everyone on the map
+            </Link>
+          </Button>
+        }
       />
       <StatusBanner state={overview.data?.state} />
 
@@ -399,279 +91,15 @@ function DwarvesPage() {
             onOpen={setSelected}
           />
         </>
-      ) : null}
-
-      <Card className="overflow-hidden p-0">
-        <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-          <Tabs value={group} onValueChange={(v) => setGroup(v as Group)}>
-            <TabsList className="flex-wrap">
-              {(Object.keys(GROUP_LABELS) as Group[]).map((key) => (
-                <TabsTrigger key={key} value={key} className="gap-1.5">
-                  {GROUP_LABELS[key]}
-                  <span className="text-xs text-muted-foreground tabular-nums">{counts[key]}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </Tabs>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={showDead}
-                onChange={(e) => setShowDead(e.target.checked)}
-              />
-              include the dead
-            </label>
-            <Tabs value={view} onValueChange={(v) => setView(v as View)}>
-              <TabsList>
-                <TabsTrigger value="grid" className="gap-1.5">
-                  <LayoutGridIcon className="size-3.5" />
-                  Grid
-                </TabsTrigger>
-                <TabsTrigger value="table" className="gap-1.5">
-                  <TableIcon className="size-3.5" />
-                  Table
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </div>
-
-        {rows.length === 0 ? (
-          <div className="p-6">
-            <EmptyState title="Nobody here">
-              {units.length === 0 ? 'No dump has been taken yet.' : 'No unit matches this filter.'}
-            </EmptyState>
-          </div>
-        ) : view === 'grid' ? (
-          <Grid units={rows} now={now} onOpen={setSelected} />
-        ) : (
-          <DataTable
-            data={rows}
-            columns={columns}
-            showSelectColumn={false}
-            showActionsColumn={false}
-            showToolbar={false}
-            enableSortingRemoval={false}
-            defaultSort={[{ id: 'mood', desc: false }]}
-            getRowId={(unit) => String(unit.id)}
-            rowClassName={(unit) => (isLiving(unit) ? undefined : 'opacity-50')}
-            onRowClick={setSelected}
-          />
-        )}
-      </Card>
-
-      <Drawer
-        direction="right"
-        open={selected !== null}
-        onOpenChange={(open) => {
-          if (!open) setSelected(null)
-        }}
-      >
-        <DrawerContent className="data-[vaul-drawer-direction=right]:h-full data-[vaul-drawer-direction=right]:w-full data-[vaul-drawer-direction=right]:sm:max-w-xl">
-          {selected ? (
-            <>
-              <DrawerHeader className="border-b">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-start gap-3">
-                    <UnitPortrait
-                      unit={selected}
-                      size={72}
-                      fallbackToSprite
-                      className="shrink-0 rounded-md border bg-muted/40"
-                      title={`${selected.race} as drawn in the game`}
-                    />
-                    <div className="min-w-0">
-                      <DrawerTitle className="flex flex-wrap items-center gap-2">
-                        {unitDisplayName(selected)}
-                        <UnitLinks
-                          unit={selected}
-                          legends={legendsRefFor(selected, legendsWorldId, knownFigures)}
-                        />
-                        {unitGroup(selected) === 'citizen' || unitGroup(selected) === 'resident' ? (
-                          <MoodBadge
-                            category={selected.stress_category}
-                            className="text-sm font-normal"
-                          />
-                        ) : null}
-                        {selected.mood ? (
-                          <Badge variant="outline" className="text-sm font-normal">
-                            {humanize(selected.mood)} mood
-                          </Badge>
-                        ) : null}
-                      </DrawerTitle>
-                      <DrawerDescription className="mt-1">
-                        {[
-                          selected.name_english && selected.name_english !== selected.name
-                            ? selected.name_english
-                            : null,
-                          selected.caste,
-                          sexLabel(selected.sex),
-                          selected.profession,
-                          `${Math.floor(selected.age)} years`,
-                          isLiving(selected) ? null : 'dead',
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </DrawerDescription>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {isLiving(selected) ? <ShowInGameButton unit={selected} size="icon" /> : null}
-                    <DrawerClose asChild>
-                      <Button size="icon" variant="ghost" aria-label="Close">
-                        <XIcon className="size-4" />
-                      </Button>
-                    </DrawerClose>
-                  </div>
-                </div>
-              </DrawerHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
-                <DwarfDetails
-                  unitId={selected.id}
-                  compact
-                  legends={legendsRefFor(selected, legendsWorldId, knownFigures)}
-                  tab={drawerTab}
-                  onTabChange={setDrawerTab}
-                />
-              </div>
-              <DrawerFooter className="border-t">
-                <Button asChild>
-                  <Link
-                    to="/fortress/dwarves/$id"
-                    params={{ id: String(selected.id) }}
-                    search={drawerTab === 'overview' ? {} : { tab: drawerTab }}
-                  >
-                    <Maximize2Icon className="size-4" />
-                    Show full page
-                  </Link>
-                </Button>
-              </DrawerFooter>
-            </>
-          ) : null}
-        </DrawerContent>
-      </Drawer>
-    </div>
-  )
-}
-
-/** Their newest thought worth a line, coloured by how it made them feel. */
-function LatelyText({ unit, now }: { unit: FortUnit; now: GameTime | null }) {
-  const t = notableThought(unit, now)
-  if (!t) return null
-  const tone = emotionTone(t[1])
-  const phrase = thoughtPhrase(t[0], t[1])
-  const ago = gameAgo({ year: t[3], tick: t[4] }, now)
-  return (
-    <span
-      className={cn(
-        'text-sm',
-        tone === 'bad' && 'text-red-700 dark:text-red-300',
-        tone === 'good' && 'text-emerald-700 dark:text-emerald-300',
-        tone === 'neutral' && 'text-muted-foreground',
-      )}
-    >
-      {phrase.charAt(0).toUpperCase()}
-      {phrase.slice(1)}
-      {ago ? <span className="text-muted-foreground"> · {ago}</span> : null}
-    </span>
-  )
-}
-
-/** Everyone as a card: portrait, what they are doing, what is on their mind, what they need. */
-function Grid({
-  units,
-  now,
-  onOpen,
-}: {
-  units: FortUnit[]
-  now: GameTime | null
-  onOpen: (unit: FortUnit) => void
-}) {
-  const [q, setQ] = React.useState('')
-  const entries = React.useMemo(() => {
-    const needle = q.trim().toLowerCase()
-    return units
-      .filter(
-        (u) =>
-          !needle ||
-          [u.name, u.readable, u.profession, u.job ?? '', u.race, u.squad ?? '', ...u.positions]
-            .join(' ')
-            .toLowerCase()
-            .includes(needle),
-      )
-      .map((unit) => ({ unit, concerns: unitConcerns(unit, now) }))
-      .sort(
-        (a, b) =>
-          concernScore(b.concerns) - concernScore(a.concerns) ||
-          a.unit.stress_category - b.unit.stress_category ||
-          unitDisplayName(a.unit).localeCompare(unitDisplayName(b.unit)),
-      )
-  }, [units, q, now])
-  return (
-    <div className="flex flex-col gap-3 p-4">
-      <Input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search by name, profession, job or squad…"
-        className="max-w-sm"
-        aria-label="Search the grid"
-      />
-      {entries.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {entries.map(({ unit, concerns }) => {
-            const living = isLiving(unit)
-            const activity = activityOf(unit)
-            return (
-              <li key={unit.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(unit)}
-                  className={cn(
-                    'flex h-full w-full gap-3 rounded-lg border bg-card p-2.5 text-left transition-colors hover:bg-accent/40',
-                    !living && 'opacity-60',
-                  )}
-                >
-                  <UnitPortrait
-                    unit={unit}
-                    size={48}
-                    fallbackToSprite
-                    className="shrink-0 rounded-md border bg-muted/40"
-                  />
-                  <span className="flex min-w-0 flex-1 flex-col gap-1">
-                    <span className="flex items-start justify-between gap-2">
-                      <span className="min-w-0">
-                        <span className="block truncate font-medium">{unitDisplayName(unit)}</span>
-                        <span className="block truncate text-sm text-muted-foreground">
-                          {[unit.profession, ...unit.positions, unit.squad]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </span>
-                      </span>
-                      {living && isCitizenish(unit) ? (
-                        <MoodBadge category={unit.stress_category} className="shrink-0" />
-                      ) : null}
-                    </span>
-                    <span
-                      className={cn(
-                        'truncate text-sm',
-                        activity.key === 'idle' && 'text-amber-700 dark:text-amber-300',
-                      )}
-                    >
-                      {living ? (unit.job ?? activity.label) : 'Dead'}
-                    </span>
-                    <ConcernBadges concerns={concerns} className="mt-0.5" />
-                  </span>
-                </button>
-              </li>
-            )
-          })}
-        </ul>
       ) : (
-        <EmptyState title="Nobody by that name">
-          Try a profession, a job, or part of a name.
+        <EmptyState title="No citizens yet">
+          {units.length
+            ? 'Nobody on the map is a citizen of the fortress. Everyone else is under Everyone on the map.'
+            : 'No dump has been taken yet.'}
         </EmptyState>
       )}
+
+      <UnitDrawer unit={selected} onClose={() => setSelected(null)} />
     </div>
   )
 }

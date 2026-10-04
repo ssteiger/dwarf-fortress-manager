@@ -25,6 +25,7 @@ export const DUMP_STEPS = [
 	"buildings",
 	"jobs",
 	"announcements",
+	"diplomacy",
 	"writing",
 	"map",
 	"store",
@@ -40,7 +41,13 @@ export function dumpSteps(withMap: boolean): DumpStep[] {
 	return DUMP_STEPS.filter((step) => withMap || step !== "map");
 }
 
-const DUMP_PROGRESS_STATES = ["running", "done", "menu", "offline", "error"] as const;
+const DUMP_PROGRESS_STATES = [
+	"running",
+	"done",
+	"menu",
+	"offline",
+	"error",
+] as const;
 
 /** `running` until the read ends; the rest say how it ended. */
 export type DumpProgressState = (typeof DUMP_PROGRESS_STATES)[number];
@@ -570,8 +577,12 @@ export interface FortJob {
 	building_id: number | null;
 	order_id: number;
 	items: number;
-	/** [what, how many, how many brought] per requirement, e.g. ["iron bars", 3, 2]. Absent before version 9. */
-	needs?: [string, number, number][];
+	/**
+	 * [what, how many, how many brought, item_type token] per requirement,
+	 * e.g. ["iron bars", 3, 2, "BAR"]. Absent before version 9; the item type
+	 * from version 10.
+	 */
+	needs?: [string, number, number, string?][];
 	/** working, bringing, fetching, item_lost; null while it waits. Absent before version 9. */
 	state?: string | null;
 }
@@ -667,6 +678,225 @@ export interface FortAnnouncement {
 	z: number;
 }
 
+/** The game's diplomacy_state_type: how one group stands with another. */
+export type DiplomacyRelation =
+	| "Peace"
+	| "TotalWar"
+	| "NoContact"
+	| "AcceptingTribute"
+	| "OfferingTribute"
+	| "Skirmishing";
+
+/** A site a power holds, placed relative to the fortress in world tiles (x east, y south). */
+export interface FortPowerSite {
+	id: number;
+	name: string | null;
+	name_native: string | null;
+	/** world_site_type: Town, DarkFortress, MountainHalls, ForestRetreat, Cave, Fortress, Monument, ... */
+	type: string;
+	/** False for tombs, lairs, camps and shrines. */
+	settlement: boolean;
+	dx: number;
+	dy: number;
+	/** The larger of |dx| and |dy|. */
+	distance: number;
+	/** The group that holds it, the power itself or one of its site governments. */
+	owner_id: number;
+}
+
+export interface FortPowerLeader {
+	position: string;
+	hf: number;
+	name: string | null;
+	name_native: string | null;
+	alive: boolean;
+}
+
+/**
+ * Fortress progress levels (0-5) at which the power takes notice and at which
+ * it can lay siege, one per measure; 0 means that measure never triggers it.
+ */
+export interface FortPowerTriggers {
+	population: number;
+	production: number;
+	trade: number;
+	pop_siege: number;
+	prod_siege: number;
+	trade_siege: number;
+}
+
+/** One of a power's groups the fortress's civilization deals with directly. */
+export interface FortPowerGroup {
+	id: number;
+	name: string | null;
+	type: string;
+	relation: DiplomacyRelation | null;
+	war_id: number | null;
+}
+
+/**
+ * A civilization, or a group answering to none, with its settlements and how
+ * it stands with the fortress's civilization.
+ */
+export interface FortPower {
+	id: number;
+	name: string | null;
+	name_native: string | null;
+	/** historical_entity_type: Civilization, SiteGovernment, ... */
+	type: string;
+	race: string | null;
+	race_plural: string | null;
+	race_adjective: string | null;
+	/** Entity raw token, e.g. MOUNTAIN, PLAINS, FOREST, EVIL. */
+	raw: string | null;
+	/** The fortress's own civilization. */
+	own: boolean;
+	/** How the fortress's civilization stands with it; null without contact. */
+	relation: DiplomacyRelation | null;
+	/** How it stands with the fortress's civilization or site government. */
+	their_relation: DiplomacyRelation | null;
+	/** diplomacy_state_flag names, e.g. allies. */
+	relation_flags: string[];
+	war_id: number | null;
+	tribute_season: number | null;
+	/** World tiles to its nearest settlement, or nearest site when it has none. */
+	distance: number | null;
+	/** Settlements it holds. */
+	site_count: number;
+	/** Nearest sites, settlements first. */
+	sites: FortPowerSite[];
+	leaders: FortPowerLeader[];
+	/** Entity raw tokens: SIEGER, BABYSNATCHER, ITEM_THIEF, AMBUSHER, ... */
+	behaviour: string[];
+	triggers: FortPowerTriggers | null;
+	groups: FortPowerGroup[];
+	/** [power id, relation] for the other listed powers it has dealings with. */
+	relations: [number, DiplomacyRelation | null][];
+}
+
+export interface FortWarEvent {
+	/** history_event_collection_type: BATTLE, SITE_CONQUERED, RAID, THEFT, ABDUCTION. */
+	kind: string;
+	year: number;
+	name: string | null;
+	site_id: number | null;
+	site: string | null;
+	/** Entity ids of the side that attacked and the side attacked. */
+	attacker: number | null;
+	defender: number | null;
+	attacker_deaths?: number;
+	defender_deaths?: number;
+	/** ATTACKER_WON or DEFENDER_WON, battles only. */
+	outcome?: string;
+}
+
+export interface FortWar {
+	id: number;
+	name: string | null;
+	start_year: number;
+	/** Null while it goes on. */
+	end_year: number | null;
+	/** Entity ids. */
+	attackers: number[];
+	defenders: number[];
+	/** The fortress's civilization fights in it. */
+	ours: boolean;
+	battles: number;
+	conquests: number;
+	raids: number;
+	deaths: number;
+	event_count: number;
+	/** The newest battles, conquests and raids. */
+	events: FortWarEvent[];
+}
+
+/** An entity wars, agreements and armies mention. */
+export interface FortDiplomacyEntity {
+	name: string | null;
+	type: string;
+	race: string | null;
+	/** The power it answers to, itself when it is one. */
+	power_id: number;
+}
+
+export interface FortAgreement {
+	id: number;
+	/** agreement_details_type: Location (temple or guildhall petitions), Parley, ... */
+	kind: string;
+	year: number;
+	tick: number;
+	/** Entity ids of the other parties. */
+	parties: number[];
+	/** As DFHack's list-agreements counts it. */
+	status: "outstanding" | "satisfied" | "denied" | "expired";
+	/** Temple, Temple complex, Guildhall or Grand guildhall. */
+	location?: string;
+	profession?: string;
+	deity?: string;
+}
+
+export interface FortInvasion {
+	id: number;
+	civ_id: number;
+	flags: string[];
+	size: number | null;
+	year: number | null;
+}
+
+/** An army in the field: one the fortress sent, or one bound for it. */
+export interface FortArmyMission {
+	id: number;
+	entity_id: number;
+	/** army_controller_goal_type, e.g. SITE_INVASION, MAKE_REQUEST, RESCUE_HF. */
+	goal: string;
+	site_id: number | null;
+	site: string | null;
+	year: number | null;
+}
+
+/**
+ * Neighbours, wars, petitions and what draws invaders, from version 11 on.
+ * Here and in the types it holds, the dump leaves out a field the game has
+ * no value for, so a field typed `| null` can also be absent: test it with
+ * `== null`.
+ */
+export interface FortDiplomacy {
+	civ_id: number;
+	group_id: number;
+	site_id: number;
+	year: number;
+	/** Nearest first. */
+	powers: FortPower[];
+	/** The fortress's own wars first, then ongoing ones. */
+	wars: FortWar[];
+	/** Keyed by entity id. */
+	entities: Record<string, FortDiplomacyEntity>;
+	agreements: FortAgreement[];
+	invasions: FortInvasion[];
+	missions: FortArmyMission[];
+	incoming: FortArmyMission[];
+	/** The fortress's progress levels, 0-5. */
+	progress: {
+		population: number;
+		production: number;
+		trade: number;
+		rank: number;
+	};
+	/** Thresholds of progress levels 1-5: citizens, created wealth, exported wealth. */
+	triggers: {
+		population: number[];
+		production: number[];
+		trade: number[];
+	} | null;
+	invasion_rules: {
+		min_raids_before_siege: number;
+		min_raids_between_sieges: number;
+		siege_frequency: number;
+		invasion_unit_cap: number;
+	} | null;
+	invaders_repelled: number | null;
+}
+
 export interface FortDumpPayload {
 	status: FortStatus;
 	dump_version: number;
@@ -683,6 +913,8 @@ export interface FortDumpPayload {
 	artifacts?: RowTable | null;
 	figures?: RowTable | null;
 	announcements: RowTable | null;
+	/** Version 11 on. */
+	diplomacy?: FortDiplomacy | null;
 	map: FortMapPayload | null;
 	error?: string;
 }
@@ -1003,6 +1235,30 @@ export const WORKORDER_NEEDS_ITEM = [
 /** Job types whose orders must name the material: the ore to smelt, the metal to draw. */
 const WORKORDER_NEEDS_MATERIAL = ["SmeltOre", "ExtractMetalStrands"];
 
+/**
+ * Reactions a CustomReaction order may name: the smelter's alloys (from
+ * bars), pig iron, steel and coke, and milling seeds to paste for the press.
+ */
+export const WORKORDER_REACTIONS = [
+	"PIG_IRON_MAKING",
+	"STEEL_MAKING",
+	"BRONZE_MAKING2",
+	"BRASS_MAKING2",
+	"ELECTRUM_MAKING2",
+	"BILLON_MAKING2",
+	"PEWTER_FINE_MAKING2",
+	"PEWTER_TRIFLE_MAKING2",
+	"PEWTER_LAY_MAKING",
+	"NICKEL_SILVER_MAKING",
+	"BLACK_BRONZE_MAKING",
+	"STERLING_SILVER_MAKING",
+	"ROSE_GOLD_MAKING",
+	"BISMUTH_BRONZE_MAKING",
+	"BITUMINOUS_COAL_TO_COKE",
+	"LIGNITE_TO_COKE",
+	"MILL_SEEDS_NUTS_TO_PASTE",
+] as const;
+
 export const ORDER_LIBRARIES = [
 	"basic",
 	"furnace",
@@ -1044,11 +1300,16 @@ function checkWorkorderJson(text: string): string | null {
 		return "The work order is not valid JSON";
 	}
 	for (const order of Array.isArray(parsed) ? parsed : [parsed]) {
-		if (!order || typeof order !== "object") return "Each work order must be a JSON object";
-		const { job, item_subtype, material, material_category, amount_total } = order as Record<
-			string,
-			unknown
-		>;
+		if (!order || typeof order !== "object")
+			return "Each work order must be a JSON object";
+		const {
+			job,
+			item_subtype,
+			material,
+			material_category,
+			amount_total,
+			reaction,
+		} = order as Record<string, unknown>;
 		if (amount_total !== undefined && typeof amount_total !== "number")
 			return "amount_total must be a number";
 		if (includes(WORKORDER_JOB_TYPES, job)) continue;
@@ -1061,6 +1322,10 @@ function checkWorkorderJson(text: string): string | null {
 			if (typeof material === "string") continue;
 			return `A ${job} order must name the material. Use ${LIBRARY_HINT} instead.`;
 		}
+		if (job === "CustomReaction") {
+			if (includes(WORKORDER_REACTIONS, reaction)) continue;
+			return `The app queues CustomReaction orders only for ${WORKORDER_REACTIONS.join(", ")}. Use ${LIBRARY_HINT} instead.`;
+		}
 		return `The app does not queue ${typeof job === "string" ? job : "this job"} orders. Use ${LIBRARY_HINT} instead.`;
 	}
 	return null;
@@ -1068,9 +1333,14 @@ function checkWorkorderJson(text: string): string | null {
 
 function checkWorkorder(args: string[]): string | null {
 	const [first, ...rest] = args;
-	if (first === undefined || ["-l", "--listtypes", "-h", "--help"].includes(first)) return null;
+	if (
+		first === undefined ||
+		["-l", "--listtypes", "-h", "--help"].includes(first)
+	)
+		return null;
 	if (first.startsWith("-")) return `The app does not run workorder ${first}`;
-	if (first.startsWith("{") || first.startsWith("[")) return checkWorkorderJson(args.join(" "));
+	if (first.startsWith("{") || first.startsWith("["))
+		return checkWorkorderJson(args.join(" "));
 	if (includes(WORKORDER_NEEDS_ITEM, first))
 		return `"workorder ${first}" cannot say which item to make, and the game crashes on such orders. Use ${LIBRARY_HINT} instead.`;
 	if (!includes(WORKORDER_JOB_TYPES, first))
@@ -1082,9 +1352,11 @@ function checkWorkorder(args: string[]): string | null {
 
 function checkOrders(args: string[]): string | null {
 	const [sub, target, ...rest] = args;
-	if (includes(["list", "sort", "recheck"], sub) && target === undefined) return null;
+	if (includes(["list", "sort", "recheck"], sub) && target === undefined)
+		return null;
 	const library = target?.match(/^library\/(.+)$/)?.[1];
-	if (sub === "import" && !rest.length && includes(ORDER_LIBRARIES, library)) return null;
+	if (sub === "import" && !rest.length && includes(ORDER_LIBRARIES, library))
+		return null;
 	return `The app runs orders list, sort, recheck and import library/${ORDER_LIBRARIES.join(", library/")} only`;
 }
 
@@ -1095,6 +1367,71 @@ function checkToggle(args: string[]): string | null {
 }
 
 const anyArgs = () => null;
+
+const noArgs = (args: string[]) =>
+	args.length ? "This command takes no arguments" : null;
+
+/** Lists relations, or sets one civilization's both ways; never the whole world at once. */
+function checkDiplomacy(args: string[]): string | null {
+	if (args.length === 0) return null;
+	const [civ, relation, ...rest] = args;
+	if (rest.length || relation === undefined || !/^\d{1,6}$/.test(civ))
+		return "Write it as diplomacy <civilization id> peace or war";
+	if (!includes(["peace", "war"], relation.toLowerCase()))
+		return "The relation must be peace or war";
+	return null;
+}
+
+const FORCED_EVENTS = ["caravan", "diplomat", "migrants"] as const;
+
+/** Visits only: caravans and diplomats, from a civilization by id or entity token, and migrants. */
+function checkForce(args: string[]): string | null {
+	const [event, civ, ...rest] = args;
+	const kind = event?.toLowerCase();
+	if (!includes(FORCED_EVENTS, kind))
+		return "The app forces only a Caravan, a Diplomat or Migrants";
+	if (rest.length) return "Write it as force Caravan <civilization id>";
+	if (civ !== undefined && kind === "migrants")
+		return "Migrants always come from your own civilization";
+	if (civ !== undefined && !/^(\d{1,6}|[A-Z_]+|player)$/.test(civ))
+		return "Name the civilization by its id or entity token, like 419 or FOREST";
+	return null;
+}
+
+const CARAVAN_COMMANDS = [
+	"list",
+	"unload",
+	"happy",
+	"leave",
+	"extend",
+] as const;
+
+function checkCaravan(args: string[]): string | null {
+	const [sub, ...rest] = args;
+	if (sub === undefined) return null;
+	if (!includes(CARAVAN_COMMANDS, sub))
+		return `The app runs caravan ${CARAVAN_COMMANDS.join(", ")} only`;
+	if (rest.some((a) => !/^\d{1,4}$/.test(a)))
+		return "Caravan days and ids are numbers";
+	if (rest.length && (sub === "list" || sub === "unload"))
+		return `caravan ${sub} takes no arguments`;
+	return null;
+}
+
+function checkStuckMerchants(args: string[]): string | null {
+	if (
+		args.length === 0 ||
+		(args.length === 1 && includes(["-n", "--dry-run"], args[0]))
+	)
+		return null;
+	return "Write it as fix/stuck-merchants, or with -n to only list them";
+}
+
+function checkListAgreements(args: string[]): string | null {
+	if (args.length === 0 || (args.length === 1 && args[0] === "all"))
+		return null;
+	return "Write it as list-agreements, or list-agreements all";
+}
 
 /** The commands the app runs from the assistant, each with the check for its arguments. */
 const CONSOLE_COMMANDS: Record<string, (args: string[]) => string | null> = {
@@ -1117,6 +1454,15 @@ const CONSOLE_COMMANDS: Record<string, (args: string[]) => string | null> = {
 	burial: anyArgs,
 	"ban-cooking": anyArgs,
 	cleanowned: anyArgs,
+	diplomacy: checkDiplomacy,
+	force: checkForce,
+	caravan: checkCaravan,
+	"fix/stuck-merchants": checkStuckMerchants,
+	"fix/stuck-squad": noArgs,
+	"fix/civil-war": noArgs,
+	"list-agreements": checkListAgreements,
+	"gui/petitions": noArgs,
+	"gui/civ-alert": noArgs,
 };
 
 /** Names of the commands the app runs, for the assistant's instructions. */
@@ -1132,7 +1478,9 @@ export function checkConsoleCommand(text: unknown): string | null {
 	if (/[\r\n]/.test(trimmed)) return "One command per line";
 	const [name, ...args] = splitConsoleCommand(trimmed);
 	if (!name) return "The command is empty";
-	const check = Object.hasOwn(CONSOLE_COMMANDS, name) ? CONSOLE_COMMANDS[name] : undefined;
+	const check = Object.hasOwn(CONSOLE_COMMANDS, name)
+		? CONSOLE_COMMANDS[name]
+		: undefined;
 	if (!check)
 		return `The app does not run ${name}. Copy it into DFHack's console yourself if you are sure it is safe.`;
 	return check(args);
@@ -1166,7 +1514,8 @@ export const UNIT_ACTIONS = {
 	title: {
 		label: "Give a title",
 		what: "Sets a custom profession, which the game shows in place of their profession everywhere. An empty title brings the usual one back.",
-		command: 'lua df.unit.find({id}).custom_profession = dfhack.utf2df("{text}")',
+		command:
+			'lua df.unit.find({id}).custom_profession = dfhack.utf2df("{text}")',
 	},
 	calm: {
 		label: "Clear their stress",

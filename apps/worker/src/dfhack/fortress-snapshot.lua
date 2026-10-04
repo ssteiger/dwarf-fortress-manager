@@ -12,14 +12,14 @@
 --   ERR <message>               something failed (nothing written)
 --
 -- While it runs, <out_path>.progress holds the step it is on (world, units,
--- items, buildings, jobs, announcements, writing, map). Console text only
+-- items, buildings, jobs, announcements, diplomacy, writing, map). Console text only
 -- reaches the worker once the script has finished; the file can be read while
 -- the game is still paused. Manager orders and squads are read in the jobs
 -- step, artifacts and the figures items name in the items step.
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 10
+local DUMP_VERSION = 11
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -1430,11 +1430,12 @@ local function free_count(e, div)
     return n
 end
 
--- [label, need, have] for every requirement of a job.
+-- [label, need, have, item type] for every requirement of a job.
 local function job_need_rows(job)
     local out = arr{}
     for _, n in ipairs(job_needs(job)) do
-        out[#out + 1] = row(job_item_label(n.e, n.need), n.need, n.have)
+        out[#out + 1] = row(job_item_label(n.e, n.need), n.need, n.have,
+            enum_name(df.item_type, n.e.item_type))
     end
     return out
 end
@@ -2329,6 +2330,527 @@ local function collect_summary(units_rows, item_count, building_count, announcem
 end
 
 -- ---------------------------------------------------------------------------
+-- Diplomacy and war
+-- ---------------------------------------------------------------------------
+
+-- Sites nobody lives in as a home: tombs, lairs, camps and the like.
+local NOT_SETTLEMENTS = {Monument = true, LairShrine = true, Camp = true, ImportantLocation = true}
+
+-- Entity raw tokens that say what a power does to a fortress.
+local POWER_FLAGS = {
+    'SIEGER', 'BABYSNATCHER', 'ITEM_THIEF', 'AMBUSHER', 'LOCAL_BANDITRY',
+    'AT_PEACE_WITH_WILDLIFE', 'WILL_ACCEPT_TRIBUTE', 'MERCHANT_NOBILITY',
+    'SIEGE_SKILLED_MINERS', 'INVADERS_IGNORE_NEUTRALS', 'ABUSE_BODIES',
+}
+
+local SITES_PER_POWER = 8
+local EVENTS_PER_WAR = 12
+
+local function parent_entity(ent)
+    for _, l in ipairs(ent.entity_links) do
+        if l.type == df.entity_entity_link_type.PARENT then
+            local p = df.historical_entity.find(l.target)
+            if p then return p end
+        end
+    end
+    return nil
+end
+
+local power_cache = {}
+
+-- The topmost group an entity answers to, its civilization when it has one:
+-- kobold hamlets answer to the site government that founded them.
+local function power_of(ent)
+    if not ent then return nil end
+    local cached = power_cache[ent.id]
+    if cached then return cached end
+    local top = ent
+    for _ = 1, 4 do
+        if top.type == df.historical_entity_type.Civilization then break end
+        local p = parent_entity(top)
+        if not p then break end
+        top = p
+    end
+    power_cache[ent.id] = top
+    return top
+end
+
+local function diplomacy_state(ent, ids)
+    for _, s in ipairs(ent.relations.diplomacy.state) do
+        if ids[s.group_id] then return s end
+    end
+    return nil
+end
+
+local function relation_name(state)
+    return state and enum_name(df.diplomacy_state_type, state.relation) or nil
+end
+
+local function true_flags(flags)
+    local out = arr{}
+    for k, v in pairs(flags) do
+        if v == true then out[#out + 1] = tostring(k) end
+    end
+    table.sort(out)
+    return out
+end
+
+-- Office holders with a figure, highest precedence first.
+local function power_leaders(ent)
+    local positions = {}
+    for _, p in ipairs(ent.positions.own) do positions[p.id] = p end
+    local out = {}
+    for _, a in ipairs(ent.positions.assignments) do
+        local p = positions[a.position_id]
+        local hf = p and hf_find(a.histfig)
+        if hf then
+            local title = (hf.sex == 0 and nonempty(p.name_female[0]))
+                or (hf.sex == 1 and nonempty(p.name_male[0]))
+                or nonempty(p.name[0]) or p.code:lower():gsub('_', ' ')
+            out[#out + 1] = {
+                position = title,
+                precedence = p.precedence,
+                hf = hf.id,
+                name = nonempty(translate(hf.name, true)),
+                name_native = nonempty(translate(hf.name, false)),
+                alive = hf.died_year == -1,
+            }
+        end
+    end
+    table.sort(out, function(a, b)
+        local pa = a.precedence >= 0 and a.precedence or math.huge
+        local pb = b.precedence >= 0 and b.precedence or math.huge
+        if pa ~= pb then return pa < pb end
+        return a.hf < b.hf
+    end)
+    local top = arr{}
+    for i = 1, math.min(#out, 5) do
+        out[i].precedence = nil
+        top[i] = out[i]
+    end
+    return top
+end
+
+local function power_behaviour(ent)
+    local out = arr{}
+    for _, k in ipairs(POWER_FLAGS) do
+        if try(function() return ent.entity_raw.flags[k] end) == true then out[#out + 1] = k end
+    end
+    return out
+end
+
+-- Fortress progress levels at which the power takes notice and lays siege; 0 never.
+local function power_triggers(ent)
+    return try(function()
+        local pt = ent.entity_raw.progress_trigger
+        return {
+            population = pt.population, production = pt.production, trade = pt.trade,
+            pop_siege = pt.pop_siege, prod_siege = pt.prod_siege, trade_siege = pt.trade_siege,
+        }
+    end)
+end
+
+local function site_label(site_id)
+    local site = site_id and site_id >= 0 and df.world_site.find(site_id)
+    return site and nonempty(translate(site.name, true)) or nil
+end
+
+-- Battles, conquests and raids of one war, newest first.
+local function war_events(col, note_entity)
+    local events = {}
+    local counts = {battles = 0, conquests = 0, raids = 0, deaths = 0}
+    for _, cid in ipairs(col.collections) do
+        local c = df.history_event_collection.find(cid)
+        local kind = c and enum_name(df.history_event_collection_type, c:getType())
+        if kind == 'BATTLE' or kind == 'SITE_CONQUERED' or kind == 'RAID'
+            or kind == 'THEFT' or kind == 'ABDUCTION' then
+            local site_id = nonneg(try(function() return c.site end))
+            local attacker = try(function() return c.attacker_civ[0] end)
+                or try(function() return c.attacking_entity end)
+            local defender = try(function() return c.defender_civ[0] end)
+            note_entity(attacker)
+            note_entity(defender)
+            local e = {
+                kind = kind,
+                year = c.start_year,
+                name = nonempty(try(function() return translate(c.name, true) end)),
+                site_id = site_id,
+                site = site_label(site_id),
+                attacker = nonneg(attacker),
+                defender = nonneg(defender),
+            }
+            if kind == 'BATTLE' then
+                counts.battles = counts.battles + 1
+                local a, d = 0, 0
+                for _, n in ipairs(c.attacker_squad_deaths) do a = a + math.max(0, n) end
+                for _, n in ipairs(c.defender_squad_deaths) do d = d + math.max(0, n) end
+                e.attacker_deaths, e.defender_deaths = a, d
+                e.outcome = enum_name(df.battle_outcome_type, c.outcome)
+                counts.deaths = counts.deaths + a + d
+            elseif kind == 'SITE_CONQUERED' then
+                counts.conquests = counts.conquests + 1
+            else
+                counts.raids = counts.raids + 1
+            end
+            events[#events + 1] = e
+        end
+    end
+    table.sort(events, function(a, b) return a.year > b.year end)
+    local top = arr{}
+    for i = 1, math.min(#events, EVENTS_PER_WAR) do top[i] = events[i] end
+    return top, counts, #events
+end
+
+local function collect_diplomacy()
+    local pi = df.global.plotinfo
+    local civ_id, group_id, site_id = pi.civ_id, pi.group_id, pi.site_id
+    local ours = {[civ_id] = true, [group_id] = true}
+    local mine = df.historical_entity.find(civ_id)
+    local here = df.world_site.find(site_id)
+    local hx, hy = here and here.pos.x or 0, here and here.pos.y or 0
+
+    local entities = {}
+    local function note_entity(id)
+        if id == nil or id < 0 or entities[tostring(id)] then return end
+        local ent = df.historical_entity.find(id)
+        if not ent then return end
+        local pw = power_of(ent)
+        entities[tostring(id)] = {
+            name = nonempty(translate(ent.name, true)),
+            type = enum_name(df.historical_entity_type, ent.type),
+            race = race_label(ent.race),
+            power_id = pw and pw.id or id,
+        }
+    end
+
+    -- Sites by the power that holds them. Settlements make a power a neighbour;
+    -- tombs and lairs only place powers that are known for other reasons.
+    local held = {}
+    for _, s in ipairs(df.global.world.world_data.sites) do
+        local owner = s.cur_owner_id >= 0 and s.cur_owner_id or s.civ_id
+        local ent = s.id ~= site_id and owner >= 0 and df.historical_entity.find(owner)
+        if ent then
+            local pw = power_of(ent)
+            local h = held[pw.id]
+            if not h then
+                h = {ent = pw, sites = {}, settled = false}
+                held[pw.id] = h
+            end
+            local kind = enum_name(df.world_site_type, s.type)
+            local settlement = not NOT_SETTLEMENTS[kind]
+            if settlement then h.settled = true end
+            local dx, dy = s.pos.x - hx, s.pos.y - hy
+            h.sites[#h.sites + 1] = {
+                site = s,
+                id = s.id,
+                type = kind,
+                settlement = settlement,
+                dx = dx, dy = dy,
+                distance = math.max(math.abs(dx), math.abs(dy)),
+                owner_id = ent.id,
+            }
+        end
+    end
+
+    local powers, order = {}, {}
+    local function power_entry(ent)
+        local p = powers[ent.id]
+        if not p then
+            p = {ent = ent, sites = held[ent.id] and held[ent.id].sites or {}, groups = arr{}}
+            powers[ent.id] = p
+            order[#order + 1] = ent.id
+        end
+        return p
+    end
+    for _, h in pairs(held) do
+        if h.settled then power_entry(h.ent) end
+    end
+
+    -- Everyone the civilization has dealings with, even without a settlement.
+    if mine then
+        for _, s in ipairs(mine.relations.diplomacy.state) do
+            local ent = df.historical_entity.find(s.group_id)
+            local pw = power_of(ent)
+            if pw and pw.id ~= civ_id then
+                local p = power_entry(pw)
+                if pw.id ~= ent.id then
+                    p.groups[#p.groups + 1] = {
+                        id = ent.id,
+                        name = nonempty(translate(ent.name, true)),
+                        type = enum_name(df.historical_entity_type, ent.type),
+                        relation = relation_name(s),
+                        war_id = nonneg(s.war_event_collection),
+                    }
+                end
+            end
+        end
+    end
+
+    -- Wars: every one the fortress's civilization fights, and those between listed powers.
+    local wars = arr{}
+    local war_list = try(function() return df.global.world.history.event_collections.other.WAR end) or {}
+    local function add_war(col)
+        local us, listed = false, false
+        local sides = {attackers = arr{}, defenders = arr{}}
+        for side, field in pairs{attackers = 'attacker_civ', defenders = 'defender_civ'} do
+            for _, id in ipairs(col[field]) do
+                sides[side][#sides[side] + 1] = id
+                local pw = power_of(df.historical_entity.find(id))
+                if ours[id] or (pw and pw.id == civ_id) then us = true end
+                if pw and powers[pw.id] then listed = true end
+            end
+        end
+        if us or listed then
+            if us then
+                for _, list in pairs(sides) do
+                    for _, id in ipairs(list) do
+                        local pw = power_of(df.historical_entity.find(id))
+                        if pw and pw.id ~= civ_id then power_entry(pw) end
+                    end
+                end
+            end
+            for _, list in pairs(sides) do
+                for _, id in ipairs(list) do note_entity(id) end
+            end
+            local events, counts, total = war_events(col, note_entity)
+            wars[#wars + 1] = {
+                id = col.id,
+                name = nonempty(translate(col.name, true)),
+                start_year = col.start_year,
+                end_year = nonneg(col.end_year),
+                attackers = sides.attackers,
+                defenders = sides.defenders,
+                ours = us,
+                battles = counts.battles,
+                conquests = counts.conquests,
+                raids = counts.raids,
+                deaths = counts.deaths,
+                event_count = total,
+                events = events,
+            }
+        end
+    end
+    for _, col in ipairs(war_list) do try(add_war, col) end
+    table.sort(wars, function(a, b)
+        if a.ours ~= b.ours then return a.ours end
+        if (a.end_year == nil) ~= (b.end_year == nil) then return a.end_year == nil end
+        return a.start_year > b.start_year
+    end)
+
+    for _, p in pairs(powers) do
+        table.sort(p.sites, function(a, b)
+            if a.settlement ~= b.settlement then return a.settlement end
+            if a.distance ~= b.distance then return a.distance < b.distance end
+            return a.id < b.id
+        end)
+        p.distance = p.sites[1] and p.sites[1].distance or math.huge
+        p.settlements = 0
+        for _, s in ipairs(p.sites) do
+            if s.settlement then p.settlements = p.settlements + 1 end
+        end
+    end
+    table.sort(order, function(a, b)
+        if powers[a].distance ~= powers[b].distance then return powers[a].distance < powers[b].distance end
+        return a < b
+    end)
+
+    -- How each listed power stands with the others it knows.
+    local function relations_of(ent)
+        local seen, out = {}, arr{}
+        for _, s in ipairs(ent.relations.diplomacy.state) do
+            local pw = power_of(df.historical_entity.find(s.group_id))
+            if pw and pw.id ~= ent.id and (powers[pw.id] or pw.id == civ_id) then
+                local prev = seen[pw.id]
+                if not prev or (prev.relation == 0 and s.relation ~= 0) then
+                    seen[pw.id] = s
+                end
+            end
+        end
+        for id, s in pairs(seen) do out[#out + 1] = row(id, relation_name(s)) end
+        table.sort(out, function(a, b) return a[1] < b[1] end)
+        return out
+    end
+
+    local out_powers = arr{}
+    for _, id in ipairs(order) do
+        local p = powers[id]
+        local ent = p.ent
+        local craw = df.creature_raw.find(ent.race)
+        -- For the civilization itself this is how it stands with itself: war means civil war.
+        local toward = mine and diplomacy_state(mine, {[ent.id] = true}) or nil
+        local back = ent.id ~= civ_id and diplomacy_state(ent, ours) or nil
+        local sites = arr{}
+        for i = 1, math.min(#p.sites, SITES_PER_POWER) do
+            local s = p.sites[i]
+            s.name = nonempty(translate(s.site.name, true))
+            s.name_native = nonempty(translate(s.site.name, false))
+            s.site = nil
+            sites[i] = s
+        end
+        out_powers[#out_powers + 1] = {
+            id = ent.id,
+            name = nonempty(translate(ent.name, true)),
+            name_native = nonempty(translate(ent.name, false)),
+            type = enum_name(df.historical_entity_type, ent.type),
+            race = craw and craw.name[0] or nil,
+            race_plural = craw and nonempty(craw.name[1]) or nil,
+            race_adjective = craw and nonempty(craw.name[2]) or nil,
+            raw = try(function() return ent.entity_raw.code end),
+            own = ent.id == civ_id,
+            relation = relation_name(toward),
+            their_relation = relation_name(back),
+            relation_flags = toward and true_flags(toward.flags) or arr{},
+            war_id = toward and nonneg(toward.war_event_collection) or nil,
+            tribute_season = toward and toward.tribute_season or nil,
+            distance = p.sites[1] and p.sites[1].distance or nil,
+            site_count = p.settlements,
+            sites = sites,
+            leaders = try(power_leaders, ent) or arr{},
+            behaviour = power_behaviour(ent),
+            triggers = power_triggers(ent),
+            groups = p.groups,
+            relations = try(relations_of, ent) or arr{},
+        }
+    end
+
+    -- Petitions and other agreements the fortress or its civilization is party to.
+    local agreements = arr{}
+    for _, a in ipairs(try(df.agreement.get_vector) or {}) do
+        local d = #a.details > 0 and a.details[0] or nil
+        local loc_site = d and try(function() return d.data.Location.site end)
+        local party_ours, others = false, arr{}
+        for _, p in ipairs(a.parties) do
+            for _, e in ipairs(p.entity_ids) do
+                if ours[e] then party_ours = true
+                else
+                    others[#others + 1] = e
+                    note_entity(e)
+                end
+            end
+        end
+        if d and (party_ours or (loc_site ~= nil and loc_site == site_id)) then
+            local kind = enum_name(df.agreement_details_type, d.type)
+            local entry = {
+                id = a.id,
+                kind = kind,
+                year = d.year,
+                tick = d.year_tick,
+                parties = others,
+            }
+            if a.flags.convicted_accepted then entry.status = 'satisfied'
+            elseif a.flags.petition_not_accepted then entry.status = 'denied'
+            elseif df.global.cur_year - d.year > 1
+                or (df.global.cur_year - d.year == 1 and df.global.cur_year_tick >= d.year_tick) then
+                entry.status = 'expired'
+            else entry.status = 'outstanding' end
+            local loc = kind == 'Location' and try(function() return d.data.Location end)
+            if loc then
+                local temple = loc.type == df.abstract_building_type.TEMPLE
+                local guild = loc.type == df.abstract_building_type.GUILDHALL
+                entry.location = temple and (loc.tier == 2 and 'Temple complex' or 'Temple')
+                    or guild and (loc.tier == 2 and 'Grand guildhall' or 'Guildhall')
+                    or enum_name(df.abstract_building_type, loc.type)
+                if guild then
+                    entry.profession = try(function()
+                        return (df.profession[loc.profession]:lower():gsub('_', ' '))
+                    end)
+                elseif temple then
+                    entry.deity = try(function()
+                        if loc.deity_type == df.religious_practice_type.WORSHIP_HFID then
+                            return translate(df.historical_figure.find(loc.deity_data.practice_id).name, true)
+                        end
+                        local religion = df.historical_entity.find(loc.deity_data.practice_id)
+                        return translate(df.historical_figure.find(religion.relations.deities[0]).name, true)
+                    end)
+                end
+            end
+            agreements[#agreements + 1] = entry
+        end
+    end
+    table.sort(agreements, function(a, b)
+        if a.year ~= b.year then return a.year > b.year end
+        return a.tick > b.tick
+    end)
+
+    local invasions = arr{}
+    for _, inv in ipairs(try(function() return pi.invasions.list end) or {}) do
+        note_entity(inv.civ_id)
+        invasions[#invasions + 1] = {
+            id = inv.id,
+            civ_id = inv.civ_id,
+            flags = try(true_flags, inv.flags) or arr{},
+            size = try(function() return inv.size end),
+            year = try(function() return inv.created_year end),
+        }
+    end
+
+    -- Armies the fortress's people lead abroad, and others whose goal is this site.
+    local missions, incoming = arr{}, arr{}
+    for _, ac in ipairs(try(function() return df.global.world.army_controllers.all end) or {}) do
+        local target = try(function() return ac.site_id end) or -1
+        local entry = try(function()
+            return {
+                id = ac.id,
+                entity_id = ac.entity_id,
+                goal = enum_name(df.army_controller_goal_type, ac.goal),
+                site_id = nonneg(target),
+                site = site_label(target),
+                year = try(function() return ac.year end),
+            }
+        end)
+        if entry and ours[ac.entity_id] then
+            note_entity(ac.entity_id)
+            missions[#missions + 1] = entry
+        elseif entry and target == site_id then
+            note_entity(ac.entity_id)
+            incoming[#incoming + 1] = entry
+        end
+    end
+
+    local cd = pi.main.custom_difficulty
+    local function levels(list)
+        local out = arr{}
+        for i = 0, 4 do out[#out + 1] = list[i] end
+        return out
+    end
+    return {
+        civ_id = civ_id,
+        group_id = group_id,
+        site_id = site_id,
+        year = df.global.cur_year,
+        powers = out_powers,
+        wars = wars,
+        entities = entities,
+        agreements = agreements,
+        invasions = invasions,
+        missions = missions,
+        incoming = incoming,
+        progress = {
+            population = pi.progress_population,
+            production = pi.progress_production,
+            trade = pi.progress_trade,
+            rank = pi.fortress_rank,
+        },
+        triggers = try(function()
+            return {
+                population = levels(cd.enemy_pop_trigger),
+                production = levels(cd.enemy_prod_trigger),
+                trade = levels(cd.enemy_trade_trigger),
+            }
+        end),
+        invasion_rules = try(function()
+            return {
+                min_raids_before_siege = cd.min_raids_before_siege,
+                min_raids_between_sieges = cd.min_raids_between_sieges,
+                siege_frequency = cd.siege_frequency,
+                invasion_unit_cap = cd.invasion_unit_cap,
+            }
+        end),
+        invaders_repelled = try(function() return pi.tasks.invaders_repelled end),
+    }
+end
+
+-- ---------------------------------------------------------------------------
 -- Map
 -- ---------------------------------------------------------------------------
 
@@ -2559,6 +3081,9 @@ local function run()
     local announcement_rows = collect_announcements(400)
     local summary = collect_summary(unit_rows, #item_rows, #building_rows, announcement_rows)
 
+    progress('diplomacy')
+    local diplomacy = try(collect_diplomacy)
+
     progress('writing')
     local tmp_path = out_path .. '.tmp'
     local f = assert(io.open(tmp_path, 'wb'))
@@ -2574,6 +3099,7 @@ local function run()
     f:write(',"artifacts":'); write_table(f, ARTIFACT_COLUMNS, artifact_rows)
     f:write(',"figures":'); write_table(f, FIGURE_COLUMNS, figure_rows)
     f:write(',"announcements":'); write_table(f, ANNOUNCEMENT_COLUMNS, announcement_rows)
+    f:write(',"diplomacy":' .. jval(diplomacy))
     if with_map then
         progress('map')
         f:write(',"map":'); write_map(f)

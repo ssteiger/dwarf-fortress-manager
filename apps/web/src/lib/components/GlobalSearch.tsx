@@ -27,11 +27,13 @@ import {
   MountainIcon,
   NotebookPenIcon,
   PackageIcon,
+  PawPrintIcon,
   PlugIcon,
   ScrollTextIcon,
   SearchIcon,
   SettingsIcon,
   SparklesIcon,
+  SwordsIcon,
   UserIcon,
   UsersIcon,
 } from 'lucide-react'
@@ -69,10 +71,12 @@ const unitName = (unit: DwarfHit['unit']) => unit.nickname || unit.name || unit.
 /** The icon each page wears in the sidebar, the legends tabs or the settings list. */
 const PAGE_ICON: Record<AppPath, LucideIcon> = {
   '/fortress': MountainIcon,
+  '/fortress/dwarves-and-creatures': PawPrintIcon,
   '/fortress/dwarves': UsersIcon,
   '/fortress/items': PackageIcon,
   '/fortress/work': HammerIcon,
   '/fortress/map': MapIcon,
+  '/fortress/diplomacy-and-war': SwordsIcon,
   '/fortress/chronicle': ScrollTextIcon,
   '/legends': BookOpenIcon,
   '/legends/world': GlobeIcon,

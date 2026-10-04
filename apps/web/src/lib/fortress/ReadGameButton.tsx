@@ -40,6 +40,7 @@ const STEP_LABEL: Record<DumpStep, string> = {
   buildings: 'Buildings and zones',
   jobs: 'Jobs',
   announcements: 'Announcements',
+  diplomacy: 'Neighbours and wars',
   writing: 'Writing it all down',
   map: 'The map',
   store: 'Saving it for the app',

@@ -1,6 +1,8 @@
 import {
   type FortArtifact,
   type FortBuilding,
+  type FortCaravan,
+  type FortDiplomacy,
   type FortEvent,
   type FortFigure,
   type FortItem,
@@ -20,6 +22,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { type SQL, desc, eq, sql } from 'drizzle-orm'
 
 import { relationOf } from './character'
+import { type FixPlan, planFixes } from './fixes'
 import { isLiving, mentionNeedles } from './format'
 import { type SortDirection, type SortValue, compareSortValues } from './sort'
 import {
@@ -1017,6 +1020,84 @@ export const getFortWork = createServerFn({ method: 'GET' }).handler(
         name: u.name,
         profession: u.profession,
       })),
+    }
+  },
+)
+
+export interface FortDiplomacyResult {
+  capturedAt: string | null
+  /** Null in dumps older than version 11. */
+  diplomacy: FortDiplomacy | null
+  caravans: FortCaravan[]
+  /** What the fortress's progress levels measure: citizens, created and exported wealth. */
+  citizens: number
+  createdWealth: number | null
+  exportedWealth: number | null
+}
+
+/** Neighbours, wars and petitions, with what draws caravans and invaders. */
+export const getFortDiplomacy = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<FortDiplomacyResult> => {
+    const [dumpRows, stateRows] = await Promise.all([
+      postgres_db
+        .select({
+          captured_at: schema.fort_dump.captured_at,
+          diplomacy: schema.fort_dump.diplomacy,
+        })
+        .from(schema.fort_dump)
+        .where(eq(schema.fort_dump.id, SINGLETON_ID))
+        .limit(1),
+      postgres_db
+        .select({ summary: schema.fort_state.summary })
+        .from(schema.fort_state)
+        .where(eq(schema.fort_state.id, SINGLETON_ID))
+        .limit(1),
+    ])
+    const summary = stateRows[0]?.summary ?? null
+    return {
+      capturedAt: dumpRows[0]?.captured_at ?? null,
+      diplomacy: dumpRows[0]?.diplomacy ?? null,
+      caravans: summary?.caravans ?? [],
+      citizens: summary ? summary.adults + summary.children + summary.babies : 0,
+      createdWealth: summary?.wealth?.total ?? null,
+      exportedWealth: summary?.wealth?.exported ?? null,
+    }
+  },
+)
+
+export interface FortFixes extends FixPlan {
+  capturedAt: string | null
+}
+
+/** Work orders, in order, for what the suspended and failing jobs lack. */
+export const getFortFixes = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<FortFixes> => {
+    const [dumpRows, stateRows] = await Promise.all([
+      postgres_db
+        .select({
+          captured_at: schema.fort_dump.captured_at,
+          jobs: schema.fort_dump.jobs,
+          items: schema.fort_dump.items,
+          orders: schema.fort_dump.orders,
+        })
+        .from(schema.fort_dump)
+        .where(eq(schema.fort_dump.id, SINGLETON_ID))
+        .limit(1),
+      postgres_db
+        .select({ summary: schema.fort_state.summary })
+        .from(schema.fort_state)
+        .where(eq(schema.fort_state.id, SINGLETON_ID))
+        .limit(1),
+    ])
+    const row = dumpRows[0]
+    return {
+      capturedAt: row?.captured_at ?? null,
+      ...planFixes({
+        jobs: decodeTable<FortJob>(row?.jobs),
+        items: decodeTable<FortItem>(row?.items),
+        orders: decodeTable<FortOrder>(row?.orders),
+        alerts: stateRows[0]?.summary?.alerts ?? [],
+      }),
     }
   },
 )

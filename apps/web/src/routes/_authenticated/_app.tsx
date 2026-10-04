@@ -10,8 +10,10 @@ import {
   MapIcon,
   MountainIcon,
   PackageIcon,
+  PawPrintIcon,
   ScrollTextIcon,
   SettingsIcon,
+  SwordsIcon,
   UsersIcon,
 } from 'lucide-react'
 import * as React from 'react'
@@ -59,10 +61,12 @@ function FortressEdgeDwarves() {
 
 const NAV = [
   { title: 'Overview', url: '/fortress', icon: MountainIcon },
+  { title: 'Dwarves and creatures', url: '/fortress/dwarves-and-creatures', icon: PawPrintIcon },
   { title: 'Dwarves', url: '/fortress/dwarves', icon: UsersIcon, matchPrefix: true },
   { title: 'Items', url: '/fortress/items', icon: PackageIcon },
   { title: 'Work', url: '/fortress/work', icon: HammerIcon },
   { title: 'Map', url: '/fortress/map', icon: MapIcon },
+  { title: 'Diplomacy & War', url: '/fortress/diplomacy-and-war', icon: SwordsIcon },
   { title: 'Chronicle', url: '/fortress/chronicle', icon: ScrollTextIcon },
   { title: 'Legends', url: '/legends', icon: BookOpenIcon, matchPrefix: true },
   { title: 'Nickname Dwarves', url: '/nickname-dwarves', icon: LibraryIcon },

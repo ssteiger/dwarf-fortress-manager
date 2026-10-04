@@ -11,10 +11,12 @@ import type { LegendsHit } from '../legends/server'
 /** Every page the search can jump to. The router checks these against its routes. */
 export type AppPath =
   | '/fortress'
+  | '/fortress/dwarves-and-creatures'
   | '/fortress/dwarves'
   | '/fortress/items'
   | '/fortress/work'
   | '/fortress/map'
+  | '/fortress/diplomacy-and-war'
   | '/fortress/chronicle'
   | '/legends'
   | '/legends/world'
@@ -49,8 +51,14 @@ export const PAGES: PageEntry[] = [
   {
     to: '/fortress/dwarves',
     title: 'Dwarves',
-    detail: 'Every citizen, animal and visitor',
-    keywords: 'units grid people citizens skills stress squad nobles health',
+    detail: 'Who needs help, who does what, squads and friendships',
+    keywords: 'people citizens skills stress squad military nobles bonds families',
+  },
+  {
+    to: '/fortress/dwarves-and-creatures',
+    title: 'Dwarves and creatures',
+    detail: 'Every citizen, animal, visitor and hostile on the map',
+    keywords: 'units grid table roster everyone animals pets visitors hostiles residents dead',
   },
   {
     to: '/fortress/items',
@@ -69,6 +77,13 @@ export const PAGES: PageEntry[] = [
     title: 'Map',
     detail: 'The fortress level by level',
     keywords: 'tiles dig levels z terrain layout',
+  },
+  {
+    to: '/fortress/diplomacy-and-war',
+    title: 'Diplomacy & War',
+    detail: 'Neighbours, wars, sieges, caravans and petitions',
+    keywords:
+      'diplomacy war peace neighbours neighbors civilizations elves goblins humans kobolds siege invasion raid tribute diplomat liaison caravan petition temple guildhall',
   },
   {
     to: '/fortress/chronicle',

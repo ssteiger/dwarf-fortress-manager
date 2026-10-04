@@ -19,6 +19,7 @@ import { adviceGuide, workshopGuide } from '~/lib/fortress/guides'
 import { cancellationHint } from '~/lib/fortress/insights'
 import { useOpenGuide } from '../../-components/Guide'
 import { UnitChips } from '../../-components/Insights'
+import { FixStepsButton } from './FixSteps'
 
 function GuideButton({ advice, label }: { advice: Advice | undefined; label: string }) {
   const open = useOpenGuide()
@@ -40,6 +41,28 @@ function Count({ n }: { n: number }) {
 }
 
 const WHERE_SHOWN = 4
+
+/** The way into the step-by-step work orders, while anything is suspended or failing. */
+export function StuckFixes({ suspended, failing }: { suspended: number; failing: number }) {
+  if (!suspended && !failing) return null
+  const what = [
+    suspended ? `${suspended} suspended ${suspended === 1 ? 'job' : 'jobs'}` : null,
+    failing ? `${failing} ${failing === 1 ? 'job that keeps' : 'jobs that keep'} failing` : null,
+  ]
+    .filter(Boolean)
+    .join(' and ')
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+      <p className="text-sm">
+        <span className="font-medium">{what.charAt(0).toUpperCase() + what.slice(1)}.</span>{' '}
+        <span className="text-muted-foreground">
+          See the work orders that make what they lack, and add them to the game one by one.
+        </span>
+      </p>
+      <FixStepsButton />
+    </div>
+  )
+}
 
 /** Suspended jobs, a line per kind of job at each kind of building, with where they are. */
 export function SuspendedJobs({
