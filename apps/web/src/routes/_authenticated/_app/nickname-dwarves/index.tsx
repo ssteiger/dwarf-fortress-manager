@@ -33,6 +33,7 @@ import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
 import { getFortUnits } from '~/lib/fortress/server'
 import { EmptyState, PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
 import { NameList } from './-components/NameList'
+import { NamePicker } from './-components/NamePicker'
 import {
   type DossierFact,
   MAX_NICKNAME_LENGTH,
@@ -57,7 +58,7 @@ const ALLITERATE_KEY = 'nickname-dwarves-alliterate'
 const FLASH_MS = 1600
 
 /** What the player put in a dwarf's box: their own words, or one of the ideas as offered. */
-type Draft = { typed: string } | { idea: string }
+type Draft = { typed: string } | { idea: string; listed?: boolean }
 
 function useAlliteration(): [boolean, (on: boolean) => void] {
   const [on, setOn] = React.useState(false)
@@ -102,6 +103,7 @@ function RouteComponent() {
   const [writing, setWriting] = React.useState<{ done: number; total: number } | null>(null)
   const [asking, setAsking] = React.useState<ReadonlySet<number>>(new Set())
   const [flash, setFlash] = React.useState<number | null>(null)
+  const [picking, setPicking] = React.useState<number | null>(null)
 
   const mutation = useMutation({
     mutationFn: (assignments: NicknameAssignment[]) =>
@@ -203,7 +205,12 @@ function RouteComponent() {
     const idea = ideasFor(unit).find(
       (i) => i.nickname.toLowerCase() === key || present(unit, i.nickname).toLowerCase() === key,
     )
-    return idea ? { why: idea.why, source: idea.source } : { why: null, source: 'typed' }
+    if (idea) return { why: idea.why, source: idea.source }
+    const draft = drafts[unit.id]
+    if (draft && 'listed' in draft && present(unit, draft.idea).toLowerCase() === key) {
+      return { why: 'From your list.', source: 'list' }
+    }
+    return { why: null, source: 'typed' }
   }
 
   const changes = visibleCitizens.filter(
@@ -377,6 +384,17 @@ function RouteComponent() {
           onShow={show}
         />
       ) : null}
+      <NamePicker
+        target={
+          picking !== null ? { unitId: picking, called: calledBy.get(picking) ?? 'them' } : null
+        }
+        list={list}
+        calledBy={calledBy}
+        onPick={(unitId, name) =>
+          setDrafts((current) => ({ ...current, [unitId]: { idea: name, listed: true } }))
+        }
+        onClose={() => setPicking(null)}
+      />
 
       <Card>
         <CardHeader>
@@ -467,6 +485,7 @@ function RouteComponent() {
                       setDrafts((current) => ({ ...current, [unit.id]: { typed } }))
                     }
                     onPick={(idea) => setDrafts((current) => ({ ...current, [unit.id]: { idea } }))}
+                    onBrowse={list.length ? () => setPicking(unit.id) : null}
                     onQueue={() => queue([unit])}
                     onAsk={() => write([unit], true)}
                   />
@@ -527,6 +546,7 @@ function NicknameRow({
   asking,
   onType,
   onPick,
+  onBrowse,
   onQueue,
   onAsk,
 }: {
@@ -544,6 +564,8 @@ function NicknameRow({
   asking: boolean
   onType: (value: string) => void
   onPick: (nickname: string) => void
+  /** Opens the picker over the whole list; null while the list is empty. */
+  onBrowse: (() => void) | null
   onQueue: () => void
   onAsk: () => void
 }) {
@@ -617,20 +639,35 @@ function NicknameRow({
           <p className="text-sm text-muted-foreground">Digging through their story…</p>
         ) : null}
         {chosen?.why ? <p className="text-sm text-muted-foreground">{chosen.why}</p> : null}
-        {facts.length ? (
+        {facts.length || onBrowse ? (
           <div>
-            <button
-              type="button"
-              onClick={() => setOpen((v) => !v)}
-              aria-expanded={open}
-              className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-            >
-              What sets them apart
-              <ChevronDownIcon
-                className={cn('size-3.5 transition-transform', open && 'rotate-180')}
-              />
-            </button>
-            {open ? (
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {facts.length ? (
+                <button
+                  type="button"
+                  onClick={() => setOpen((v) => !v)}
+                  aria-expanded={open}
+                  className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
+                >
+                  What sets them apart
+                  <ChevronDownIcon
+                    className={cn('size-3.5 transition-transform', open && 'rotate-180')}
+                  />
+                </button>
+              ) : null}
+              {onBrowse ? (
+                <button
+                  type="button"
+                  onClick={onBrowse}
+                  disabled={disabled}
+                  className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <BookmarkIcon className="size-3.5" aria-hidden />
+                  Pick from your names
+                </button>
+              ) : null}
+            </div>
+            {open && facts.length ? (
               <ul className="mt-1.5 flex flex-col gap-1 text-sm">
                 {facts.map((fact) => (
                   <li key={fact.text} className="flex items-baseline gap-2">

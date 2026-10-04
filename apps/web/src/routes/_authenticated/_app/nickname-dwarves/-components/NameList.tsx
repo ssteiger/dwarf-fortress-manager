@@ -25,106 +25,11 @@ import * as React from 'react'
 import { toast } from 'sonner'
 
 import { type ListedName, MAX_LIST, addToNameList, removeFromNameList } from '../-server'
-
-/** Names VonGalactic gave his dwarves on stream, transcribed from his videos. */
-const VONGALACTIC = [
-  //'Driftwood Muncher',
-  'Space Potato',
-  'Dr. Methylene Blue, PhD',
-  //'Curling Stone 2 Unleashed',
-  'Three Kobolds in a Trenchcoat',
-  'Lump in a Bag',
-  'Human with Dwarfism',
-  'Rufus the Bulldog',
-  'Mr. Potato Head',
-  'Dwarfy McDwarfface',
-  'Ice Cube Jr.',
-  //'Clayborn',
-  'Coco',
-  'Sven',
-  'Crinkled',
-  'OSHA Supervisor',
-  'Fluid Druid',
-  'Tiny Toes Thompson',
-  'Elf Fister',
-  'Octavius',
-  'Neo',
-  'Lever Enjoyer',
-  'Test Dummy',
-  'Grundle Puncher',
-  'Fred Durst the Vampire',
-  'Dangerous Narrative',
-  'Girl Failure',
-  'Dick Wolf',
-  'Dino Nuggie',
-  'Weed McGee',
-  'Sir Digby Chicken Caesar',
-  'Unkillable Urist',
-  'Big Willie',
-  'Willie Milka',
-  'Velveeta Cheese',
-  'Mike Oxlong',
-  'Dixie Normous',
-  'Peter Griffin',
-  'Flat Earth',
-  'Sack Biter',
-  'Girl Piston',
-  'Dick Twister',
-  'Gland Lover',
-  'Samurai Cop',
-  'Free Dwarf',
-  'Random World Eater',
-  'Puppy Snipper',
-  'British Furry',
-  'Installation Wizard',
-  "Von's Sentient Kimono",
-  'Wallace and Gromit',
-  'Kenshiro',
-  'Bruce Lee',
-  'Big Bongus',
-  'Fistula',
-  'Mr. Booze',
-  'Toad Frogman',
-  'Big Fat Head',
-  'Mo Problems',
-  'Baby Smasher',
-  'Urist Jagger',
-  'Schlongavius',
-  'Lemon Lad',
-  'Beanie Weenie',
-  'The Potato Contraceptive',
-  'Palm Beach Dwarfrey',
-  'Delilah Sandwich',
-  'Big Badonka Wonkers',
-  'Samurai Jack',
-  'Incontinentia Buttocks',
-  'Christmas Princess',
-  'Cocktaster',
-  'Lord Vetinari',
-  'Giant Dad',
-  'Bane',
-  'Emily Dwarf',
-  'Biggest Milker',
-  'Foot Fungus',
-  'Daffy',
-  'Inch Master',
-  'Chris Pratt',
-  'Biggie Cheese',
-  'Jerkinghoff',
-  'Performance Anxiety',
-  'Lich with BBL',
-  'Knobby Knobs',
-  'The Pointer',
-  'Bushy Hammer Nipple',
-  'Bend Over',
-  'Fish and Chips',
-  'Duck Ass',
-  'Norwood Reaper',
-]
+import { SSTEIGER_NAMES, VONGALACTIC_NAMES } from './names'
 
 const ORDER: Record<ListedName['state'], number> = { fits: 0, wildcard: 1, spare: 2, used: 3 }
 
-function statusOf(entry: ListedName, called: string): string {
+export function statusOf(entry: ListedName, called: string): string {
   if (entry.state === 'used') return `${called} goes by it`
   if (entry.state === 'fits') return `fits ${called}`
   if (entry.state === 'wildcard') return `wild card for ${called}`
@@ -151,7 +56,8 @@ export function NameList({
     .map((line) => line.trim())
     .filter(Boolean)
   const listed = new Set(list.map((entry) => entry.name.toLowerCase()))
-  const missing = VONGALACTIC.filter((name) => !listed.has(name.toLowerCase()))
+  const missingVonGalactic = VONGALACTIC_NAMES.filter((name) => !listed.has(name.toLowerCase()))
+  const missingSsteiger = SSTEIGER_NAMES.filter((name) => !listed.has(name.toLowerCase()))
 
   const add = useMutation({
     mutationFn: (names: string[]) => addToNameList({ data: { names } }),
@@ -249,19 +155,33 @@ export function NameList({
                 )}
                 {pasted.length > 1 ? `Add ${pasted.length} names` : 'Add name'}
               </Button>
-              {missing.length ? (
+              {missingVonGalactic.length ? (
                 <Button
                   type="button"
                   size="sm"
                   variant="ghost"
                   disabled={add.isPending}
-                  onClick={() => add.mutate(missing)}
+                  onClick={() => add.mutate(missingVonGalactic)}
                 >
                   {list.length === 0
-                    ? `Start with the ${missing.length} names VonGalactic gave his dwarves`
-                    : `Add the ${missing.length} VonGalactic names you don't have yet`}
+                    ? `Start with the ${missingVonGalactic.length} VonGalactic names`
+                    : `Add the ${missingVonGalactic.length} VonGalactic names you don't have yet`}
                 </Button>
-              ) : (
+              ) : null}
+              {missingSsteiger.length ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={add.isPending}
+                  onClick={() => add.mutate(missingSsteiger)}
+                >
+                  {list.length === 0
+                    ? `Start with the ${missingSsteiger.length} ssteiger names`
+                    : `Add the ${missingSsteiger.length} ssteiger names you don't have yet`}
+                </Button>
+              ) : null}
+              {missingVonGalactic.length || missingSsteiger.length ? null : (
                 <span className="text-sm text-muted-foreground">
                   Up to {MAX_LIST} names. Duplicates are skipped.
                 </span>
