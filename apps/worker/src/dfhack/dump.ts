@@ -77,8 +77,14 @@ export async function takeDump(
   config: Config,
   {
     withMap,
+    history,
     onStep = async () => {},
-  }: { withMap: boolean; onStep?: (step: DumpStep) => Promise<void> },
+  }: {
+    withMap: boolean
+    /** Read history events after `from` when the loaded fortress is `key`. */
+    history?: { from: number; key: string } | null
+    onStep?: (step: DumpStep) => Promise<void>
+  },
 ): Promise<DumpOutcome> {
   const fileName = withMap ? MAP_DUMP_NAME : FAST_DUMP_NAME
   const relativeOut = `dfhack-config/${fileName}`
@@ -90,7 +96,13 @@ export async function takeDump(
   try {
     lines = await runDfhackCommand(
       'lua',
-      ['--file', `dfhack-config/${SCRIPT_NAME}`, relativeOut, withMap ? '1' : '0'],
+      [
+        '--file',
+        `dfhack-config/${SCRIPT_NAME}`,
+        relativeOut,
+        withMap ? '1' : '0',
+        ...(history ? [String(history.from), history.key] : []),
+      ],
       { host: config.dfhackHost, port: config.dfhackPort, timeoutMs: withMap ? 180_000 : 60_000 },
     )
   } catch (err) {

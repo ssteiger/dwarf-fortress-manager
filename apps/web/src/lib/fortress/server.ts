@@ -1,10 +1,12 @@
 import {
   type FortArtifact,
+  type FortAutomation,
   type FortBuilding,
   type FortCaravan,
   type FortDiplomacy,
   type FortEvent,
   type FortFigure,
+  type FortHealth,
   type FortItem,
   type FortJob,
   type FortMapBlock,
@@ -14,14 +16,15 @@ import {
   type FortState,
   type FortTiletype,
   type FortUnit,
-  decodeTable,
+  fortKeyOf,
   postgres_db,
   schema,
 } from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
-import { type SQL, desc, eq, sql } from 'drizzle-orm'
+import { type SQL, and, desc, eq, sql } from 'drizzle-orm'
 
 import { relationOf } from './character'
+import { type CachedDump, dumpCapturedAt, dumpTable, readDump } from './dumpCache'
 import { type FixPlan, planFixes } from './fixes'
 import { isLiving, mentionNeedles } from './format'
 import { type SortDirection, type SortValue, compareSortValues } from './sort'
@@ -67,13 +70,17 @@ function timelineOf(state: Pick<FortState, 'world'> | null | undefined): Timelin
   }
 }
 
-async function currentTimeline(): Promise<Timeline | null> {
+async function currentState(): Promise<Pick<FortState, 'world'> | null> {
   const rows = await postgres_db
     .select({ world: schema.fort_state.world })
     .from(schema.fort_state)
     .where(eq(schema.fort_state.id, SINGLETON_ID))
     .limit(1)
-  return timelineOf(rows[0])
+  return rows[0] ?? null
+}
+
+async function currentTimeline(): Promise<Timeline | null> {
+  return timelineOf(await currentState())
 }
 
 const ofFortress = (t: Timeline) => sql`starts_with(${E.dedupe_key}, ${t.prefix})`
@@ -96,17 +103,13 @@ export interface FortOverview {
 
 export const getFortOverview = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortOverview> => {
-    const [stateRows, dumpRows] = await Promise.all([
+    const [stateRows, capturedAt] = await Promise.all([
       postgres_db
         .select()
         .from(schema.fort_state)
         .where(eq(schema.fort_state.id, SINGLETON_ID))
         .limit(1),
-      postgres_db
-        .select({ captured_at: schema.fort_dump.captured_at })
-        .from(schema.fort_dump)
-        .where(eq(schema.fort_dump.id, SINGLETON_ID))
-        .limit(1),
+      dumpCapturedAt(),
     ])
     const state = stateRows[0] ?? null
     const timeline = timelineOf(state)
@@ -128,7 +131,7 @@ export const getFortOverview = createServerFn({ method: 'GET' }).handler(
     ])
     return {
       state,
-      dumpCapturedAt: dumpRows[0]?.captured_at ?? null,
+      dumpCapturedAt: capturedAt,
       events,
       undone: Number(undoneRows[0]?.n ?? 0),
     }
@@ -142,17 +145,13 @@ export interface FortUnitsResult {
 
 export const getFortUnits = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortUnitsResult> => {
-    const rows = await postgres_db
-      .select({ captured_at: schema.fort_dump.captured_at, units: schema.fort_dump.units })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
-    return {
-      capturedAt: row?.captured_at ?? null,
-      // The sheet is for one unit's page; the lists poll every few seconds.
-      units: decodeTable<FortUnit>(row?.units).map(({ sheet: _sheet, ...unit }) => unit),
-    }
+    const dump = await readDump()
+    if (!dump) return { capturedAt: null, units: [] }
+    return dump.memo('units', () => ({
+      capturedAt: dump.row.captured_at,
+      // The sheet is for one unit's page; the lists show many units at once.
+      units: dump.table<FortUnit>('units').map(({ sheet: _sheet, ...unit }) => unit),
+    }))
   },
 )
 
@@ -194,54 +193,50 @@ const NOT_WORK_SKILLS = new Set(['SNEAK', 'TRACKING'])
  */
 export const getFortPeople = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortPeopleResult> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        units: schema.fort_dump.units,
-        squads: schema.fort_dump.squads,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
-    const units = decodeTable<FortUnit>(row?.units)
-    const onMap = new Set(units.filter(isLiving).map((unit) => unit.id))
-    const bonds: FortBond[] = []
-    const wasted: FortWastedTalent[] = []
-    for (const unit of units) {
-      if (!isLiving(unit) || !unit.flags.includes('citizen')) continue
-      const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
-      if (!sheet) continue
-      for (const [skill, rating, , , skillClass, enabled] of sheet.skills)
-        if (
-          enabled === false &&
-          rating >= WASTED_RATING &&
-          skillClass !== null &&
-          WORK_SKILL_CLASSES.has(skillClass) &&
-          !NOT_WORK_SKILLS.has(skill)
-        )
-          wasted.push({ unitId: unit.id, skill, rating })
-      for (const person of sheet.people) {
-        if (person.unit === null || person.unit === unit.id || !onMap.has(person.unit)) continue
-        const relation = relationOf(person)
-        if (relation.group === 'acquaintances') continue
-        bonds.push({
-          from: unit.id,
-          to: person.unit,
-          group: relation.group,
-          label: relation.label,
-          detail: relation.detail,
-        })
-      }
-    }
-    return {
-      capturedAt: row?.captured_at ?? null,
-      bonds,
-      wasted,
-      squads: decodeTable<FortSquad>(row?.squads),
-    }
+    const dump = await readDump()
+    if (!dump) return { capturedAt: null, bonds: [], wasted: [], squads: [] }
+    return dump.memo('people', () => readFortPeople(dump))
   },
 )
+
+function readFortPeople(dump: CachedDump): FortPeopleResult {
+  const units = dump.table<FortUnit>('units')
+  const onMap = new Set(units.filter(isLiving).map((unit) => unit.id))
+  const bonds: FortBond[] = []
+  const wasted: FortWastedTalent[] = []
+  for (const unit of units) {
+    if (!isLiving(unit) || !unit.flags.includes('citizen')) continue
+    const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
+    if (!sheet) continue
+    for (const [skill, rating, , , skillClass, enabled] of sheet.skills)
+      if (
+        enabled === false &&
+        rating >= WASTED_RATING &&
+        skillClass !== null &&
+        WORK_SKILL_CLASSES.has(skillClass) &&
+        !NOT_WORK_SKILLS.has(skill)
+      )
+        wasted.push({ unitId: unit.id, skill, rating })
+    for (const person of sheet.people) {
+      if (person.unit === null || person.unit === unit.id || !onMap.has(person.unit)) continue
+      const relation = relationOf(person)
+      if (relation.group === 'acquaintances') continue
+      bonds.push({
+        from: unit.id,
+        to: person.unit,
+        group: relation.group,
+        label: relation.label,
+        detail: relation.detail,
+      })
+    }
+  }
+  return {
+    capturedAt: dump.row.captured_at,
+    bonds,
+    wasted,
+    squads: dump.table<FortSquad>('squads'),
+  }
+}
 
 export interface UnburiedBody {
   unitId: number
@@ -262,39 +257,28 @@ export interface FortConcerns {
   cups: number
   /** Remains of the fortress's own dead lying anywhere but a coffin. */
   unburied: UnburiedBody[]
+  /** Null until a dump from version 12 on. */
+  health: FortHealth | null
 }
 
 async function readFortConcerns(): Promise<FortConcerns> {
-  const rows = await postgres_db
-    .select({
-      captured_at: schema.fort_dump.captured_at,
-      units: schema.fort_dump.units,
-      items: schema.fort_dump.items,
-      buildings: schema.fort_dump.buildings,
-    })
-    .from(schema.fort_dump)
-    .where(eq(schema.fort_dump.id, SINGLETON_ID))
-    .limit(1)
-  const row = rows[0]
-  const empty: FortConcerns = {
-    capturedAt: row?.captured_at ?? null,
-    zones: {},
-    coffins: 0,
-    cups: 0,
-    unburied: [],
-  }
-  if (!row) return empty
+  const dump = await readDump()
+  if (!dump) return { capturedAt: null, zones: {}, coffins: 0, cups: 0, unburied: [], health: null }
+  return dump.memo('concerns', () => fortConcerns(dump))
+}
 
+function fortConcerns(dump: CachedDump): FortConcerns {
+  const row = dump.row
   const zones: Record<string, number> = {}
   let coffins = 0
-  for (const b of decodeTable<FortBuilding>(row.buildings)) {
+  for (const b of dump.table<FortBuilding>('buildings')) {
     if (b.type === 'Civzone' && b.subtype) zones[b.subtype] = (zones[b.subtype] ?? 0) + 1
     if (b.type === 'Coffin') coffins++
   }
 
   // Our dead, by the name the game gives their corpse: "Urist McDwarf's skeleton".
   const ownDead = new Map<string, FortUnit>()
-  for (const u of decodeTable<FortUnit>(row.units)) {
+  for (const u of dump.table<FortUnit>('units')) {
     if (isLiving(u) || !u.name) continue
     if (u.flags.includes('citizen') || u.flags.includes('own_civ') || u.flags.includes('resident'))
       ownDead.set(u.name.toLowerCase(), u)
@@ -302,7 +286,7 @@ async function readFortConcerns(): Promise<FortConcerns> {
   let cups = 0
   const unburied: UnburiedBody[] = []
   const seen = new Set<number>()
-  for (const item of decodeTable<FortItem>(row.items)) {
+  for (const item of dump.table<FortItem>('items')) {
     if (item.type === 'GOBLET' && item.x !== null && !item.flags.includes('trader'))
       cups += item.stack || 1
     if (item.type !== 'CORPSE' && item.type !== 'CORPSEPIECE') continue
@@ -321,15 +305,30 @@ async function readFortConcerns(): Promise<FortConcerns> {
     })
   }
   return {
-    capturedAt: row.captured_at ?? null,
+    capturedAt: row.captured_at,
     zones,
     coffins,
     cups,
     unburied,
+    health: row.health ?? null,
   }
 }
 
 export const getFortConcerns = createServerFn({ method: 'GET' }).handler(() => readFortConcerns())
+
+export interface FortAutomationState {
+  capturedAt: string | null
+  /** Null until a dump from version 12 on. */
+  automation: FortAutomation | null
+}
+
+/** Which DFHack plugins the last dump found running. */
+export const getFortAutomation = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<FortAutomationState> => {
+    const dump = await readDump()
+    return { capturedAt: dump?.row.captured_at ?? null, automation: dump?.row.automation ?? null }
+  },
+)
 
 const CLOTHING = new Set(['ARMOR', 'PANTS', 'SHOES', 'GLOVES', 'HELM'])
 const GEAR = new Set(['ARMOR', 'PANTS', 'SHOES', 'GLOVES', 'HELM', 'SHIELD'])
@@ -412,16 +411,12 @@ export interface FortSupplies {
 }
 
 async function readFortSupplies(): Promise<FortSupplies> {
-  const rows = await postgres_db
-    .select({
-      captured_at: schema.fort_dump.captured_at,
-      items: schema.fort_dump.items,
-      buildings: schema.fort_dump.buildings,
-    })
-    .from(schema.fort_dump)
-    .where(eq(schema.fort_dump.id, SINGLETON_ID))
-    .limit(1)
-  const row = rows[0]
+  const dump = await readDump()
+  return dump ? dump.memo('supplies', () => fortSupplies(dump)) : fortSupplies(null)
+}
+
+function fortSupplies(dump: CachedDump | null): FortSupplies {
+  const row = dump?.row
   const out: FortSupplies = {
     capturedAt: row?.captured_at ?? null,
     forbidden: {},
@@ -460,10 +455,10 @@ async function readFortSupplies(): Promise<FortSupplies> {
     rotting: 0,
     merchantGoods: { items: 0, value: 0 },
   }
-  if (!row) return out
+  if (!dump) return out
 
-  const inPile = stockpileTest(decodeTable<FortBuilding>(row.buildings))
-  const items = decodeTable<FortItem>(row.items)
+  const inPile = stockpileTest(dump.table<FortBuilding>('buildings'))
+  const items = dump.table<FortItem>('items')
   const holding = new Set<number>()
   for (const item of items) if (item.container_id !== null) holding.add(item.container_id)
   const ores = new Map<string, Map<string, number>>()
@@ -613,23 +608,43 @@ export interface FortUnitDetail {
   job: FortJob | null
   /** The workshop a strange mood has claimed. */
   moodWorkshop: FortBuilding | null
+  /** Set when `unit` is the last sheet read before they died or left the map. */
+  archived: { reason: 'died' | 'left'; year: number; tick: number } | null
+}
+
+async function archivedUnit(id: number): Promise<FortUnitDetail | null> {
+  const fortKey = fortKeyOf((await currentState())?.world ?? null)
+  if (!fortKey) return null
+  const rows = await postgres_db
+    .select()
+    .from(schema.fort_unit_archive)
+    .where(
+      and(eq(schema.fort_unit_archive.fort_key, fortKey), eq(schema.fort_unit_archive.unit_id, id)),
+    )
+    .limit(1)
+  const row = rows[0]
+  if (!row) return null
+  const gone = { job: null, job_id: null, x: null, y: null, z: null }
+  const unit: FortUnit =
+    row.reason === 'died' && !row.unit.flags.includes('dead')
+      ? { ...row.unit, ...gone, flags: [...row.unit.flags, 'dead'] }
+      : { ...row.unit, ...gone }
+  return {
+    capturedAt: row.updated_at,
+    unit,
+    inventory: [],
+    buildings: [],
+    job: null,
+    moodWorkshop: null,
+    archived: { reason: row.reason, year: row.game_year, tick: row.game_tick },
+  }
 }
 
 export const getFortUnit = createServerFn({ method: 'GET' })
   .inputValidator((input: FortUnitQuery) => input)
   .handler(async ({ data }): Promise<FortUnitDetail> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        units: schema.fort_dump.units,
-        items: schema.fort_dump.items,
-        buildings: schema.fort_dump.buildings,
-        jobs: schema.fort_dump.jobs,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
+    const dump = await readDump()
+    const row = dump?.row
     const empty: FortUnitDetail = {
       capturedAt: row?.captured_at ?? null,
       unit: null,
@@ -637,12 +652,14 @@ export const getFortUnit = createServerFn({ method: 'GET' })
       buildings: [],
       job: null,
       moodWorkshop: null,
+      archived: null,
     }
-    if (!row) return empty
-    const unit = decodeTable<FortUnit>(row.units).find((u) => u.id === data.id) ?? null
-    if (!unit) return empty
+    const unit = row
+      ? (dumpTable<FortUnit>(dump, 'units').find((u) => u.id === data.id) ?? null)
+      : null
+    if (!row || !unit) return (await archivedUnit(data.id)) ?? empty
 
-    const items = decodeTable<FortItem>(row.items)
+    const items = dumpTable<FortItem>(dump, 'items')
     const byId = new Map(items.map((item) => [item.id, item]))
     const seen = new Set<number>()
     const inventory: CarriedItem[] = []
@@ -656,7 +673,7 @@ export const getFortUnit = createServerFn({ method: 'GET' })
       }
     }
 
-    const buildings = decodeTable<FortBuilding>(row.buildings)
+    const buildings = dumpTable<FortBuilding>(dump, 'buildings')
     const moodWorkshopId = unit.strange_mood?.building_id ?? null
     return {
       capturedAt: row.captured_at ?? null,
@@ -665,10 +682,11 @@ export const getFortUnit = createServerFn({ method: 'GET' })
       buildings: buildings.filter((b) => b.assigned_units.includes(unit.id)),
       job:
         unit.job_id !== null
-          ? (decodeTable<FortJob>(row.jobs).find((j) => j.id === unit.job_id) ?? null)
+          ? (dumpTable<FortJob>(dump, 'jobs').find((j) => j.id === unit.job_id) ?? null)
           : null,
       moodWorkshop:
         moodWorkshopId !== null ? (buildings.find((b) => b.id === moodWorkshopId) ?? null) : null,
+      archived: null,
     }
   })
 
@@ -708,19 +726,8 @@ const unitRef = (unit: FortUnit): UnitRef => ({
 export const getFortItem = createServerFn({ method: 'GET' })
   .inputValidator((input: FortItemQuery) => input)
   .handler(async ({ data }): Promise<FortItemDetail> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        units: schema.fort_dump.units,
-        items: schema.fort_dump.items,
-        buildings: schema.fort_dump.buildings,
-        artifacts: schema.fort_dump.artifacts,
-        figures: schema.fort_dump.figures,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
+    const dump = await readDump()
+    const row = dump?.row
     const empty: FortItemDetail = {
       capturedAt: row?.captured_at ?? null,
       item: null,
@@ -733,16 +740,16 @@ export const getFortItem = createServerFn({ method: 'GET' })
       artifact: null,
     }
     if (!row) return empty
-    const items = decodeTable<FortItem>(row.items)
+    const items = dumpTable<FortItem>(dump, 'items')
     const item = items.find((entry) => entry.id === data.id) ?? null
     if (!item) return empty
 
-    const units = decodeTable<FortUnit>(row.units)
+    const units = dumpTable<FortUnit>(dump, 'units')
     const unitById = new Map(units.map((unit) => [unit.id, unit]))
     const unitByFigure = new Map(
       units.filter((unit) => unit.hist_figure_id >= 0).map((unit) => [unit.hist_figure_id, unit]),
     )
-    const figures = new Map(decodeTable<FortFigure>(row.figures).map((f) => [f.hf, f]))
+    const figures = new Map(dumpTable<FortFigure>(dump, 'figures').map((f) => [f.hf, f]))
     const personOf = (hf: number | null | undefined): ItemPerson | null => {
       if (hf === null || hf === undefined || hf < 0) return null
       const figure = figures.get(hf)
@@ -758,7 +765,8 @@ export const getFortItem = createServerFn({ method: 'GET' })
     }
     const record =
       item.artifact_id != null
-        ? (decodeTable<FortArtifact>(row.artifacts).find((a) => a.id === item.artifact_id) ?? null)
+        ? (dumpTable<FortArtifact>(dump, 'artifacts').find((a) => a.id === item.artifact_id) ??
+          null)
         : null
     const ownerUnit = item.owner_id != null ? unitById.get(item.owner_id) : undefined
 
@@ -766,7 +774,7 @@ export const getFortItem = createServerFn({ method: 'GET' })
       item.holder_unit_id !== null ? (unitById.get(item.holder_unit_id) ?? null) : null
     const building =
       item.holder_building_id !== null
-        ? (decodeTable<FortBuilding>(row.buildings).find(
+        ? (dumpTable<FortBuilding>(dump, 'buildings').find(
             (entry) => entry.id === item.holder_building_id,
           ) ?? null)
         : null
@@ -923,18 +931,10 @@ export interface FortItemsResult {
 export const getFortItems = createServerFn({ method: 'GET' })
   .inputValidator((input: ItemsQuery) => input)
   .handler(async ({ data }): Promise<FortItemsResult> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        items: schema.fort_dump.items,
-        buildings: schema.fort_dump.buildings,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
-    const all = decodeTable<FortItem>(row?.items)
-    const inPile = stockpileTest(decodeTable<FortBuilding>(row?.buildings))
+    const dump = await readDump()
+    const row = dump?.row
+    const all = dumpTable<FortItem>(dump, 'items')
+    const inPile = stockpileTest(dumpTable<FortBuilding>(dump, 'buildings'))
     const view: ItemView = isItemView(data.view) ? data.view : 'fortress'
     const views = Object.fromEntries(ITEM_VIEWS.map((v) => [v, 0])) as Record<ItemView, number>
     const inView: FortItem[] = []
@@ -998,24 +998,14 @@ export interface FortWorkResult {
 
 export const getFortWork = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortWorkResult> => {
-    const rows = await postgres_db
-      .select({
-        captured_at: schema.fort_dump.captured_at,
-        buildings: schema.fort_dump.buildings,
-        jobs: schema.fort_dump.jobs,
-        orders: schema.fort_dump.orders,
-        units: schema.fort_dump.units,
-      })
-      .from(schema.fort_dump)
-      .where(eq(schema.fort_dump.id, SINGLETON_ID))
-      .limit(1)
-    const row = rows[0]
+    const dump = await readDump()
+    const row = dump?.row
     return {
       capturedAt: row?.captured_at ?? null,
-      buildings: decodeTable<FortBuilding>(row?.buildings),
-      jobs: decodeTable<FortJob>(row?.jobs),
-      orders: decodeTable<FortOrder>(row?.orders),
-      units: decodeTable<FortUnit>(row?.units).map((u) => ({
+      buildings: dumpTable<FortBuilding>(dump, 'buildings'),
+      jobs: dumpTable<FortJob>(dump, 'jobs'),
+      orders: dumpTable<FortOrder>(dump, 'orders'),
+      units: dumpTable<FortUnit>(dump, 'units').map((u) => ({
         id: u.id,
         name: u.name,
         profession: u.profession,
@@ -1038,15 +1028,8 @@ export interface FortDiplomacyResult {
 /** Neighbours, wars and petitions, with what draws caravans and invaders. */
 export const getFortDiplomacy = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortDiplomacyResult> => {
-    const [dumpRows, stateRows] = await Promise.all([
-      postgres_db
-        .select({
-          captured_at: schema.fort_dump.captured_at,
-          diplomacy: schema.fort_dump.diplomacy,
-        })
-        .from(schema.fort_dump)
-        .where(eq(schema.fort_dump.id, SINGLETON_ID))
-        .limit(1),
+    const [dump, stateRows] = await Promise.all([
+      readDump(),
       postgres_db
         .select({ summary: schema.fort_state.summary })
         .from(schema.fort_state)
@@ -1055,8 +1038,8 @@ export const getFortDiplomacy = createServerFn({ method: 'GET' }).handler(
     ])
     const summary = stateRows[0]?.summary ?? null
     return {
-      capturedAt: dumpRows[0]?.captured_at ?? null,
-      diplomacy: dumpRows[0]?.diplomacy ?? null,
+      capturedAt: dump?.row.captured_at ?? null,
+      diplomacy: dump?.row.diplomacy ?? null,
       caravans: summary?.caravans ?? [],
       citizens: summary ? summary.adults + summary.children + summary.babies : 0,
       createdWealth: summary?.wealth?.total ?? null,
@@ -1072,30 +1055,21 @@ export interface FortFixes extends FixPlan {
 /** Work orders, in order, for what the suspended and failing jobs lack. */
 export const getFortFixes = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortFixes> => {
-    const [dumpRows, stateRows] = await Promise.all([
-      postgres_db
-        .select({
-          captured_at: schema.fort_dump.captured_at,
-          jobs: schema.fort_dump.jobs,
-          items: schema.fort_dump.items,
-          orders: schema.fort_dump.orders,
-        })
-        .from(schema.fort_dump)
-        .where(eq(schema.fort_dump.id, SINGLETON_ID))
-        .limit(1),
+    const [dump, stateRows] = await Promise.all([
+      readDump(),
       postgres_db
         .select({ summary: schema.fort_state.summary })
         .from(schema.fort_state)
         .where(eq(schema.fort_state.id, SINGLETON_ID))
         .limit(1),
     ])
-    const row = dumpRows[0]
+    const row = dump?.row
     return {
       capturedAt: row?.captured_at ?? null,
       ...planFixes({
-        jobs: decodeTable<FortJob>(row?.jobs),
-        items: decodeTable<FortItem>(row?.items),
-        orders: decodeTable<FortOrder>(row?.orders),
+        jobs: dumpTable<FortJob>(dump, 'jobs'),
+        items: dumpTable<FortItem>(dump, 'items'),
+        orders: dumpTable<FortOrder>(dump, 'orders'),
         alerts: stateRows[0]?.summary?.alerts ?? [],
       }),
     }
@@ -1212,22 +1186,18 @@ export interface FortMapLevel {
 export const getFortMapLevel = createServerFn({ method: 'GET' })
   .inputValidator((input: MapLevelQuery) => input)
   .handler(async ({ data }): Promise<FortMapLevel | null> => {
-    const [mapRows, dumpRows] = await Promise.all([
+    const [mapRows, dump] = await Promise.all([
       postgres_db
         .select()
         .from(schema.fort_map)
         .where(eq(schema.fort_map.id, SINGLETON_ID))
         .limit(1),
-      postgres_db
-        .select({ units: schema.fort_dump.units, buildings: schema.fort_dump.buildings })
-        .from(schema.fort_dump)
-        .where(eq(schema.fort_dump.id, SINGLETON_ID))
-        .limit(1),
+      readDump(),
     ])
     const map = mapRows[0]
     if (!map) return null
-    const units = decodeTable<FortUnit>(dumpRows[0]?.units)
-    const buildings = decodeTable<FortBuilding>(dumpRows[0]?.buildings)
+    const units = dumpTable<FortUnit>(dump, 'units')
+    const buildings = dumpTable<FortBuilding>(dump, 'buildings')
 
     const levelSet = new Set<number>()
     for (const block of map.blocks) levelSet.add(block[0])

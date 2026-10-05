@@ -52,6 +52,7 @@ export async function storeLiveDump(
     })
 
   const tables = {
+    dump_version: typeof payload.dump_version === 'number' ? payload.dump_version : null,
     units: payload.units,
     items: payload.items,
     buildings: payload.buildings,
@@ -62,6 +63,9 @@ export async function storeLiveDump(
     artifacts: payload.artifacts ?? null,
     figures: payload.figures ?? null,
     diplomacy: payload.diplomacy ?? null,
+    dead: payload.dead ?? null,
+    automation: payload.automation ?? null,
+    health: payload.health ?? null,
   }
   await postgres_db
     .insert(schema.fort_dump)

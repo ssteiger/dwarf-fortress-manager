@@ -16,15 +16,26 @@ import {
 import type {
 	DfhackAction,
 	DumpProgress,
+	FortAutomation,
 	FortDiplomacy,
+	FortHealth,
+	FortHistoryEvent,
 	FortMapPayload,
 	FortStatus,
 	FortSummary,
+	FortUnit,
 	FortWorld,
+	HistoryFigure,
 	LegendsPayload,
 	RowTable,
 	UnitAction,
 } from "./fortress-types";
+import type {
+	LifeEventData,
+	LifeEventKind,
+	SnapshotTotals,
+	SnapshotUnit,
+} from "./snapshots";
 
 export const logs = pgTable("logs", {
 	id: serial().primaryKey().notNull(),
@@ -54,6 +65,8 @@ export const fort_dump = pgTable("fort_dump", {
 	captured_at: timestamp({ withTimezone: true, mode: "string" })
 		.defaultNow()
 		.notNull(),
+	/** What the game script wrote; null before this column existed. */
+	dump_version: integer(),
 	units: jsonb().$type<RowTable>(),
 	items: jsonb().$type<RowTable>(),
 	buildings: jsonb().$type<RowTable>(),
@@ -64,6 +77,9 @@ export const fort_dump = pgTable("fort_dump", {
 	artifacts: jsonb().$type<RowTable>(),
 	figures: jsonb().$type<RowTable>(),
 	diplomacy: jsonb().$type<FortDiplomacy>(),
+	dead: jsonb().$type<RowTable>(),
+	automation: jsonb().$type<FortAutomation>(),
+	health: jsonb().$type<FortHealth>(),
 });
 
 /** Single row (id = 1): the map, dumped on its own slower cadence. */
@@ -124,6 +140,112 @@ export const fort_events = pgTable(
 		uniqueIndex("fort_events_dedupe_key_idx").on(t.dedupe_key),
 		index("fort_events_game_time_idx").on(t.game_year, t.game_tick),
 	],
+);
+
+/**
+ * The fortress over time: one row per fortress and in-game day, rewritten by
+ * each dump that day. Rows dated after the present are dropped when an
+ * earlier save is loaded.
+ */
+export const fort_snapshots = pgTable(
+	"fort_snapshots",
+	{
+		/** "save_dir:site_id", as the chronicle keys the fortress. */
+		fort_key: text().notNull(),
+		/** gameDay(year, tick): days since the world began. */
+		day: integer().notNull(),
+		game_year: integer().notNull(),
+		game_tick: integer().notNull(),
+		captured_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+		totals: jsonb().$type<SnapshotTotals>().notNull(),
+		units: jsonb().$type<Record<string, SnapshotUnit>>().notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.fort_key, t.day] })],
+);
+
+/** What two snapshots in a row differ by: a citizen's life, one fact at a time. */
+export const fort_life_events = pgTable(
+	"fort_life_events",
+	{
+		id: serial().primaryKey().notNull(),
+		fort_key: text().notNull(),
+		unit_id: integer().notNull(),
+		hf: integer(),
+		kind: text().$type<LifeEventKind>().notNull(),
+		game_year: integer().notNull(),
+		game_tick: integer().notNull(),
+		data: jsonb().$type<LifeEventData>().notNull(),
+		captured_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		index("fort_life_events_time_idx").on(t.fort_key, t.game_year, t.game_tick),
+		index("fort_life_events_unit_idx").on(t.fort_key, t.unit_id),
+	],
+);
+
+/**
+ * The world's history events at the fortress or naming its people, read live
+ * from the game. Events newer than the game holds are dropped when an earlier
+ * save is loaded.
+ */
+export const fort_history_events = pgTable(
+	"fort_history_events",
+	{
+		fort_key: text().notNull(),
+		/** The game's own event id, as the legends export numbers it too. */
+		event_id: integer().notNull(),
+		type: text().notNull(),
+		game_year: integer().notNull(),
+		game_tick: integer().notNull(),
+		here: boolean().notNull(),
+		hfids: integer().array().notNull(),
+		fields: jsonb().$type<FortHistoryEvent["fields"]>().notNull(),
+		extra: jsonb()
+			.$type<FortHistoryEvent["extra"] & { figures?: Record<string, HistoryFigure> }>()
+			.notNull(),
+		captured_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [
+		primaryKey({ columns: [t.fort_key, t.event_id] }),
+		index("fort_history_events_time_idx").on(t.fort_key, t.game_year, t.game_tick),
+		index("fort_history_events_hfids_idx").using("gin", t.hfids),
+	],
+);
+
+/** How far the worker has read each fortress's history events. */
+export const fort_history_cursors = pgTable("fort_history_cursors", {
+	fort_key: text().primaryKey().notNull(),
+	last_event_id: integer().notNull(),
+	updated_at: timestamp({ withTimezone: true, mode: "string" })
+		.defaultNow()
+		.notNull(),
+});
+
+/**
+ * The last sheet the worker read of a citizen who has since died or left,
+ * so their page outlives them.
+ */
+export const fort_unit_archive = pgTable(
+	"fort_unit_archive",
+	{
+		fort_key: text().notNull(),
+		unit_id: integer().notNull(),
+		reason: text().$type<"died" | "left">().notNull(),
+		/** When they died or left. */
+		game_year: integer().notNull(),
+		game_tick: integer().notNull(),
+		unit: jsonb().$type<FortUnit>().notNull(),
+		updated_at: timestamp({ withTimezone: true, mode: "string" })
+			.defaultNow()
+			.notNull(),
+	},
+	(t) => [primaryKey({ columns: [t.fort_key, t.unit_id] })],
 );
 
 /** Commands queued by the web app and executed by the sole DFHack worker. */

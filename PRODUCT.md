@@ -18,6 +18,26 @@ A worker next to the game reads the loaded fortress through DFHack on a timer an
 
 Success means the player knows their dwarves by name and cares what happens to them, can follow what happened in the fortress and the world without digging through the game's own screens, and knows what needs attention and how to fix it in the game.
 
+## North Star
+
+After a session the player could tell a friend the story of their fortress (who did what, who they lost, what nearly went wrong), and no dwarf died of something the app could have warned them about.
+
+## Goals
+
+Each goal comes with a way to tell whether it holds.
+
+1. **Know your dwarves.** For any citizen, the first lines of their drawer say who they are, what they are going through, and what has changed for them lately. Open five at random: each reads like a person, not a stat sheet.
+2. **Follow the fortress's story.** After any break, one screen tells what happened as prose. Each season reads as a recap built from the game's own data, and the recaps read in order as the fortress's book, a year later as well as today.
+3. **Read the world, tied to the fortress.** Legends always answers how the world touches this fortress: its people's ancestors, the wars behind its sieges, the beasts that may come.
+4. **Keep it alive.** Nothing that threatens a dwarf or the fortress is learned first from the game. Every warning has steps to take in the game, and warnings rarely turn out to be nothing.
+5. **Glance while playing.** The glance window answers "do I need to stop?" in about two seconds, without scrolling.
+6. **Act deliberately.** Every command is checked, confirmed where it is not safe to repeat, visible while it runs, and the next read says whether it worked.
+7. **Stay out of the way.** Each read pauses the game, so its cost is watched and kept small. Every page works with the game off, without sprites, and without a language model.
+
+## Non-goals
+
+Other players running it, phones and tablets, public hosting, and replacing the game's own controls (designating, building, labors beyond the whitelist).
+
 ## Positioning
 
 It reads the live game itself (units, items, buildings, jobs, announcements, the map, the legends export) and turns it into people and a story: who each dwarf is and what they are going through, what happened since the last look, and the world's long history. Alongside that it answers in plain sentences with steps to take in the game. It can also act back on the game, but only through a short, checked whitelist of DFHack commands that the worker carries out; the browser never talks to the game directly.
@@ -26,13 +46,13 @@ It reads the live game itself (units, items, buildings, jobs, announcements, the
 
 The app is opened at five kinds of moments, all of them real:
 
-- **While playing**, on a second screen beside the game: glanced at between moves, then acted on in the game.
+- **While playing**, on a second screen beside the game or in the narrow glance window: glanced at between moves, then acted on in the game.
 - **With the game paused**, to dig into a problem or a dwarf.
 - **When something goes wrong** (an alert, a death, a tantrum), to understand why it happened.
 - **Before or between sessions**, to plan what to do next.
 - **Away from the game**, to read the fortress's story or the world's history for its own sake.
 
-Coming back after time away, the app first gives a short mix, in this order: what happened since the last look, told as a story; then the dwarves who are struggling; then anything that needs attention to keep the fortress alive.
+Coming back after time away, the app first gives a short mix, in this order: what happened since the last look, told as a story; then the dwarves who are struggling; then anything that needs attention to keep the fortress alive. When something is dangerous right now (a siege, a death, a starving fortress), that comes first instead.
 
 How it runs:
 
@@ -48,22 +68,22 @@ The two halves, equal in weight:
 
 **The story**
 
-1. **Getting to know the dwarves**: everyone on the map as cards or a table, and a page per dwarf with overview, mind, skills and body, people, role play, actions and gear tabs. Nicknames for the whole fortress, built on what only each dwarf has done, eaten, lost or loved, carried on through family and successors, drawn from the player's own list of favourite names too, with the reason behind each name kept on the dwarf's page.
-2. **Following the fortress's story**: the chronicle, how the fortress feels, the story so far, and what changed since the last look.
+1. **Getting to know the dwarves**: the citizens (who could use help, work groups, skills, squads, bonds), everyone on the map as cards or a table, and a page per dwarf with overview, mind, skills and body, people, role play, actions and gear tabs, and the dated events of their life in the fortress. A watch list puts chosen dwarves first. Nicknames for the whole fortress, built on what only each dwarf has done, eaten, lost or loved, carried on through family and successors, drawn from the player's own list of favourite names too, with the reason behind each name kept on the dwarf's page. The dead: who died, how, by whose hand, where they lie, and who walks as a ghost.
+2. **Following the fortress's story**: what changed since the last look, told as a story; a recap of each season, read in order as the fortress's book; the chronicle, with what the world's history records of the fortress and its people; how the fortress feels; and its trends over time.
 3. **Reading the world's history in Legends**: world map, chart of the ages, stories, figures and races, an archive of every record and event, a page per record, a private journal, an optional narrator.
 
 **Running the fortress**
 
-4. **Keeping it alive**: what needs attention and how to fix it in the game. Overview notices, advice with step-by-step guides you can tick off, stores and items, work and workshops.
+4. **Keeping it alive**: what needs attention and how to fix it in the game. Overview notices, advice with step-by-step guides you can tick off, stores and items, work and workshops, health care, which DFHack automation is on, and diplomacy and war: neighbours, wars, petitions and what may bring a siege.
 5. **Acting on the game**: one-click DFHack fixes in guides (or the exact command to copy when one-click is off), unit actions, cheats behind a confirmation, the assistant's command cards.
 
-Pages: Overview, Dwarves, a dwarf's page, Items and an item's page, Work, Map, Chronicle, Legends (world, history, archive, stories, journal, record pages), Nickname dwarves, Settings, Worker logs, sign in and sign up.
+Pages: Overview, the glance window, Dwarves, Dwarves and creatures, a dwarf's page, The dead, Items and an item's page, Work, Map, Diplomacy & War, Chronicle (every entry, or by season), Legends (world, history, archive, stories, journal, record pages), Nickname dwarves, Settings (including a backup of notes, nicknames, the name list and the journal), Worker logs, sign in and sign up.
 
 Constraints:
 
 - The sprites and interface art belong to Kitfox and Bay 12. Each user extracts them from their own install into `apps/web/public/df-assets/`, which is gitignored. Until they are extracted the pages show no sprites, so every surface must still work without them.
 - The language model is optional. Without it every page keeps to its own deterministic prose.
-- Facts come only from the dump, the chronicle or the legends export; neither the app nor the model may state anything else as what happened. The one exception is role play: a dwarf's own voice on the Role play tab (monologue, diary, tavern gossip, biography, conversation) may invent freely, as long as it is clearly marked as fiction.
+- Facts come only from the dump, the daily snapshots kept from it, the chronicle, the world's history read from the game, or the legends export; neither the app nor the model may state anything else as what happened. The one exception is role play: a dwarf's own voice on the Role play tab (monologue, diary, tavern gossip, biography, conversation) may invent freely, as long as it is clearly marked as fiction.
 - Stack: TanStack Start (React 19), Tailwind v4, shadcn/ui owned in `packages/ui`, lucide-react, sonner.
 - Existing settings: theme (light, dark, system), text size, reduced motion, walking dwarves on or off. Text size and reduced motion were not named as binding, but they exist and work.
 

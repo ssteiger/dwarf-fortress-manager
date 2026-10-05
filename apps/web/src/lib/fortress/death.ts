@@ -1,0 +1,66 @@
+/*
+ * Client-safe: the game's death causes (`death_type` tokens) in words, as the
+ * dead roster and the dwarf pages tell them.
+ */
+
+const CAUSES: Record<string, string> = {
+  OLD_AGE: 'died of old age',
+  HUNGER: 'starved to death',
+  THIRST: 'died of thirst',
+  SHOT: 'was shot and killed',
+  BLEED: 'bled to death',
+  DROWN: 'drowned',
+  DROWN_ALT: 'drowned',
+  DROWN_ALT2: 'drowned',
+  SUFFOCATE: 'suffocated',
+  STRUCK_DOWN: 'was struck down',
+  SCUTTLE: 'was scuttled',
+  COLLISION: 'died in a collision',
+  MAGMA: 'was burned up in magma',
+  MAGMA_MIST: 'was burned by magma mist',
+  DRAGONFIRE: 'was burned by dragonfire',
+  FIRE: 'burned to death',
+  SCALD: 'was scalded to death',
+  CAVEIN: 'was crushed in a cave-in',
+  DRAWBRIDGE: 'was crushed by a drawbridge',
+  FALLING_ROCKS: 'was killed by falling rocks',
+  CHASM: 'fell into a chasm',
+  CAGE: 'died in a cage',
+  MURDER: 'was murdered',
+  TRAP: 'was killed by a trap',
+  VANISH: 'vanished',
+  ABANDON: 'was abandoned',
+  HEAT: 'died of the heat',
+  COLD: 'froze to death',
+  SPIKE: 'was impaled on spikes',
+  ENCASE_LAVA: 'was encased in lava',
+  ENCASE_MAGMA: 'was encased in magma',
+  ENCASE_ICE: 'was encased in ice',
+  BEHEAD: 'was beheaded',
+  CRUCIFY: 'was crucified',
+  BURY_ALIVE: 'was buried alive',
+  BURN_ALIVE: 'was burned alive',
+  FEED_TO_BEASTS: 'was fed to beasts',
+  HACK_TO_PIECES: 'was hacked to pieces',
+  LEAVE_OUT_IN_AIR: 'was left out in the air',
+  BOIL: 'boiled away',
+  MELT: 'melted',
+  CONDENSE: 'condensed',
+  SOLIDIFY: 'solidified',
+  INFECTION: 'died of an infection',
+  MEMORIALIZE: 'was put to rest',
+  SCARE: 'was scared to death',
+  DARKNESS: 'died in the darkness',
+  COLLAPSE: 'collapsed and died',
+  DRAIN_BLOOD: 'was drained of blood',
+  SLAUGHTER: 'was slaughtered',
+  VEHICLE: 'was run over',
+  FALLING_OBJECT: 'was struck by a falling object',
+  LEAPT_FROM_HEIGHT: 'leapt from a height',
+  EXECUTION_GENERIC: 'was executed',
+}
+
+/** "bled to death", or "died" for a cause the game left out. */
+export function deathPhrase(cause: string | null): string {
+  return (cause && CAUSES[cause]) || 'died'
+}

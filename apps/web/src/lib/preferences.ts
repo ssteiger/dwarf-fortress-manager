@@ -19,6 +19,7 @@ export type AlertKind =
   | 'arrival'
   | 'society'
   | 'artifact'
+  | 'watched'
 
 export interface Preferences {
   textSize: TextSize
@@ -44,6 +45,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
     arrival: true,
     society: true,
     artifact: true,
+    watched: true,
   },
 }
 

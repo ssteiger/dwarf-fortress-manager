@@ -1,5 +1,6 @@
 import type { FortSquad, FortUnit } from '@fortress/db-drizzle'
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '@fortress/ui'
+import { Link } from '@tanstack/react-router'
 import {
   BriefcaseIcon,
   GraduationCapIcon,
@@ -12,7 +13,7 @@ import * as React from 'react'
 import { CreatureSprite } from '~/lib/df-assets/components'
 import { skillLabel } from '~/lib/fortress/dossier'
 import { skillRank, unitDisplayName } from '~/lib/fortress/format'
-import { type Concern, isGrownCitizen } from '~/lib/fortress/insights'
+import { type Concern, firstName, isGrownCitizen } from '~/lib/fortress/insights'
 import type { FortBond, FortWastedTalent } from '~/lib/fortress/server'
 import { ConcernBadges, type OpenUnit, UnitChip } from '../../-components/Insights'
 
@@ -111,6 +112,63 @@ export function HelpList({ entries, onOpen }: { entries: HelpEntry[]; onOpen: Op
           <ShowAll hidden={entries.length - shown.length} onClick={() => setAll(true)} />
         </CardContent>
       ) : null}
+    </Card>
+  )
+}
+
+const STRIP_SHOWN = 5
+
+/** The worst few of `HelpList`, in a row, for the overview; each opens the dwarf's page. */
+export function HelpStrip({ entries }: { entries: HelpEntry[] }) {
+  const shown = entries.slice(0, STRIP_SHOWN)
+  return (
+    <Card className="gap-3">
+      <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <HandHelpingIcon className="size-4 text-primary" />
+          Could use your help
+          <span className="text-sm font-normal text-muted-foreground tabular-nums">
+            {entries.length}
+          </span>
+        </CardTitle>
+        <Link
+          to="/fortress/dwarves"
+          className="text-sm text-primary underline-offset-4 hover:underline"
+        >
+          {entries.length > shown.length
+            ? `All ${entries.length} on the Dwarves page`
+            : 'More on the Dwarves page'}
+        </Link>
+      </CardHeader>
+      <CardContent>
+        <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-5">
+          {shown.map(({ unit, concerns }) => {
+            const worst = [...concerns].sort(
+              (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
+            )
+            return (
+              <li key={unit.id} className="min-w-0">
+                <Link
+                  to="/fortress/dwarves/$id"
+                  params={{ id: String(unit.id) }}
+                  className="-mx-2 flex h-full flex-col gap-1.5 rounded-md px-2 py-2 transition-colors hover:bg-accent"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <CreatureSprite unit={unit} size={24} className="shrink-0" />
+                    <span className="truncate font-medium">{firstName(unit)}</span>
+                  </span>
+                  <ConcernBadges concerns={worst.slice(0, 2)} />
+                  {worst[0]?.hint ? (
+                    <span className="line-clamp-2 text-sm text-muted-foreground">
+                      {firstSentence(worst[0].hint)}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </CardContent>
     </Card>
   )
 }

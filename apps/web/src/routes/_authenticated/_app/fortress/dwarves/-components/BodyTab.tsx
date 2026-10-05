@@ -1,6 +1,7 @@
-import type { FortUnit, UnitSheet } from '@fortress/db-drizzle'
+import type { FortHealth, FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 
+import { list } from '~/lib/fortress/advisor'
 import {
   SKILL_GROUP_ORDER,
   attributeLabel,
@@ -14,6 +15,8 @@ import {
   xpForNextLevel,
 } from '~/lib/fortress/character'
 import { SKILL_RANKS, humanize, skillRank, splitPascal } from '~/lib/fortress/format'
+import { type PatientNeed, needBlockers, needPhrase, patientNeeds } from '~/lib/fortress/health'
+import { useFortConcerns } from '~/lib/fortress/queries'
 import { Meter, Muted, Section, SheetMissing, capitalize } from './SheetParts'
 
 export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }) {
@@ -197,10 +200,17 @@ function AttributeRow({ attr }: { attr: UnitSheet['attributes'][number] }) {
 function HealthSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | null }) {
   const hurt = sheet ? injuries(sheet) : []
   const syndromes = sheet ? syndromeNames(sheet) : []
+  const health = useFortConcerns().data?.health ?? null
+  const patient = health?.patients.find((p) => p.unit === unit.id)
+  const needs = patient ? patientNeeds(patient) : []
   const bloodPct =
     unit.blood !== null && unit.blood_max ? Math.round((unit.blood / unit.blood_max) * 100) : null
   const nothing =
-    !hurt.length && !syndromes.length && !sheet?.pregnant && (bloodPct === null || bloodPct >= 100)
+    !hurt.length &&
+    !syndromes.length &&
+    !needs.length &&
+    !sheet?.pregnant &&
+    (bloodPct === null || bloodPct >= 100)
   return (
     <Section title="Health" count={hurt.length || undefined}>
       <div className="flex flex-col gap-3 text-sm">
@@ -244,10 +254,34 @@ function HealthSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | nul
           </div>
         ) : null}
         {bloodPct !== null && bloodPct < 100 ? <p>Blood at {bloodPct}%</p> : null}
+        {health && needs.length ? <Treatment health={health} needs={needs} /> : null}
         {sheet?.pregnant ? <p>Expecting a child.</p> : null}
         {nothing ? <Muted>Hale and whole.</Muted> : null}
       </div>
     </Section>
+  )
+}
+
+/** What the game says this dwarf waits for from the doctors, and what holds it up. */
+function Treatment({ health, needs }: { health: FortHealth; needs: PatientNeed[] }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground">Waiting for the doctors</span>
+      <ul className="flex flex-col gap-1">
+        {needs.map((need) => {
+          const blockers = needBlockers(need, { health, buildings: null })
+          return (
+            <li key={need.treatment}>
+              {capitalize(needPhrase(need))}
+              {blockers.length ? (
+                <span className="text-red-600 dark:text-red-400">; {list(blockers)}</span>
+              ) : null}
+              .
+            </li>
+          )
+        })}
+      </ul>
+    </div>
   )
 }
 

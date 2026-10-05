@@ -9,10 +9,14 @@ import { type AlertKind, usePreferences } from '~/lib/preferences'
 import { desktopAlertsAllowed, useAlertMode } from './alerts'
 import { formatGameTick, isLiving, unitGroup } from './format'
 import { alertLevel, cleanAnnouncement, creatureCounts, storyKind } from './insights'
-import { useFortOverview, useFortUnits } from './queries'
+import { useFortDumpWatch, useFortOverview, useFortUnits } from './queries'
+import { useWatchList } from './watch'
+import { type WatchAlert, type WatchMark, watchAlerts, watchMark } from './watchChanges'
 
 /** At most this many toasts per poll, so a siege does not bury the screen. */
 const MAX_PER_POLL = 4
+
+type Target = { to: '/fortress' } | { to: '/fortress/dwarves/$id'; params: { id: string } }
 
 /** Which Settings → Alerts switch an announcement answers to. */
 function alertKindOf(event: Pick<FortEvent, 'type' | 'text'>): AlertKind | null {
@@ -42,6 +46,7 @@ function alertKindOf(event: Pick<FortEvent, 'type' | 'text'>): AlertKind | null 
  * Renders nothing. What was already there when the app opened stays quiet.
  */
 export function FortWatcher() {
+  useFortDumpWatch()
   const navigate = useNavigate()
   const mode = useAlertMode()
   const { alertKinds } = usePreferences()
@@ -49,13 +54,20 @@ export function FortWatcher() {
   const units = useFortUnits()
   const seenEvent = React.useRef<number | null>(null)
   const seenDanger = React.useRef<Set<number> | null>(null)
+  const seenWatched = React.useRef<Map<number, WatchMark>>(new Map())
   const fortName = overview.data?.state?.fort_name ?? 'The fortress'
 
   const tell = React.useCallback(
-    (title: string, detail: string | undefined, urgent: boolean, tag: string) => {
+    (
+      title: string,
+      detail: string | undefined,
+      urgent: boolean,
+      tag: string,
+      target: Target = { to: '/fortress' },
+    ) => {
       const open = {
         label: 'Open',
-        onClick: () => navigate({ to: '/fortress' }),
+        onClick: () => navigate(target),
       }
       if (urgent)
         toast.error(title, {
@@ -71,7 +83,7 @@ export function FortWatcher() {
         })
         note.onclick = () => {
           window.focus()
-          navigate({ to: '/fortress' })
+          navigate(target)
         }
       }
     },
@@ -128,6 +140,26 @@ export function FortWatcher() {
       'fort-danger',
     )
   }, [all, mode, alertKinds.sighting, tell])
+
+  const { ids: watched } = useWatchList()
+  React.useEffect(() => {
+    if (!all) return
+    const before = seenWatched.current
+    const next = new Map<number, WatchMark>()
+    for (const unit of all) if (watched.has(unit.id)) next.set(unit.id, watchMark(unit))
+    seenWatched.current = next
+    if (mode === 'off' || !alertKinds.watched) return
+    const told: { alert: WatchAlert; unitId: number }[] = []
+    for (const unit of all) {
+      const mark = before.get(unit.id)
+      if (mark) for (const alert of watchAlerts(unit, mark)) told.push({ alert, unitId: unit.id })
+    }
+    for (const { alert, unitId } of told.slice(0, MAX_PER_POLL))
+      tell(alert.title, alert.detail, alert.urgent, `fort-watch-${unitId}`, {
+        to: '/fortress/dwarves/$id',
+        params: { id: String(unitId) },
+      })
+  }, [all, watched, mode, alertKinds.watched, tell])
 
   return null
 }

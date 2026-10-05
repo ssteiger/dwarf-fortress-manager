@@ -4,7 +4,13 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { UnitPortrait } from '~/lib/df-assets/components'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
 import { useFortOverview, useFortUnit } from '~/lib/fortress/queries'
-import { FortBreadcrumbs, MoodBadge, PageHeader, StatusBanner } from '../-components/FortChrome'
+import {
+  FortBreadcrumbs,
+  MoodBadge,
+  PageHeader,
+  StatusBanner,
+  WatchButton,
+} from '../-components/FortChrome'
 import { ShowInGameButton } from './-components/ActionsTab'
 import { DwarfDetails, type DwarfTab, isDwarfTab } from './-components/DwarfDetails'
 import {
@@ -42,7 +48,9 @@ function DwarfPage() {
   const knownFigures = useKnownHistFigures(legendsWorldId, [unit?.hist_figure_id ?? -1])
   const legends = unit ? legendsRefFor(unit, legendsWorldId, knownFigures) : null
 
+  const archived = data?.archived ?? null
   const living = unit ? isLiving(unit) : false
+  const onMap = living && !archived
   const group = unit ? unitGroup(unit) : 'other'
   const subtitle = unit
     ? [
@@ -52,7 +60,7 @@ function DwarfPage() {
         sexLabel(unit.sex),
         unit.profession,
         `${Math.floor(unit.age)} years`,
-        !living ? 'dead' : null,
+        !living ? 'dead' : archived ? 'left the map' : null,
       ]
         .filter(Boolean)
         .join(' · ')
@@ -81,7 +89,7 @@ function DwarfPage() {
               />
             ) : null}
             {title}
-            {unit && (group === 'citizen' || group === 'resident') ? (
+            {unit && onMap && (group === 'citizen' || group === 'resident') ? (
               <MoodBadge category={unit.stress_category} className="text-sm font-normal" />
             ) : null}
             {unit?.mood ? (
@@ -98,7 +106,8 @@ function DwarfPage() {
         actions={
           unit ? (
             <>
-              {living ? <ShowInGameButton unit={unit} /> : null}
+              {living && !archived ? <WatchButton unit={unit} /> : null}
+              {onMap ? <ShowInGameButton unit={unit} /> : null}
               <UnitLinks unit={unit} legends={legends} variant="button" />
             </>
           ) : null

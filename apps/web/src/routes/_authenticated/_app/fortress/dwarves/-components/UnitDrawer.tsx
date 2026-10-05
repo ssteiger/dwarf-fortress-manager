@@ -16,7 +16,7 @@ import * as React from 'react'
 
 import { UnitPortrait } from '~/lib/df-assets/components'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
-import { MoodBadge } from '../../-components/FortChrome'
+import { MoodBadge, WatchButton } from '../../-components/FortChrome'
 import { ShowInGameButton } from './ActionsTab'
 import { DwarfDetails, type DwarfTab } from './DwarfDetails'
 import { UnitLinks, legendsRefFor, useFortLegendsWorldId, useKnownHistFigures } from './UnitLinks'
@@ -82,6 +82,7 @@ export function UnitDrawer({ unit, onClose }: { unit: FortUnit | null; onClose: 
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {isLiving(unit) ? <WatchButton unit={unit} size="icon" /> : null}
                   {isLiving(unit) ? <ShowInGameButton unit={unit} size="icon" /> : null}
                   <DrawerClose asChild>
                     <Button size="icon" variant="ghost" aria-label="Close">

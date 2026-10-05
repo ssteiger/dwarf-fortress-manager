@@ -813,7 +813,7 @@ export function storyHooks(
     const ago = gameAgo({ year, tick }, now)
     out.push({
       key: `core:${thought}:${year}:${tick}`,
-      text: `${name} ${thoughtPhrase(thought, emotion)}${ago ? ` ${ago}` : ` in ${year}`}, and was never the same.`,
+      text: `${name} ${thoughtPhrase(thought, emotion, unit)}${ago ? ` ${ago}` : ` in ${year}`}, and was never the same.`,
     })
   }
   if (sheet.pregnant) out.push({ key: 'pregnant', text: `${name} is expecting a child.` })
@@ -917,7 +917,7 @@ export function characterBrief(unit: FortUnit, now: GameTime | null): string[] {
   for (const remark of character.physique) lines.push(`${capitalize(p.they)} ${p.is} ${remark}.`)
   for (const t of (unit.thoughts ?? []).slice(0, 8)) {
     const ago = gameAgo({ year: t[3], tick: t[4] }, now)
-    lines.push(`Lately ${p.they} ${thoughtPhrase(t[0], t[1])}${ago ? ` (${ago})` : ''}.`)
+    lines.push(`Lately ${p.they} ${thoughtPhrase(t[0], t[1], unit)}${ago ? ` (${ago})` : ''}.`)
   }
   for (const memory of character.haunted) lines.push(`${memory}.`)
   const hurt = injuries(sheet)

@@ -5,9 +5,25 @@ import type {
   FortJob,
   FortSummary,
   FortUnit,
+  HospitalSupply,
 } from '@fortress/db-drizzle'
 
 import { isLiving, splitPascal, stressLabel, unitGroup } from './format'
+import {
+  CORE_MEDICAL_LABORS,
+  MEDICAL_LABOR_LABEL,
+  SUPPLY_SOURCE,
+  SUPPLY_WORD,
+  hospitalLacks,
+  hospitalLimit,
+  hospitalShortages,
+  needBlockers,
+  needPhrase,
+  needsSummary,
+  patientNeeds,
+  treatmentLabor,
+  treatmentUses,
+} from './health'
 import {
   type GameTime,
   TICKS_PER_MONTH,
@@ -18,8 +34,10 @@ import {
   fortFeelings,
   isCitizenish,
   isGrownCitizen,
+  isOwnGhost,
   moodNeedsText,
   pronouns,
+  remainsOf,
   seasonOf,
 } from './insights'
 import type { FortConcerns, FortSupplies } from './server'
@@ -120,9 +138,9 @@ export function plural(n: number, one: string, many = `${one}s`): string {
   return `${fmt(n)} ${n === 1 ? one : many}`
 }
 
-export function list(words: string[]): string {
+export function list(words: string[], conjunction: 'and' | 'or' = 'and'): string {
   if (words.length <= 1) return words.join('')
-  return `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+  return `${words.slice(0, -1).join(', ')} ${conjunction} ${words[words.length - 1]}`
 }
 
 export function names(units: FortUnit[], max = 3): string {
@@ -543,7 +561,13 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
           : 'Build a kitchen to turn plants and meat into meals that keep.',
         'Fish, hunt, gather wild plants (Zones → Gather fruit), and butcher animals you will not keep.',
       ]),
-      actions: ['autofarm', 'seedwatch', 'banCooking'],
+      actions: [
+        'autofarm',
+        'seedwatch',
+        'seedwatchAll',
+        'banCooking',
+        ...(stock('eggs') > 0 ? (['nestboxes'] as const) : []),
+      ],
       dfhack: [
         {
           command: 'enable autobutcher',
@@ -559,80 +583,212 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
     const hospitals = zones.Hospital ?? 0
     const doctor = holder(/medical/i)
     const diagnosers = skilled(['DIAGNOSE'])
-    const status: AdviceStatus = hospitals ? 'good' : hurt.length ? 'problem' : 'attention'
+    const health = concerns?.health ?? null
+    const shortages = health ? hospitalShortages(health.hospitals) : []
+    const inStore: Record<HospitalSupply, number | null> = {
+      splints: supplies?.splints ?? null,
+      crutches: supplies?.crutches ?? null,
+      buckets: supplies?.buckets ?? null,
+      soap: supplies?.soap ?? null,
+      thread: supplies?.thread ?? null,
+      cloth: stock('cloth'),
+      powder: null,
+    }
+    const supplyHelp = (s: HospitalSupply): string => {
+      const n = inStore[s]
+      if (health?.hospitals.some((h) => hospitalLimit(h, s) === 0))
+        return `The hospital is set to keep no ${SUPPLY_WORD[s]}: raise the number in the zone’s settings.`
+      return n
+        ? `The fortress holds ${fmt(n)} ${SUPPLY_WORD[s]}; dwarves carry them to the hospital when it has room and a path leads there.`
+        : SUPPLY_SOURCE[s]
+    }
+    const status: AdviceStatus = hospitals
+      ? shortages.length
+        ? 'attention'
+        : 'good'
+      : hurt.length
+        ? 'problem'
+        : 'attention'
     add({
       key: 'hospital',
       area: 'health',
       status,
       weight: 95,
-      title: hospitals ? 'A hospital is ready' : 'Build a hospital',
+      title: hospitals
+        ? shortages.length
+          ? 'Stock the hospital'
+          : 'A hospital is ready'
+        : 'Build a hospital',
       why: hospitals
-        ? `${plural(hospitals, 'hospital zone')}${hurt.length ? `, with ${plural(hurt.length, 'dwarf', 'dwarves')} hurt` : ''}.`
+        ? `${plural(hospitals, 'hospital zone')}${hurt.length ? `, with ${plural(hurt.length, 'dwarf', 'dwarves')} hurt` : ''}.${shortages.length ? ` The game says it needs more ${list(shortages.map((s) => SUPPLY_WORD[s]))}.` : ''}`
         : hurt.length
           ? `${plural(hurt.length, 'dwarf is', 'dwarves are')} hurt and there is nowhere to treat them. Untreated wounds fester and heal slowly, if at all.`
           : 'Nobody is hurt yet, but when someone is, there is nowhere to treat them.',
       steps: compact([
         !hospitals && 'Zones → Hospital, over a quiet room with a few beds and a table.',
-        supplies
-          ? `Give it water: a well nearby, or buckets (you have ${supplies.buckets}).`
-          : 'Give it water: a well nearby, or buckets.',
-        supplies
-          ? `Keep supplies close: thread and cloth for sutures and dressings (${plural(stock('cloth'), 'cloth', 'cloth')}), splints (${supplies.splints}), crutches (${supplies.crutches}), soap (${supplies.soap}).`
-          : 'Keep thread, cloth, splints, crutches and soap close.',
+        ...(shortages.length
+          ? shortages.map(supplyHelp)
+          : [
+              supplies
+                ? `Give it water: a well nearby, or buckets (you have ${supplies.buckets}).`
+                : 'Give it water: a well nearby, or buckets.',
+              supplies
+                ? `Keep supplies close: thread and cloth for sutures and dressings (${plural(stock('cloth'), 'cloth', 'cloth')}), splints (${supplies.splints}), crutches (${supplies.crutches}), soap (${supplies.soap}).`
+                : 'Keep thread, cloth, splints, crutches and soap close.',
+            ]),
         doctor
           ? `${firstName(doctor)} is your chief medical dwarf${diagnosers.includes(doctor) ? '.' : `, but has never diagnosed anyone: enable Diagnosis for ${pronouns(doctor).them} in the Labor screen.`}`
           : 'Appoint a chief medical dwarf in the Nobles screen, and enable the medical labors on your doctors.',
       ]),
+      actions: hospitals ? ['dwarfvet'] : undefined,
       units: hurt,
     })
+
+    const byId = new Map(citizens.map((u) => [u.id, u]))
+    const patients = (health?.patients ?? []).flatMap((p) => {
+      const unit = byId.get(p.unit)
+      const needs = patientNeeds(p)
+      return unit && needs.length ? [{ unit, needs }] : []
+    })
+    if (health && patients.length) {
+      const context = { health, buildings }
+      const waits = patients.map(({ unit, needs }) => ({
+        unit,
+        needs,
+        stuck: needs.flatMap((need) => {
+          const blockers = needBlockers(need, context)
+          return blockers.length ? [{ need, blockers }] : []
+        }),
+      }))
+      const stuck = waits.filter((w) => w.stuck.length)
+      const missingSupplies = new Set<HospitalSupply>()
+      const missingLabors = new Set<string>()
+      for (const w of stuck)
+        for (const { need } of w.stuck) {
+          for (const s of hospitalLacks(health.hospitals, treatmentUses(need.treatment)))
+            missingSupplies.add(s)
+          const labor = treatmentLabor(need.treatment)
+          if (labor && !health.doctors.some((d) => d.labors.includes(labor)))
+            missingLabors.add(MEDICAL_LABOR_LABEL[labor])
+        }
+      const lead = [...stuck, ...waits.filter((w) => !w.stuck.length)]
+      const told = lead
+        .slice(0, 3)
+        .map(({ unit, needs }) => `${firstName(unit)} ${needsSummary(needs)}.`)
+      add({
+        key: 'patients',
+        area: 'health',
+        status: stuck.length ? 'problem' : 'good',
+        weight: 98,
+        title: stuck.length
+          ? stuck.length === 1
+            ? `Get ${firstName(stuck[0].unit)} treated`
+            : 'Get the hurt treated'
+          : `The doctors are seeing to ${plural(patients.length, 'dwarf', 'dwarves')}`,
+        why: `${told.join(' ')}${lead.length > 3 ? ` ${plural(lead.length - 3, 'other waits', 'others wait')} too.` : ''}`,
+        steps: compact([
+          ...stuck
+            .flatMap((w) =>
+              w.stuck.map(
+                ({ need, blockers }) =>
+                  `${firstName(w.unit)} ${needPhrase(need)}; ${list(blockers)}.`,
+              ),
+            )
+            .slice(0, 6),
+          !health.hospitals.length &&
+            'Zones → Hospital, over a quiet room with a few beds and a table.',
+          missingLabors.size &&
+            `Enable ${list([...missingLabors])} for a dwarf or two in the Labor screen.`,
+          ...[...missingSupplies].map(supplyHelp),
+          stuck.some((w) => w.stuck.some((s) => s.need.treatment === 'rq_traction')) &&
+            !buildings.some((b) => b.type === 'TractionBench') &&
+            'Build a traction bench in the hospital, from a table, a mechanism and a rope or chain.',
+          !stuck.length &&
+            'Everything they need is there. Keep the hospital quiet and stocked until they are back on their feet.',
+        ]),
+        units: lead.map((w) => w.unit),
+      })
+    }
+
     const medics = skilled(['DIAGNOSE', 'SURGERY', 'SUTURE', 'SET_BONE'])
-    if (!medics.length)
+    const onDuty = health ? new Set(health.doctors.flatMap((d) => d.labors)) : null
+    const offDuty = onDuty
+      ? CORE_MEDICAL_LABORS.filter((l) => !onDuty.has(l)).map((l) => MEDICAL_LABOR_LABEL[l])
+      : []
+    if (!medics.length || offDuty.length)
       add({
         key: 'doctors',
         area: 'health',
         status: 'attention',
         weight: 60,
-        title: 'Train some doctors',
-        why: 'Nobody has diagnosed, sutured, set a bone or operated. Medical skill only grows by treating patients, so start before the first siege.',
+        title: offDuty.length ? 'Put some dwarves on medical duty' : 'Train some doctors',
+        why: offDuty.length
+          ? `Nobody has ${list(offDuty)} on, so the hurt wait in bed for treatment that never comes.`
+          : 'Nobody has diagnosed, sutured, set a bone or operated. Medical skill only grows by treating patients, so start before the first siege.',
         steps: compact([
           'Pick two or three steady dwarves and enable Diagnosis, Suturing, Bone setting, Surgery and Wound dressing in the Labor screen.',
+          medics.length > 0 && `${names(medics)} have done it before.`,
           doctor && `${firstName(doctor)} should be the one who diagnoses.`,
           'Everyone else can keep Feed patients and Recovering wounded, so the hurt get carried to bed.',
         ]),
+        units: medics,
       })
   }
   {
     const unburied = concerns?.unburied ?? []
+    const ghosts = units.filter(isOwnGhost)
     const tombs = zones.Tomb ?? 0
     const coffins = built.Coffin ?? 0
     const byId = new Map(units.map((u) => [u.id, u]))
-    const status: AdviceStatus = unburied.length
-      ? 'problem'
-      : tombs && coffins
-        ? 'good'
-        : 'attention'
+    const whose = (b: (typeof unburied)[number]) => {
+      const unit = byId.get(b.unitId)
+      return unit ? firstName(unit) : b.name
+    }
+    const body = (b: (typeof unburied)[number]) =>
+      `${remainsOf(b, byId.get(b.unitId))}${b.x !== null ? ` (at ${b.x},${b.y} z${b.z})` : ''}`
+    const status: AdviceStatus =
+      unburied.length || ghosts.length ? 'problem' : tombs && coffins ? 'good' : 'attention'
+    const ghostWhy = ghosts.length
+      ? `${ghosts.length === 1 ? `The ghost of ${firstName(ghosts[0])} walks` : `${ghosts.length} ghosts walk`} the fortress, frightening the living.`
+      : null
     add({
       key: 'burial',
       area: 'health',
       status,
-      weight: 80,
-      title: unburied.length
-        ? unburied.length === 1
-          ? `Bury ${unburied[0].name}`
-          : `Bury your ${unburied.length} dead`
-        : tombs && coffins
-          ? 'Room for the dead'
-          : 'Prepare a place for the dead',
-      why: unburied.length
-        ? `${list(unburied.map((b) => `${b.description}${b.x !== null ? ` (at ${b.x},${b.y} z${b.z})` : ''}`))}. Seeing the dead shakes the living, and the unburied can return as ghosts.`
-        : `${plural(tombs, 'tomb zone')} and ${plural(coffins, 'coffin')} placed.`,
-      steps: [
+      weight: ghosts.length ? 110 : 80,
+      title: ghosts.length
+        ? ghosts.length === 1
+          ? `Put ${firstName(ghosts[0])}’s ghost to rest`
+          : `Put ${ghosts.length} ghosts to rest`
+        : unburied.length
+          ? unburied.length === 1
+            ? `Bury ${whose(unburied[0])}`
+            : `Bury your ${unburied.length} dead`
+          : tombs && coffins
+            ? 'Room for the dead'
+            : 'Prepare a place for the dead',
+      why: compact([
+        ghostWhy,
+        unburied.length
+          ? `${list(unburied.map(body))} ${unburied.length === 1 ? 'lies' : 'lie'} unburied. Seeing the dead shakes the living, and the unburied can return as ghosts.`
+          : null,
+        !ghostWhy && !unburied.length
+          ? `${plural(tombs, 'tomb zone')} and ${plural(coffins, 'coffin')} placed.`
+          : null,
+      ]).join(' '),
+      steps: compact([
         'Place a coffin (Build → Furniture → Coffin) and draw a tomb zone over it. In the zone settings, allow burial.',
         'Dwarves carry the dead to a free coffin on their own.',
-        "For bodies that are lost or destroyed, engrave a memorial slab at a mason's workshop and place it.",
+        "For bodies that are lost or destroyed, make a slab at a mason's workshop, engrave it as a memorial at a craftsdwarf's workshop, and place it.",
+        ghosts.length
+          ? 'A ghost rests once its body is in a coffin or its memorial slab is placed. DFHack’s autoslab orders the slabs for every ghost.'
+          : null,
+      ]),
+      actions: ghosts.length ? ['burial', 'autoslab'] : ['burial'],
+      units: [
+        ...ghosts,
+        ...unburied.map((b) => byId.get(b.unitId)).filter((u): u is FortUnit => u !== undefined),
       ],
-      actions: ['burial'],
-      units: unburied.map((b) => byId.get(b.unitId)).filter((u): u is FortUnit => u !== undefined),
     })
   }
 
@@ -903,7 +1059,7 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
       title: cups >= pop ? 'Cups for everyone' : 'Make mugs',
       why: `${plural(cups, 'cup')} for ${plural(pop, 'dwarf', 'dwarves')}.${noCup.length ? ` ${plural(noCup.length, 'dwarf', 'dwarves')} grumbled about drinking without one this month.` : ''}`,
       steps: [
-        `At a craftsdwarf's workshop, "Make rock mug" (or wooden cups from logs), about one per dwarf: ${Math.max(0, pop - cups)} more.`,
+        `At a craftsdwarf's workshop, "Make rock mug" (or wooden cups from logs), about one per dwarf${pop > cups ? `: ${fmt(pop - cups)} more` : ''}.`,
         'Store them in a stockpile near the drink.',
       ],
       units: noCup,
@@ -1006,7 +1162,7 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
         status: 'attention',
         weight: 45,
         title: 'Train for the skills you lack',
-        why: `No citizen has ever done any ${list(lacking)}.`,
+        why: `No citizen has ever done any ${list(lacking, 'or')}.`,
         steps: compact([
           'Skills grow with practice: pick a dwarf, enable the labor in the Labor screen, and give them work to do.',
           idle.length && `Idle dwarves are the easiest to train: ${names(idle)}.`,
@@ -1220,6 +1376,7 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
       (u.mood && ['Melancholy', 'Raving', 'Berserk', 'Traumatized'].includes(u.mood)),
   )
   const hurt = citizens.filter((u) => u.wounds > 0)
+  const waiting = (concerns?.health?.patients ?? []).filter((p) => patientNeeds(p).length).length
   const ghosts = living.filter((u) => u.flags.includes('ghost'))
   const undead = hostiles.filter(
     (u) => u.flags.includes('undead') || u.flags.includes('opposed_to_life'),
@@ -1305,7 +1462,9 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         'Stock thread, cloth, splints, crutches, soap and buckets in or near the hospital.',
         'Keep Recovering wounded enabled on plenty of dwarves, so the hurt get carried in.',
       ],
-      now: hurt.length ? `${names(hurt)} ${hurt.length === 1 ? 'is' : 'are'} hurt.` : undefined,
+      now: hurt.length
+        ? `${names(hurt)} ${hurt.length === 1 ? 'is' : 'are'} hurt${waiting ? `; ${fmt(waiting)} still ${waiting === 1 ? 'waits' : 'wait'} for treatment` : ''}.`
+        : undefined,
     },
     {
       key: 'dead',
@@ -1334,8 +1493,8 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         'Fish, hunt, gather plants and butcher surplus animals.',
         'Trade with the next caravan for food and drink.',
       ],
-      actions: ['seedwatch', 'autofarm'],
-      now: shortage.length ? shortage.map((a) => a.title).join('. ') : undefined,
+      actions: ['seedwatch', 'seedwatchAll', 'autofarm'],
+      now: shortage.length ? `${shortage.map((a) => a.title).join('. ')}.` : undefined,
     },
     {
       key: 'sleep',
@@ -1422,7 +1581,9 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         'Send your broker; appraisal and social skills get better prices.',
         'Buy what you cannot make: metal, cloth, food, animals.',
         'Gifts improve relations; the liaison takes orders for next year.',
+        'Merchants who stay at the edge of the map long after trading are stuck, and keep the next caravan away.',
       ],
+      actions: ['fixStuckMerchants'],
       now: summary?.merchants ? `${plural(summary.merchants, 'merchant')} on the map.` : undefined,
     },
     {
@@ -1433,7 +1594,9 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         'Look through their skills on the dwarves page and put them to work where you are short.',
         'Give them beds; a dormitory will do until they get rooms.',
         'Watch the first months: newcomers bring grudges, curses and sometimes worse.',
+        'If migrants stop coming to an old fortress, the game’s list of units may be full of the long dead.',
       ],
+      actions: ['fixDeadUnits'],
       now: migrants.length ? 'Migrants arrived this month.' : undefined,
     },
   ]

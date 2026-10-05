@@ -41,7 +41,6 @@ import {
 import { formatNumber, jobNeedsText, splitPascal } from '~/lib/fortress/format'
 import { gameTimeOf, isGrownCitizen } from '~/lib/fortress/insights'
 import {
-  FORT_REFRESH_MS,
   useFortConcerns,
   useFortOverview,
   useFortSupplies,
@@ -55,7 +54,7 @@ import {
   SituationList,
   WorkshopList,
 } from '../-components/Advice'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { EmptyState, PageHeader, SectionBoundary, StatusBanner } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
 import {
   FailingJobs,
@@ -135,7 +134,6 @@ function WorkPage() {
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'work'],
     queryFn: () => getFortWork(),
-    refetchInterval: FORT_REFRESH_MS * 2,
   })
   const everyone = useFortUnits()
   const concerns = useFortConcerns()
@@ -442,237 +440,249 @@ function WorkPage() {
             </TabsList>
 
             <TabsContent value="checklist">
-              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-                <div className="flex min-w-0 flex-col gap-4">
-                  <Card className="gap-4">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <ListChecksIcon className="size-4 text-primary" />
-                        To see to
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        {counts.problem
-                          ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'} and `
-                          : ''}
-                        {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, the
-                        worst first. Open one for the steps in the game.
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <NextSteps advice={advice} max={advice.length} />
-                    </CardContent>
-                  </Card>
-                  <Card className="gap-4">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <CircleCheckIcon className="size-4 text-primary" />
-                        Already fine
-                        <span className="text-sm font-normal text-muted-foreground tabular-nums">
-                          {counts.good}
-                        </span>
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        What a thriving fortress has that yours has too.
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <FineChecks advice={advice} />
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="flex min-w-0 flex-col gap-4">
-                  {season ? (
-                    <Card className="gap-3">
+              <SectionBoundary name="The checklist">
+                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+                  <div className="flex min-w-0 flex-col gap-4">
+                    <Card className="gap-4">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <SeasonIcon season={season.season} />
-                          {season.season.charAt(0).toUpperCase()}
-                          {season.season.slice(1)}
-                          {state?.world ? ` of ${state.world.year}` : ''}
+                          <ListChecksIcon className="size-4 text-primary" />
+                          To see to
                         </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          {counts.problem
+                            ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'} and `
+                            : ''}
+                          {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, the
+                          worst first. Open one for the steps in the game.
+                        </p>
                       </CardHeader>
                       <CardContent>
-                        <ul className="flex flex-col gap-1.5 text-sm">
-                          {season.notes.map((note) => (
-                            <li key={note} className="flex gap-2">
-                              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                              {note}
-                            </li>
-                          ))}
-                        </ul>
+                        <NextSteps advice={advice} max={advice.length} />
                       </CardContent>
                     </Card>
-                  ) : null}
-                  <Card className="gap-4">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <LifeBuoyIcon className="size-4 text-primary" />
-                        When things go wrong
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
-                        What to do when trouble comes. What seems to be happening now is on top.
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <SituationList situations={playbook} />
-                    </CardContent>
-                  </Card>
+                    <Card className="gap-4">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <CircleCheckIcon className="size-4 text-primary" />
+                          Already fine
+                          <span className="text-sm font-normal text-muted-foreground tabular-nums">
+                            {counts.good}
+                          </span>
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          What a thriving fortress has that yours has too.
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <FineChecks advice={advice} />
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <div className="flex min-w-0 flex-col gap-4">
+                    {season ? (
+                      <Card className="gap-3">
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <SeasonIcon season={season.season} />
+                            {season.season.charAt(0).toUpperCase()}
+                            {season.season.slice(1)}
+                            {state?.world ? ` of ${state.world.year}` : ''}
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <ul className="flex flex-col gap-1.5 text-sm">
+                            {season.notes.map((note) => (
+                              <li key={note} className="flex gap-2">
+                                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
+                                {note}
+                              </li>
+                            ))}
+                          </ul>
+                        </CardContent>
+                      </Card>
+                    ) : null}
+                    <Card className="gap-4">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <LifeBuoyIcon className="size-4 text-primary" />
+                          When things go wrong
+                        </CardTitle>
+                        <p className="text-sm text-muted-foreground">
+                          What to do when trouble comes. What seems to be happening now is on top.
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <SituationList situations={playbook} />
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
-              </div>
+              </SectionBoundary>
             </TabsContent>
 
             <TabsContent value="stuck" className="flex flex-col gap-4">
-              <StuckFixes suspended={suspended} failing={failing} />
-              <div className="grid items-start gap-4 xl:grid-cols-2">
-                <SuspendedJobs
-                  jobs={jobs}
-                  buildingNames={buildingNames}
-                  advice={adviceByKey('suspended')}
-                />
-                <FailingJobs alerts={alerts} advice={adviceByKey('failing')} />
-              </div>
-              <UnworkableWork rows={shops} idle={idle} />
+              <SectionBoundary name="The stuck work">
+                <StuckFixes suspended={suspended} failing={failing} />
+                <div className="grid items-start gap-4 xl:grid-cols-2">
+                  <SuspendedJobs
+                    jobs={jobs}
+                    buildingNames={buildingNames}
+                    advice={adviceByKey('suspended')}
+                  />
+                  <FailingJobs alerts={alerts} advice={adviceByKey('failing')} />
+                </div>
+                <UnworkableWork rows={shops} idle={idle} />
+              </SectionBoundary>
             </TabsContent>
 
             <TabsContent value="queue" className="flex flex-col gap-4">
-              <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <ListTodoIcon className="size-4 text-primary" />
-                      The work queue
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {formatNumber(jobs.length)} jobs in {queue.length} kinds:{' '}
-                      {formatNumber(working)} being worked,{' '}
-                      {formatNumber(jobs.length - working - suspended)} waiting and{' '}
-                      {formatNumber(suspended)} suspended. Open a kind for what to do about it.
-                    </p>
+              <SectionBoundary name="The work queue">
+                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <Card className="gap-4">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <ListTodoIcon className="size-4 text-primary" />
+                        The work queue
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        {formatNumber(jobs.length)} jobs in {queue.length} kinds:{' '}
+                        {formatNumber(working)} being worked,{' '}
+                        {formatNumber(jobs.length - working - suspended)} waiting and{' '}
+                        {formatNumber(suspended)} suspended. Open a kind for what to do about it.
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <JobQueueList groups={queue} advice={advice} />
+                    </CardContent>
+                  </Card>
+                  <IdleHands idle={idle} advice={adviceByKey('idle')} />
+                </div>
+                <Card className="gap-0 overflow-hidden p-0">
+                  <CardHeader className="px-4 pt-4">
+                    <CardTitle className="text-base">Every job</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <JobQueueList groups={queue} advice={advice} />
-                  </CardContent>
+                  {jobs.length === 0 ? (
+                    <div className="p-6">
+                      <EmptyState title="No jobs">
+                        Nothing is queued, or no dump has been taken.
+                      </EmptyState>
+                    </div>
+                  ) : (
+                    <DataTable
+                      data={jobs}
+                      columns={jobColumns}
+                      showSelectColumn={false}
+                      showActionsColumn={false}
+                      showToolbar={false}
+                      enableSortingRemoval={false}
+                      defaultSort={[{ id: 'worker', desc: false }]}
+                      getRowId={(job) => String(job.id)}
+                      rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
+                    />
+                  )}
                 </Card>
-                <IdleHands idle={idle} advice={adviceByKey('idle')} />
-              </div>
-              <Card className="gap-0 overflow-hidden p-0">
-                <CardHeader className="px-4 pt-4">
-                  <CardTitle className="text-base">Every job</CardTitle>
-                </CardHeader>
-                {jobs.length === 0 ? (
-                  <div className="p-6">
-                    <EmptyState title="No jobs">
-                      Nothing is queued, or no dump has been taken.
-                    </EmptyState>
-                  </div>
-                ) : (
-                  <DataTable
-                    data={jobs}
-                    columns={jobColumns}
-                    showSelectColumn={false}
-                    showActionsColumn={false}
-                    showToolbar={false}
-                    enableSortingRemoval={false}
-                    defaultSort={[{ id: 'worker', desc: false }]}
-                    getRowId={(job) => String(job.id)}
-                    rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
-                  />
-                )}
-              </Card>
+              </SectionBoundary>
             </TabsContent>
 
             <TabsContent value="orders" className="flex flex-col gap-4">
-              <Card className="gap-0 overflow-hidden p-0">
-                <CardHeader className="gap-1.5 px-4 pt-4 pb-4">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <ClipboardListIcon className="size-4 text-primary" />
-                    Work orders
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {orders.length
-                      ? `${formatNumber(orders.length)} orders at the manager: ${formatNumber(orderCounts.active)} active, ${formatNumber(orderCounts.waiting)} waiting for their conditions${orderCounts.unchecked ? `, and ${formatNumber(orderCounts.unchecked)} the manager has not checked yet` : ''}.`
-                      : 'No work orders, or the dump predates them. Restart the worker so it installs the new dump script.'}
-                    {orderCounts.unchecked
-                      ? ' Orders run only once the manager has checked them: appoint a manager if nobody holds the post.'
-                      : ''}
-                  </p>
-                </CardHeader>
-                {orders.length ? (
-                  <DataTable
-                    data={orders}
-                    columns={orderColumns}
-                    showSelectColumn={false}
-                    showActionsColumn={false}
-                    showToolbar={false}
-                    enableSortingRemoval={false}
-                    defaultSort={[{ id: 'status', desc: false }]}
-                    getRowId={(order) => String(order.id)}
-                    rowClassName={(order) => (order.validated ? undefined : 'opacity-60')}
-                  />
-                ) : null}
-              </Card>
+              <SectionBoundary name="The work orders">
+                <Card className="gap-0 overflow-hidden p-0">
+                  <CardHeader className="gap-1.5 px-4 pt-4 pb-4">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <ClipboardListIcon className="size-4 text-primary" />
+                      Work orders
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {orders.length
+                        ? `${formatNumber(orders.length)} orders at the manager: ${formatNumber(orderCounts.active)} active, ${formatNumber(orderCounts.waiting)} waiting for their conditions${orderCounts.unchecked ? `, and ${formatNumber(orderCounts.unchecked)} the manager has not checked yet` : ''}.`
+                        : 'No work orders, or the dump predates them. Restart the worker so it installs the new dump script.'}
+                      {orderCounts.unchecked
+                        ? ' Orders run only once the manager has checked them: appoint a manager if nobody holds the post.'
+                        : ''}
+                    </p>
+                  </CardHeader>
+                  {orders.length ? (
+                    <DataTable
+                      data={orders}
+                      columns={orderColumns}
+                      showSelectColumn={false}
+                      showActionsColumn={false}
+                      showToolbar={false}
+                      enableSortingRemoval={false}
+                      defaultSort={[{ id: 'status', desc: false }]}
+                      getRowId={(order) => String(order.id)}
+                      rowClassName={(order) => (order.validated ? undefined : 'opacity-60')}
+                    />
+                  ) : null}
+                </Card>
+              </SectionBoundary>
             </TabsContent>
 
             <TabsContent value="workshops" className="flex flex-col gap-4">
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <HammerIcon className="size-4 text-primary" />
-                    Workshops and who can work them
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    Missing essentials first, then the ones nobody can work, then the busy ones. The
-                    best hands at each, by skill.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <WorkshopList rows={shops} idle={idle} max={shops.length} />
-                </CardContent>
-              </Card>
-              <BuildingTable
-                title="Every workshop"
-                buildings={groups.workshops}
-                showJobs
-                showItems={false}
-                unitNames={unitNames}
-              />
+              <SectionBoundary name="The workshops">
+                <Card className="gap-4">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <HammerIcon className="size-4 text-primary" />
+                      Workshops and who can work them
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Missing essentials first, then the ones nobody can work, then the busy ones.
+                      The best hands at each, by skill.
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <WorkshopList rows={shops} idle={idle} max={shops.length} />
+                  </CardContent>
+                </Card>
+                <BuildingTable
+                  title="Every workshop"
+                  buildings={groups.workshops}
+                  showJobs
+                  showItems={false}
+                  unitNames={unitNames}
+                />
+              </SectionBoundary>
             </TabsContent>
 
             <TabsContent value="buildings">
-              <Tabs defaultValue="stockpiles" className="gap-3">
-                <TabsList>
-                  <TabsTrigger value="stockpiles" className="gap-1.5">
-                    Stockpiles
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {groups.stockpiles.length}
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger value="zones" className="gap-1.5">
-                    Zones
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {groups.zones.length}
-                    </span>
-                  </TabsTrigger>
-                  <TabsTrigger value="furniture" className="gap-1.5">
-                    Furniture and other
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {groups.furniture.length}
-                    </span>
-                  </TabsTrigger>
-                </TabsList>
-                {(['stockpiles', 'zones', 'furniture'] as const).map((key) => (
-                  <TabsContent key={key} value={key}>
-                    <BuildingTable
-                      buildings={groups[key]}
-                      showJobs={false}
-                      showItems={key === 'stockpiles'}
-                      unitNames={unitNames}
-                      labelOf={key === 'stockpiles' ? stockpileLabel : undefined}
-                    />
-                  </TabsContent>
-                ))}
-              </Tabs>
+              <SectionBoundary name="The buildings">
+                <Tabs defaultValue="stockpiles" className="gap-3">
+                  <TabsList>
+                    <TabsTrigger value="stockpiles" className="gap-1.5">
+                      Stockpiles
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {groups.stockpiles.length}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="zones" className="gap-1.5">
+                      Zones
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {groups.zones.length}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="furniture" className="gap-1.5">
+                      Furniture and other
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {groups.furniture.length}
+                      </span>
+                    </TabsTrigger>
+                  </TabsList>
+                  {(['stockpiles', 'zones', 'furniture'] as const).map((key) => (
+                    <TabsContent key={key} value={key}>
+                      <BuildingTable
+                        buildings={groups[key]}
+                        showJobs={false}
+                        showItems={key === 'stockpiles'}
+                        unitNames={unitNames}
+                        labelOf={key === 'stockpiles' ? stockpileLabel : undefined}
+                      />
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </SectionBoundary>
             </TabsContent>
           </Tabs>
         ) : (

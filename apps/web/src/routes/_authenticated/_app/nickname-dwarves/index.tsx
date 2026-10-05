@@ -29,7 +29,7 @@ import { toast } from 'sonner'
 import { CreatureSprite } from '~/lib/df-assets/components'
 import { alliterate, alliterateAll, alliterationKey } from '~/lib/fortress/alliteration'
 import type { DwarfName } from '~/lib/fortress/dossier'
-import { FORT_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
+import { useFortOverview } from '~/lib/fortress/queries'
 import { getFortUnits } from '~/lib/fortress/server'
 import { EmptyState, PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
 import { NameList } from './-components/NameList'
@@ -86,7 +86,6 @@ function RouteComponent() {
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'units'],
     queryFn: () => getFortUnits(),
-    refetchInterval: FORT_REFRESH_MS * 2,
   })
   // Fetched once per visit so suggestions stay put while the dump refreshes underneath.
   const ideasQuery = useQuery({

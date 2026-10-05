@@ -520,7 +520,7 @@ function orderedNote(make: Make, orders: FortOrder[]): string | null {
   const state = same.some((o) => o.active)
     ? 'and running'
     : same.some((o) => o.validated)
-      ? 'waiting for its conditions'
+      ? `waiting for ${same.length === 1 ? 'its' : 'their'} conditions`
       : 'not checked by the manager yet'
   return `${same.length === 1 ? 'An order for this is' : `${same.length} orders for this are`} already at the manager with ${left.toLocaleString()} left, ${state}.`
 }

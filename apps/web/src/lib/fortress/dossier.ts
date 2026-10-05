@@ -1014,7 +1014,7 @@ function stableHash(value: string): number {
   return hash >>> 0
 }
 
-function fill(text: string, unit: FortUnit): string {
+function fill(text: string, unit: Pick<FortUnit, 'sex'>): string {
   const p = pronouns(unit)
   return text
     .replace(/\{their\}/g, p.their)
@@ -1041,7 +1041,7 @@ function entry(unit: FortUnit, key: string, weight: number, [text, ...names]: En
 }
 
 /** "engraving stone" for CARVE_STONE: a skill as it reads in a sentence. */
-export function skillLabel(token: string, unit: FortUnit): string {
+export function skillLabel(token: string, unit: Pick<FortUnit, 'sex'>): string {
   return fill(SKILL_LABELS[token] ?? humanize(token).toLowerCase(), unit)
 }
 
@@ -2527,7 +2527,7 @@ const DOERS =
 
 export function nameShape(nickname: string): NameShape {
   const words = nickname.trim().split(/\s+/)
-  if (/\b(Jr\.|II|2|Reborn|the Younger|Lil|Baby)\b/.test(nickname)) return 'sequel'
+  if (/\b(Jr\.|II|2|Reborn|the Younger|Lil|Baby)(?!\w)/.test(nickname)) return 'sequel'
   if (
     /^(Dr\.|Mr\.|Ms\.|Mrs\.|Mx\.|Sir|Dame|Captain|Saint|Mayor|Professor|Count)\s|, PhD$/.test(
       nickname,

@@ -11,7 +11,8 @@
       "next-env.d",
       "src/routeTree.gen.ts",
       "src/lib/styles/app.css",
-      "public/df-assets"
+      "public/df-assets",
+      "src/lib/fortress/__fixtures__/*.json"
     ]
   }
 }

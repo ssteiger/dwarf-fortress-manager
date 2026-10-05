@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
+import { Route as AuthenticatedGlanceRouteImport } from './routes/_authenticated/glance'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/_app'
 import { Route as AuthRegisterIndexRouteImport } from './routes/auth/register/index'
 import { Route as AuthLoginIndexRouteImport } from './routes/auth/login/index'
@@ -36,6 +37,7 @@ import { Route as AuthenticatedAppFortressItemsIndexRouteImport } from './routes
 import { Route as AuthenticatedAppFortressDwarvesIndexRouteImport } from './routes/_authenticated/_app/fortress/dwarves/index'
 import { Route as AuthenticatedAppFortressDwarvesAndCreaturesIndexRouteImport } from './routes/_authenticated/_app/fortress/dwarves-and-creatures/index'
 import { Route as AuthenticatedAppFortressDiplomacyAndWarIndexRouteImport } from './routes/_authenticated/_app/fortress/diplomacy-and-war/index'
+import { Route as AuthenticatedAppFortressDeadIndexRouteImport } from './routes/_authenticated/_app/fortress/dead/index'
 import { Route as AuthenticatedAppFortressChronicleIndexRouteImport } from './routes/_authenticated/_app/fortress/chronicle/index'
 import { Route as AuthenticatedAppLegendsStoriesKeyRouteImport } from './routes/_authenticated/_app/legends/stories/$key'
 import { Route as AuthenticatedAppLegendsKindIdRouteImport } from './routes/_authenticated/_app/legends/$kind/$id'
@@ -50,6 +52,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth/callback',
   path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedGlanceRoute = AuthenticatedGlanceRouteImport.update({
+  id: '/glance',
+  path: '/glance',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/_app',
@@ -196,6 +203,12 @@ const AuthenticatedAppFortressDiplomacyAndWarIndexRoute =
     path: '/fortress/diplomacy-and-war/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const AuthenticatedAppFortressDeadIndexRoute =
+  AuthenticatedAppFortressDeadIndexRouteImport.update({
+    id: '/fortress/dead/',
+    path: '/fortress/dead/',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppFortressChronicleIndexRoute =
   AuthenticatedAppFortressChronicleIndexRouteImport.update({
     id: '/fortress/chronicle/',
@@ -229,6 +242,7 @@ const AuthenticatedAppFortressDwarvesIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedAppIndexRoute
+  '/glance': typeof AuthenticatedGlanceRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/settings': typeof AuthenticatedAppSettingsRouteRouteWithChildren
   '/auth/login/': typeof AuthLoginIndexRoute
@@ -243,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
+  '/fortress/dead/': typeof AuthenticatedAppFortressDeadIndexRoute
   '/fortress/diplomacy-and-war/': typeof AuthenticatedAppFortressDiplomacyAndWarIndexRoute
   '/fortress/dwarves-and-creatures/': typeof AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute
   '/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
@@ -261,6 +276,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedAppIndexRoute
+  '/glance': typeof AuthenticatedGlanceRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginIndexRoute
   '/auth/register': typeof AuthRegisterIndexRoute
@@ -274,6 +290,7 @@ export interface FileRoutesByTo {
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/fortress/chronicle': typeof AuthenticatedAppFortressChronicleIndexRoute
+  '/fortress/dead': typeof AuthenticatedAppFortressDeadIndexRoute
   '/fortress/diplomacy-and-war': typeof AuthenticatedAppFortressDiplomacyAndWarIndexRoute
   '/fortress/dwarves-and-creatures': typeof AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute
   '/fortress/dwarves': typeof AuthenticatedAppFortressDwarvesIndexRoute
@@ -294,6 +311,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/_app': typeof AuthenticatedAppRouteWithChildren
+  '/_authenticated/glance': typeof AuthenticatedGlanceRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/_app/settings': typeof AuthenticatedAppSettingsRouteRouteWithChildren
   '/_authenticated/_app/': typeof AuthenticatedAppIndexRoute
@@ -309,6 +327,7 @@ export interface FileRoutesById {
   '/_authenticated/_app/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
   '/_authenticated/_app/legends/stories/$key': typeof AuthenticatedAppLegendsStoriesKeyRoute
   '/_authenticated/_app/fortress/chronicle/': typeof AuthenticatedAppFortressChronicleIndexRoute
+  '/_authenticated/_app/fortress/dead/': typeof AuthenticatedAppFortressDeadIndexRoute
   '/_authenticated/_app/fortress/diplomacy-and-war/': typeof AuthenticatedAppFortressDiplomacyAndWarIndexRoute
   '/_authenticated/_app/fortress/dwarves-and-creatures/': typeof AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute
   '/_authenticated/_app/fortress/dwarves/': typeof AuthenticatedAppFortressDwarvesIndexRoute
@@ -329,6 +348,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/glance'
     | '/auth/callback'
     | '/settings'
     | '/auth/login/'
@@ -343,6 +363,7 @@ export interface FileRouteTypes {
     | '/legends/$kind/$id'
     | '/legends/stories/$key'
     | '/fortress/chronicle/'
+    | '/fortress/dead/'
     | '/fortress/diplomacy-and-war/'
     | '/fortress/dwarves-and-creatures/'
     | '/fortress/dwarves/'
@@ -361,6 +382,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/glance'
     | '/auth/callback'
     | '/auth/login'
     | '/auth/register'
@@ -374,6 +396,7 @@ export interface FileRouteTypes {
     | '/legends/$kind/$id'
     | '/legends/stories/$key'
     | '/fortress/chronicle'
+    | '/fortress/dead'
     | '/fortress/diplomacy-and-war'
     | '/fortress/dwarves-and-creatures'
     | '/fortress/dwarves'
@@ -393,6 +416,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/_authenticated/_app'
+    | '/_authenticated/glance'
     | '/auth/callback'
     | '/_authenticated/_app/settings'
     | '/_authenticated/_app/'
@@ -408,6 +432,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/legends/$kind/$id'
     | '/_authenticated/_app/legends/stories/$key'
     | '/_authenticated/_app/fortress/chronicle/'
+    | '/_authenticated/_app/fortress/dead/'
     | '/_authenticated/_app/fortress/diplomacy-and-war/'
     | '/_authenticated/_app/fortress/dwarves-and-creatures/'
     | '/_authenticated/_app/fortress/dwarves/'
@@ -447,6 +472,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/callback'
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/glance': {
+      id: '/_authenticated/glance'
+      path: '/glance'
+      fullPath: '/glance'
+      preLoaderRoute: typeof AuthenticatedGlanceRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/_app': {
       id: '/_authenticated/_app'
@@ -623,6 +655,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppFortressDiplomacyAndWarIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/_app/fortress/dead/': {
+      id: '/_authenticated/_app/fortress/dead/'
+      path: '/fortress/dead'
+      fullPath: '/fortress/dead/'
+      preLoaderRoute: typeof AuthenticatedAppFortressDeadIndexRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/_app/fortress/chronicle/': {
       id: '/_authenticated/_app/fortress/chronicle/'
       path: '/fortress/chronicle'
@@ -699,6 +738,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
   AuthenticatedAppLegendsStoriesKeyRoute: typeof AuthenticatedAppLegendsStoriesKeyRoute
   AuthenticatedAppFortressChronicleIndexRoute: typeof AuthenticatedAppFortressChronicleIndexRoute
+  AuthenticatedAppFortressDeadIndexRoute: typeof AuthenticatedAppFortressDeadIndexRoute
   AuthenticatedAppFortressDiplomacyAndWarIndexRoute: typeof AuthenticatedAppFortressDiplomacyAndWarIndexRoute
   AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute: typeof AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute
   AuthenticatedAppFortressDwarvesIndexRoute: typeof AuthenticatedAppFortressDwarvesIndexRoute
@@ -730,6 +770,8 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
     AuthenticatedAppLegendsStoriesKeyRoute,
   AuthenticatedAppFortressChronicleIndexRoute:
     AuthenticatedAppFortressChronicleIndexRoute,
+  AuthenticatedAppFortressDeadIndexRoute:
+    AuthenticatedAppFortressDeadIndexRoute,
   AuthenticatedAppFortressDiplomacyAndWarIndexRoute:
     AuthenticatedAppFortressDiplomacyAndWarIndexRoute,
   AuthenticatedAppFortressDwarvesAndCreaturesIndexRoute:
@@ -758,10 +800,12 @@ const AuthenticatedAppRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRouteWithChildren
+  AuthenticatedGlanceRoute: typeof AuthenticatedGlanceRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRouteWithChildren,
+  AuthenticatedGlanceRoute: AuthenticatedGlanceRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

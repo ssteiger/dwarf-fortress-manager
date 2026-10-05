@@ -131,11 +131,31 @@ export function UnitChips({
 }
 
 /** An announcement with the dwarves it names turned into links. */
-export function AnnouncementText({ parts, onOpen }: { parts: TextPart[]; onOpen?: OpenUnit }) {
+export function AnnouncementText({
+  parts,
+  onOpen,
+  legends,
+}: {
+  parts: TextPart[]
+  onOpen?: OpenUnit
+  /** Figures off the map link to their legends when the export has them. */
+  legends?: { worldId: number; known: Set<number> } | null
+}) {
   return (
     <>
       {parts.map((part, i) =>
-        part.unit ? (
+        part.hf !== undefined && legends?.known.has(part.hf) ? (
+          <Link
+            // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional
+            key={i}
+            to="/legends/$kind/$id"
+            params={{ kind: 'historical_figure', id: String(part.hf) }}
+            search={{ world: legends.worldId }}
+            className="underline decoration-dotted underline-offset-4 hover:text-primary"
+          >
+            {part.text}
+          </Link>
+        ) : part.unit ? (
           onOpen ? (
             <button
               // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional

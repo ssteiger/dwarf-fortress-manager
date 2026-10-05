@@ -26,6 +26,9 @@
       "dependsOn": ["^build"],
       "cache": true
     },
+    "test": {
+      "cache": true
+    },
     "biome:check": {
       "cache": true
     },

@@ -1,6 +1,7 @@
 import {
   DFHACK_ACTIONS,
   type DfhackActionSpec,
+  TOGGLEABLE_PLUGINS,
   UNIT_ACTIONS,
   isDfhackAction,
   isUnitAction,
@@ -33,8 +34,15 @@ import { CircleAlertIcon, PlugZapIcon, RefreshCwIcon, TriangleAlertIcon } from '
 import * as React from 'react'
 import { toast } from 'sonner'
 
+import { PLUGIN_WHAT } from '~/lib/fortress/automation'
 import { type DumpState, setDumpSchedule } from '~/lib/fortress/dump'
-import { DUMP_STATE_KEY, useDumpState, useFortUnits, useTick } from '~/lib/fortress/queries'
+import {
+  DUMP_STATE_KEY,
+  useDumpState,
+  useFortAutomation,
+  useFortUnits,
+  useTick,
+} from '~/lib/fortress/queries'
 import { setPreference, usePreferences } from '~/lib/preferences'
 import {
   type ConnectionStatus,
@@ -278,6 +286,85 @@ function ReadingSection({ dump }: { dump: DumpState }) {
           The worker is not running. It picks up these settings when it starts.
         </p>
       ) : null}
+    </SettingsSection>
+  )
+}
+
+function AutomationSection() {
+  const query = useFortAutomation()
+  const automation = query.data?.automation ?? null
+  const others = automation
+    ? Object.entries(automation.enabled)
+        .filter(([name, on]) => on && !(TOGGLEABLE_PLUGINS as readonly string[]).includes(name))
+        .map(([name]) => name)
+        .sort()
+    : []
+  return (
+    <SettingsSection
+      id="automation"
+      title="Automation in the game"
+      description={
+        <>
+          Which DFHack plugins run in your fortress, as of the last read
+          {query.data?.capturedAt ? ` ${ago(query.data.capturedAt)}` : ''}. Guides stop offering to
+          turn on what is already on.
+        </>
+      }
+    >
+      {query.isPending ? (
+        <Skeleton className="h-40 rounded-lg" />
+      ) : query.isError ? (
+        <p className="text-sm text-destructive">{query.error.message}</p>
+      ) : !automation ? (
+        <p className="text-sm text-muted-foreground">
+          Not read yet. The worker reports this with its next read of the game, once it has been
+          restarted.
+        </p>
+      ) : (
+        <>
+          <ul className="flex flex-col divide-y">
+            {TOGGLEABLE_PLUGINS.map((name) => {
+              const on = automation.enabled[name]
+              const status = automation.status[name]?.trim()
+              return (
+                <li key={name} className="flex flex-col gap-1 py-2.5 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <code className="font-mono text-sm">{name}</code>
+                    {on === undefined ? (
+                      <Badge variant="outline">Not installed</Badge>
+                    ) : (
+                      <Badge variant={on ? 'default' : 'secondary'}>{on ? 'On' : 'Off'}</Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">{PLUGIN_WHAT[name]}</p>
+                  {status ? (
+                    <details className="text-sm">
+                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                        What it says about itself
+                      </summary>
+                      <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 text-xs whitespace-pre-wrap">
+                        {status}
+                      </pre>
+                    </details>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          {others.length ? (
+            <p className="text-sm text-muted-foreground">
+              Also on:{' '}
+              {others.map((name, i) => (
+                <React.Fragment key={name}>
+                  {i ? ', ' : null}
+                  <code className="font-mono text-xs">{name}</code>
+                </React.Fragment>
+              ))}
+              .
+            </p>
+          ) : null}
+        </>
+      )}
     </SettingsSection>
   )
 }
@@ -537,6 +624,8 @@ function ConnectionSettingsPage() {
           ))}
         </ul>
       </SettingsSection>
+
+      <AutomationSection />
 
       {query.data ? <CommandsSection commands={query.data.commands} /> : null}
 

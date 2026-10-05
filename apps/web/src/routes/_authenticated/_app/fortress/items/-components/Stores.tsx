@@ -1,6 +1,6 @@
 import type { FortItem, FortSummary } from '@fortress/db-drizzle'
 import { Button, cn } from '@fortress/ui'
-import { ChevronRightIcon, ZapIcon } from 'lucide-react'
+import { ChevronRightIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
@@ -16,7 +16,7 @@ import {
   type StoreTile,
 } from '~/lib/fortress/stores'
 import { StatusIcon } from '../../-components/Advice'
-import { GuideButton, useOpenGuide } from '../../-components/Guide'
+import { GuideButton, OneClickMark, useOpenGuide } from '../../-components/Guide'
 
 const TILE_TONE: Record<AdviceStatus, string> = {
   problem: 'border-red-500/40 bg-red-500/5',
@@ -95,7 +95,7 @@ export function ProductionPlan({ rows, max = 8 }: { rows: PlanRow[]; max?: numbe
                 <span className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <span className="flex items-center gap-2 font-medium group-hover:underline">
                     {row.label}
-                    {row.actions?.length ? <ZapIcon className="size-3.5 text-primary" /> : null}
+                    <OneClickMark actions={row.actions} />
                   </span>
                   <span className="text-sm text-muted-foreground tabular-nums">
                     {formatNumber(row.have)} of {formatNumber(row.want)}

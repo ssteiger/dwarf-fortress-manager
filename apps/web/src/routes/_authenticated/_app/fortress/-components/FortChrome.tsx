@@ -1,4 +1,5 @@
 import type { FortState, FortUnit } from '@fortress/db-drizzle'
+import { DUMP_VERSION } from '@fortress/db-drizzle/fortress-types'
 import {
   Alert,
   AlertDescription,
@@ -13,13 +14,28 @@ import {
   Button,
   cn,
 } from '@fortress/ui'
-import { Link } from '@tanstack/react-router'
+import { useQueryClient } from '@tanstack/react-query'
+import { CatchBoundary, Link } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
-import { MoonIcon, PlugZapIcon, RefreshCwIcon } from 'lucide-react'
+import {
+  DatabaseZapIcon,
+  EyeIcon,
+  MoonIcon,
+  PlugZapIcon,
+  RefreshCwIcon,
+  TriangleAlertIcon,
+} from 'lucide-react'
 import * as React from 'react'
 
 import { STRESS_CLASSES, isLiving, stressLabel, unitNeeds } from '~/lib/fortress/format'
-import { useTick } from '~/lib/fortress/queries'
+import { firstName } from '~/lib/fortress/insights'
+import {
+  type FailingRead,
+  useFailingFortReads,
+  useLastDumpState,
+  useTick,
+} from '~/lib/fortress/queries'
+import { useWatchList } from '~/lib/fortress/watch'
 
 /** Title row shared by every fortress page. */
 export function PageHeader({
@@ -67,9 +83,130 @@ export function PageHeader({
   )
 }
 
-/** Shown when the worker cannot see a loaded fortress. */
+/**
+ * What stands between the page and a fresh read: reads the app could not
+ * make, a dump in a format it does not know, a game it cannot reach.
+ */
 export function StatusBanner({ state }: { state: FortState | null | undefined }) {
   useTick(5000)
+  const failing = useFailingFortReads()
+  return (
+    <>
+      {failing.length ? <ReadProblems failing={failing} /> : null}
+      <VersionNotice />
+      {failing.length && !state ? null : <GameStatus state={state} />}
+    </>
+  )
+}
+
+const MAX_SHOWN_ERROR = 240
+
+const READ_NAMES: Record<string, string> = {
+  automation: 'the DFHack plugins',
+  changes: 'the changes over time',
+  concerns: 'the fortress’s worries',
+  dead: 'the dead',
+  diplomacy: 'the neighbours',
+  dump: 'the worker’s status',
+  'event-mentions': 'the mentions in the chronicle',
+  events: 'the chronicle',
+  fixes: 'the fixes',
+  history: 'the world’s history',
+  item: 'this item',
+  items: 'the items',
+  map: 'the map',
+  overview: 'the overview',
+  people: 'the bonds between citizens',
+  supplies: 'the stocks',
+  trends: 'the trends',
+  unit: 'this creature’s sheet',
+  'unit-history': 'this creature’s history',
+  units: 'the creatures',
+  work: 'the work',
+}
+
+function ReadProblems({ failing }: { failing: FailingRead[] }) {
+  const client = useQueryClient()
+  const [retrying, setRetrying] = React.useState(false)
+  const what = [
+    ...new Set(failing.map((f) => READ_NAMES[f.what] ?? `the ${f.what.replace(/-/g, ' ')}`)),
+  ]
+  const message = failing[0].message
+  const shown = message.length > MAX_SHOWN_ERROR ? `${message.slice(0, MAX_SHOWN_ERROR)}…` : message
+  const kept = failing.filter((f) => f.lastGoodAt > 0)
+  const oldest = kept.length ? Math.min(...kept.map((f) => f.lastGoodAt)) : null
+  const retry = async () => {
+    setRetrying(true)
+    try {
+      await client.refetchQueries({
+        queryKey: ['fort'],
+        predicate: (q) =>
+          q.state.status === 'error' && failing.some((f) => f.what === String(q.queryKey[1])),
+      })
+    } finally {
+      setRetrying(false)
+    }
+  }
+  return (
+    <Alert variant="destructive">
+      <DatabaseZapIcon className="size-4" />
+      <AlertTitle>
+        Could not read {what.length > 3 ? `${what.length} parts of the fortress` : listWords(what)}
+      </AlertTitle>
+      <AlertDescription>
+        <p>
+          The read failed with “{shown}”.
+          {oldest !== null
+            ? ` What you see is the last good read, from ${formatDistanceToNow(oldest, { addSuffix: true })}.`
+            : ' What has not been read yet stays empty until it works.'}{' '}
+          The app tries again every few seconds, or you can try now.
+        </p>
+        <Button size="sm" variant="outline" className="mt-2" disabled={retrying} onClick={retry}>
+          {retrying ? 'Trying…' : 'Try again now'}
+        </Button>
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function listWords(words: string[]): string {
+  return words.length <= 1
+    ? words.join('')
+    : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`
+}
+
+/** A dump written by a game script older or newer than this app. */
+function VersionNotice() {
+  const version = useLastDumpState()?.dumpVersion ?? null
+  if (version === null || version === DUMP_VERSION) return null
+  return (
+    <Alert>
+      <PlugZapIcon className="size-4" />
+      <AlertTitle>
+        {version < DUMP_VERSION
+          ? 'The game was read by an older script'
+          : 'The game was read by a newer script'}
+      </AlertTitle>
+      <AlertDescription>
+        {version < DUMP_VERSION ? (
+          <>
+            The last read came from version {version} of the game script, and this app reads version{' '}
+            {DUMP_VERSION}, so some pages show less than they could. Restart the worker (
+            <code className="rounded bg-muted px-1 py-0.5 text-xs">bun run dev:worker</code>) so it
+            installs the new script, then read the game again.
+          </>
+        ) : (
+          <>
+            The last read came from version {version} of the game script, newer than the version{' '}
+            {DUMP_VERSION} this app reads. Restart the web app so it picks up the new code.
+          </>
+        )}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function GameStatus({ state }: { state: FortState | null | undefined }) {
   if (!state) {
     return (
       <Alert>
@@ -103,9 +240,41 @@ export function StatusBanner({ state }: { state: FortState | null | undefined })
       <AlertTitle>Dwarf Fortress is not reachable</AlertTitle>
       <AlertDescription>
         The worker could not talk to DFHack (checked {since})
-        {state.error ? `: ${state.error}` : '.'} Everything below is the last dump that was taken.
+        {state.error ? `: ${state.error.replace(/[.!]?\s*$/, '.')}` : '.'} Everything below is the
+        last dump that was taken.
       </AlertDescription>
     </Alert>
+  )
+}
+
+/**
+ * A part of a page that fails to render says so in its place while the rest
+ * of the page stays, and tries again when the next dump lands.
+ */
+export function SectionBoundary({ name, children }: { name: string; children: React.ReactNode }) {
+  const dumpAt = useLastDumpState()?.dumpCapturedAt ?? ''
+  return (
+    <CatchBoundary
+      getResetKey={() => dumpAt}
+      errorComponent={({ error, reset }) => (
+        <Alert>
+          <TriangleAlertIcon className="size-4" />
+          <AlertTitle>{name} could not be shown</AlertTitle>
+          <AlertDescription>
+            <p>
+              Something in the last read did not fit what this part of the page expects: “
+              {error.message}”. The rest of the page is unaffected, and this part tries again when
+              the next dump lands.
+            </p>
+            <Button size="sm" variant="outline" className="mt-2" onClick={reset}>
+              Try again now
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+    >
+      {children}
+    </CatchBoundary>
   )
 }
 
@@ -163,6 +332,30 @@ export function UnitConditionBadges({ unit }: { unit: FortUnit }) {
       {unit.flags.includes('insane') && living ? <Badge variant="destructive">Insane</Badge> : null}
       {unit.flags.includes('ghost') ? <Badge variant="outline">Ghost</Badge> : null}
     </div>
+  )
+}
+
+/** Pins a creature to the watch list, or takes them off it. */
+export function WatchButton({ unit, size = 'sm' }: { unit: FortUnit; size?: 'sm' | 'icon' }) {
+  const { ids, toggle, fortKey } = useWatchList()
+  if (!fortKey) return null
+  const watching = ids.has(unit.id)
+  const label = watching
+    ? `Stop watching ${firstName(unit)}`
+    : `Watch ${firstName(unit)}: changes to them come first in alerts and in what changed since your last look`
+  return (
+    <Button
+      size={size}
+      variant={watching ? 'secondary' : 'outline'}
+      className={size === 'sm' ? 'gap-1.5' : undefined}
+      aria-pressed={watching}
+      aria-label={label}
+      title={label}
+      onClick={() => toggle(unit.id)}
+    >
+      <EyeIcon className={cn('size-3.5', watching && 'text-primary')} />
+      {size === 'sm' ? (watching ? 'Watching' : 'Watch') : null}
+    </Button>
   )
 }
 

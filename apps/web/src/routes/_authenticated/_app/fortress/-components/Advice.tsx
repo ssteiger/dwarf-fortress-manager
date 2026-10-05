@@ -1,4 +1,4 @@
-import type { FortUnit } from '@fortress/db-drizzle'
+import type { DfhackAction, FortUnit } from '@fortress/db-drizzle'
 import { Badge, Button, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import {
@@ -31,7 +31,7 @@ import {
 import { skillRank } from '~/lib/fortress/format'
 import { adviceGuide, jobGroupGuide, situationGuide, workshopGuide } from '~/lib/fortress/guides'
 import { firstName } from '~/lib/fortress/insights'
-import { useOpenGuide } from './Guide'
+import { OneClickMark, useActionsToOffer, useOpenGuide } from './Guide'
 import { UnitChips } from './Insights'
 
 export const AREA_ICON: Record<AdviceArea, typeof ShieldIcon> = {
@@ -78,7 +78,8 @@ export function StatusIcon({ status, className }: { status: AdviceStatus; classN
   )
 }
 
-function OneClickHint({ count }: { count: number }) {
+function OneClickHint({ actions }: { actions?: readonly DfhackAction[] }) {
+  const count = useActionsToOffer(actions).length
   if (!count) return null
   return (
     <span className="inline-flex items-center gap-1 text-xs text-primary">
@@ -129,7 +130,7 @@ export function AdviceCard({ advice }: { advice: Advice }) {
               {advice.status === 'good' ? 'How to keep it so' : 'How to fix it'}
               {advice.steps.length ? ` · ${advice.steps.length} steps` : ''}
             </span>
-            <OneClickHint count={advice.actions?.length ?? 0} />
+            <OneClickHint actions={advice.actions} />
           </span>
         </span>
         <ChevronRightIcon className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
@@ -259,7 +260,7 @@ function SituationRow({ situation }: { situation: Situation }) {
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className={cn(active ? 'font-medium' : 'text-sm')}>{situation.title}</span>
-            {situation.actions?.length ? <ZapIcon className="size-3.5 text-primary" /> : null}
+            <OneClickMark actions={situation.actions} />
           </span>
           {active ? (
             <span className="mt-0.5 block text-sm text-muted-foreground">{situation.now}</span>

@@ -13,6 +13,7 @@ export type AppPath =
   | '/fortress'
   | '/fortress/dwarves-and-creatures'
   | '/fortress/dwarves'
+  | '/fortress/dead'
   | '/fortress/items'
   | '/fortress/work'
   | '/fortress/map'
@@ -59,6 +60,12 @@ export const PAGES: PageEntry[] = [
     title: 'Dwarves and creatures',
     detail: 'Every citizen, animal, visitor and hostile on the map',
     keywords: 'units grid table roster everyone animals pets visitors hostiles residents dead',
+  },
+  {
+    to: '/fortress/dead',
+    title: 'The dead',
+    detail: 'Who died, how, and who still walks as a ghost',
+    keywords: 'dead deaths killed graves tomb coffin burial ghosts memorial slab departed left',
   },
   {
     to: '/fortress/items',

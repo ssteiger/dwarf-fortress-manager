@@ -1,4 +1,5 @@
 import {
+  DUMP_VERSION,
   type DumpProgressState,
   type DumpStep,
   type FortDumpPayload,
@@ -9,6 +10,7 @@ import { installSnapshotScript, takeDump } from './dfhack/dump'
 import { installNicknameScript } from './dfhack/nickname'
 import { installUnitActionScript } from './dfhack/unit-action'
 import { processPendingCommands, recoverInterruptedCommands } from './fortress/commands'
+import { recordSnapshot } from './fortress/history'
 import {
   type DumpSchedule,
   answerDumpRequests,
@@ -18,6 +20,7 @@ import {
   setDumpProgress,
 } from './fortress/schedule'
 import { readStatus, storeLiveDump, storeMap, storeStatus } from './fortress/store'
+import { historyCursor, recordHistory } from './fortress/worldHistory'
 import { scanAndImportLegends } from './legends/import'
 import { logger } from './utils/logger'
 
@@ -46,6 +49,7 @@ let lastStatus: string | null = null
 let lastSchedule: string | null = null
 let scheduleUnreadable = false
 let progressUnwritable = false
+let warnedVersion: number | null = null
 
 function describeError(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -141,12 +145,25 @@ async function pollOnce(): Promise<void> {
 
   try {
     await reach('game')
-    const outcome = await takeDump(config, { withMap: mapDue, onStep: reach })
+    const history = await historyCursor().catch(() => null)
+    const outcome = await takeDump(config, { withMap: mapDue, history, onStep: reach })
 
     if (outcome.kind === 'live') {
       await reach('store')
       const { payload } = outcome
+      if (payload.dump_version !== DUMP_VERSION && payload.dump_version !== warnedVersion) {
+        warnedVersion = payload.dump_version
+        const text = `Fortress worker: the game script in dfhack-config wrote dump version ${payload.dump_version}, and this worker reads version ${DUMP_VERSION}. Restart the worker so it installs the matching script.`
+        console.warn(text)
+        await logger.warn(text).catch(() => {})
+      }
       const { newEvents } = await storeLiveDump(payload, outcome.elapsedMs)
+      await recordSnapshot(payload).catch((err) => {
+        console.error('Could not record the day’s snapshot:', describeError(err))
+      })
+      await recordHistory(payload).catch((err) => {
+        console.error('Could not record history events:', describeError(err))
+      })
       if (payload.map) {
         await storeMap(payload)
         lastMapAt = Date.now()

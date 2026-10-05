@@ -5,6 +5,7 @@
 -- DFHack remote console:
 --
 --   lua --file dfhack-config/fortress-snapshot.lua <out_path> <with_map:0|1>
+--       [<history_from_id> <history_key>]
 --
 -- Prints exactly one status line:
 --   OK <bytes> <elapsed_ms>     dump written to <out_path>
@@ -19,7 +20,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 11
+local DUMP_VERSION = 12
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -1779,6 +1780,463 @@ local function collect_figures()
 end
 
 -- ---------------------------------------------------------------------------
+-- The dead: the fortress's own people who died, on the map or long gone
+-- ---------------------------------------------------------------------------
+
+local DEAD_COLUMNS = arr{
+    'id', 'hf', 'name', 'name_english', 'nickname', 'race', 'sex', 'profession',
+    'born_year', 'died_year', 'died_tick', 'cause', 'slayer', 'slayer_race',
+    'ghost', 'body', 'memorial', 'kills',
+}
+
+-- A member of the fortress's own group, now or before they died.
+local function member_of(hf, entity_id)
+    local MEMBER = df.histfig_entity_link_type.MEMBER
+    local FORMER = df.histfig_entity_link_type.FORMER_MEMBER
+    for _, link in ipairs(hf.entity_links) do
+        if link.entity_id == entity_id then
+            local kind = try(function() return link:getType() end)
+            if kind == MEMBER or kind == FORMER then return true end
+        end
+    end
+    return false
+end
+
+-- Unit id -> 'buried' when any of their remains lie in a coffin, else 'unburied'.
+local function remains_by_unit()
+    local states = {}
+    for _, kind in ipairs({'CORPSE', 'CORPSEPIECE'}) do
+        local list = try(function() return df.global.world.items.other[kind] end) or {}
+        for _, it in ipairs(list) do
+            local uid = try(function() return it.unit_id end)
+            if uid and uid >= 0 and states[uid] ~= 'buried' then
+                local holder = try(dfhack.items.getHolderBuilding, it)
+                local coffin = holder and try(function() return holder:getType() == df.building_type.Coffin end)
+                states[uid] = coffin and 'buried' or 'unburied'
+            end
+        end
+    end
+    return states
+end
+
+-- Historical figure id -> true for every memorial slab engraved for them.
+local function memorials()
+    local slabs = {}
+    local list = try(function() return df.global.world.items.other.SLAB end) or {}
+    local MEMORIAL = try(function() return df.slab_engraving_type.Memorial end)
+    for _, it in ipairs(list) do
+        local topic = try(function() return it.topic end)
+        if topic and topic >= 0 and try(function() return it.engraving_type end) == MEMORIAL then
+            slabs[topic] = true
+        end
+    end
+    return slabs
+end
+
+local function death_incident(u)
+    local id = try(function() return u.counters.death_id end)
+    if not id or id < 0 then return nil end
+    return try(df.incident.find, id)
+end
+
+local function dead_row(u, hf, remains, slabs)
+    local visible = dfhack.units.getVisibleName(u)
+    local craw = df.creature_raw.find(u.race)
+    local incident = death_incident(u)
+    local cause = incident and (try(function() return incident.death_cause end)
+        or try(function() return incident.data.Death.death_cause end))
+    local slayer, slayer_race = nil, nil
+    local killer_id = incident and try(function() return incident.criminal end)
+    local killer = killer_id and killer_id >= 0 and df.unit.find(killer_id) or nil
+    if killer then
+        slayer = nonempty(dfhack.units.getReadableName(killer))
+        local kraw = df.creature_raw.find(killer.race)
+        slayer_race = kraw and kraw.name[0] or nil
+    end
+    return row(
+        u.id,
+        hf.id,
+        translate(visible, false),
+        translate(visible, true),
+        nonempty(try(function() return visible.nickname end)),
+        craw and craw.name[0] or nil,
+        u.sex,
+        try(dfhack.units.getProfessionName, u),
+        hf.born_year,
+        hf.died_year,
+        hf.died_seconds,
+        cause and cause >= 0 and enum_name(df.death_type, cause) or nil,
+        slayer,
+        slayer_race,
+        try(function() return u.flags3.ghostly end) == true,
+        remains[u.id] or 'none',
+        slabs[hf.id] == true,
+        try(dfhack.units.getKillCount, u)
+    )
+end
+
+local function collect_dead()
+    local rows = {}
+    local group_id = df.global.plotinfo.group_id
+    local remains, slabs = nil, nil
+    for _, u in ipairs(df.global.world.units.all) do
+        if u.hist_figure_id >= 0 and try(dfhack.units.isDead, u) then
+            local hf = df.historical_figure.find(u.hist_figure_id)
+            if hf and member_of(hf, group_id) then
+                remains = remains or (try(remains_by_unit) or {})
+                slabs = slabs or (try(memorials) or {})
+                local ok, r = pcall(dead_row, u, hf, remains, slabs)
+                if ok then rows[#rows + 1] = r end
+            end
+        end
+    end
+    table.sort(rows, function(a, b)
+        if a[10] ~= b[10] then return (a[10] or 0) > (b[10] or 0) end
+        return (a[11] or 0) > (b[11] or 0)
+    end)
+    return rows
+end
+
+-- ---------------------------------------------------------------------------
+-- History: the world's history events since the last dump that happened at
+-- the site or name one of its people. The worker passes the last event id it
+-- has seen for this fortress, so each dump only walks the new events.
+-- ---------------------------------------------------------------------------
+
+local history_from = tonumber(args[3] or '') or -1
+local history_key = args[4]
+
+-- Events walked per dump, so a first read of a long fortress spreads out.
+local HISTORY_SCAN_MAX = 20000
+
+local HISTORY_TYPES = {
+    HIST_FIGURE_DIED = true, HF_WOUNDED = true, HF_REVIVED = true,
+    ADD_HF_HF_LINK = true, REMOVE_HF_HF_LINK = true,
+    ADD_HF_ENTITY_LINK = true, REMOVE_HF_ENTITY_LINK = true,
+    CHANGE_HF_JOB = true, CHANGE_HF_STATE = true,
+    MASTERPIECE_CREATED_ITEM = true, MASTERPIECE_CREATED_ARCH_CONSTRUCT = true,
+    MASTERPIECE_CREATED_ENGRAVING = true, MASTERPIECE_CREATED_FOOD = true,
+    MASTERPIECE_CREATED_DYE_ITEM = true, MASTERPIECE_CREATED_ITEM_IMPROVEMENT = true,
+    ARTIFACT_CREATED = true, WRITTEN_CONTENT_COMPOSED = true,
+    CREATURE_DEVOURED = true, ITEM_STOLEN = true, HF_DOES_INTERACTION = true,
+    CREATED_BUILDING = true,
+}
+
+-- Fields holding an enum, by name; HF_HF links call theirs `type`.
+local function history_enum(kind, key)
+    if key == 'death_cause' then return df.death_type end
+    if key == 'new_job' or key == 'old_job' then return df.profession end
+    if key == 'skill_at_time' then return df.skill_rating end
+    if key == 'item_type' then return df.item_type end
+    if key == 'link_type' then return df.histfig_entity_link_type end
+    if key == 'type' and (kind == 'ADD_HF_HF_LINK' or kind == 'REMOVE_HF_HF_LINK') then
+        return df.histfig_hf_link_type
+    end
+    if key == 'state' then return try(function() return df.whereabouts_type end) end
+    return nil
+end
+
+local HF_FIELD_WORDS = {
+    maker = true, doer = true, target = true, eater = true, victim = true,
+    woundee = true, wounder = true, snatcher = true, builder = true, creator = true,
+    slayer = true, appointer = true, actor = true,
+}
+
+-- A field that names a historical figure: victim_hf, hf_target, maker, ...
+local function is_hf_field(key)
+    if key:find('race') or key:find('caste') or key:find('entity') or key:find('civ')
+        or key:find('site') or key:find('unit') or key:find('item') or key:find('artifact') then
+        return false
+    end
+    if key:find('hf') or key:find('histfig') or key:find('hist_fig') then return true end
+    return HF_FIELD_WORDS[key:gsub('_.*$', '')] == true
+end
+
+local function event_fields(ev, kind)
+    local fields, hfs = {}, {}
+    for key, value in pairs(ev) do
+        local t = type(value)
+        if t == 'number' or t == 'boolean' or t == 'string' then
+            key = tostring(key)
+            local enum = t == 'number' and history_enum(kind, key)
+            if enum then
+                fields[key] = value >= 0 and enum_name(enum, value) or NULL
+            elseif t ~= 'number' or value >= 0 then
+                fields[key] = value
+            end
+            if t == 'number' and value >= 0 and is_hf_field(key) then hfs[#hfs + 1] = value end
+        end
+    end
+    return fields, hfs
+end
+
+local function history_people(group_id, dead_rows)
+    local ours = {}
+    local group = df.historical_entity.find(group_id)
+    if group then
+        for _, id in ipairs(group.histfig_ids) do ours[id] = true end
+    end
+    for _, u in ipairs(df.global.world.units.active) do
+        if u.hist_figure_id >= 0 and try(dfhack.units.isCitizen, u, true) then
+            ours[u.hist_figure_id] = true
+        end
+    end
+    for _, r in ipairs(dead_rows) do
+        if type(r[2]) == 'number' and r[2] >= 0 then ours[r[2]] = true end
+    end
+    return ours
+end
+
+-- First index whose event comes after `id`, or whose year is `year` or later.
+local function first_event_after(events, pred)
+    local lo, hi = 0, #events
+    while lo < hi do
+        local mid = (lo + hi) // 2
+        if pred(events[mid]) then hi = mid else lo = mid + 1 end
+    end
+    return lo
+end
+
+local function position_title(entity_id, position_id, hf)
+    local ent = df.historical_entity.find(entity_id)
+    if not ent then return nil end
+    for _, p in ipairs(ent.positions.own) do
+        if p.id == position_id then
+            return (hf and hf.sex == 0 and nonempty(p.name_female[0]))
+                or (hf and hf.sex == 1 and nonempty(p.name_male[0]))
+                or nonempty(p.name[0]) or p.code:lower():gsub('_', ' ')
+        end
+    end
+    return nil
+end
+
+-- Names the sentences need: figures, artifacts, books, items, offices.
+local function event_extra(fields, hfs, figures)
+    local extra = {}
+    for _, id in ipairs(hfs) do
+        if not figures[tostring(id)] then
+            local hf = hf_find(id)
+            if hf then
+                figures[tostring(id)] = arr{
+                    nonempty(translate(hf.name, false)),
+                    nonempty(translate(hf.name, true)),
+                    race_label(hf.race),
+                    nonneg(hf.unit_id),
+                    hf.sex,
+                }
+            end
+        end
+    end
+    local artifact_id = fields.artifact_id or fields.artifact
+    if type(artifact_id) == 'number' then
+        local a = df.artifact_record.find(artifact_id)
+        if a then
+            extra.artifact = nonempty(translate(a.name, true))
+            extra.artifact_native = nonempty(translate(a.name, false))
+        end
+    end
+    if type(fields.content) == 'number' then
+        local wc = try(df.written_content.find, fields.content)
+        if wc then extra.title = nonempty(wc.title) end
+    end
+    local item_id = fields.item_id or fields.item
+    if type(item_id) == 'number' then
+        local it = df.item.find(item_id)
+        if it then extra.item = nonempty(try(dfhack.items.getReadableDescription, it)) end
+    end
+    local entity_id = fields.entity_id or fields.civ or fields.entity
+    if type(entity_id) == 'number' then
+        local ent = df.historical_entity.find(entity_id)
+        if ent then extra.entity = nonempty(translate(ent.name, true)) end
+        if type(fields.position_id) == 'number' then
+            local hf = hf_find(fields.histfig or fields.hfid)
+            extra.position = try(position_title, entity_id, fields.position_id, hf)
+        end
+    end
+    local race = fields.slayer_race or fields.race
+    if type(race) == 'number' then extra.race = race_label(race) end
+    return extra
+end
+
+-- ---------------------------------------------------------------------------
+-- Automation: which DFHack plugins are on, from the listing `enable` prints,
+-- and what the ones with a read-only status command say about themselves.
+-- ---------------------------------------------------------------------------
+
+local function collect_automation()
+    local AUTOMATION_STATUS = {
+        autobutcher = {'autobutcher', 'list'},
+        autofarm = {'autofarm', 'status'},
+        seedwatch = {'seedwatch', 'status'},
+        tailor = {'tailor', 'status'},
+    }
+    local enabled = {}
+    local listing = try(dfhack.run_command_silent, 'enable') or ''
+    for line in listing:gmatch('[^\n]+') do
+        local name, state = line:match('^%s*(%S+):%s+(%S+)')
+        if name and (state == 'on' or state == 'off') then enabled[name] = state == 'on' end
+    end
+    local status = {}
+    for name, command in pairs(AUTOMATION_STATUS) do
+        if enabled[name] then
+            local text = try(dfhack.run_command_silent, table.unpack(command))
+            if text and text:find('%S') then status[name] = text:sub(1, 4000) end
+        end
+    end
+    return {enabled = enabled, status = status}
+end
+
+-- ---------------------------------------------------------------------------
+-- Health: what each citizen waits for from the doctors (unit.health), who has
+-- a medical labor on, and what each hospital zone keeps against its limits.
+-- ---------------------------------------------------------------------------
+
+local function collect_health()
+    local MEDICAL_LABORS = {
+        'DIAGNOSE', 'SURGERY', 'BONE_SETTING', 'SUTURING', 'DRESSING_WOUNDS',
+        'RECOVER_WOUNDED', 'FEED_WATER_CIVILIANS',
+    }
+    -- The location's need_more bits; thread, cloth, powder and soap are counted
+    -- in the game's own units rather than items, so only these are counted.
+    local HOSPITAL_SUPPLIES = {'splints', 'thread', 'cloth', 'crutches', 'powder', 'buckets', 'soap'}
+    local COUNTED_SUPPLIES = {'splints', 'crutches', 'buckets'}
+
+    local function set_bits(bits)
+        local out = arr{}
+        for name, on in pairs(bits) do
+            if on == true and type(name) == 'string' and not name:find('^unk') then
+                out[#out + 1] = name
+            end
+        end
+        table.sort(out)
+        return out
+    end
+
+    local function patient_row(u)
+        local h = u.health
+        if not h then return nil end
+        local needs = try(set_bits, h.flags) or arr{}
+        local parts = arr{}
+        local bps = try(function() return u.body.body_plan.body_parts end)
+        local per_part = try(function() return h.body_part_flags end)
+        if per_part then
+            for i, bits in ipairs(per_part) do
+                local list = try(set_bits, bits)
+                if list and #list > 0 then
+                    parts[#parts + 1] = {
+                        part = try(function() return bps[i].name_singular[0].value end),
+                        needs = list,
+                    }
+                end
+            end
+        end
+        if #needs == 0 and #parts == 0 then return nil end
+        return {unit = u.id, needs = needs, parts = parts}
+    end
+
+    local site = try(function() return df.world_site.find(df.global.plotinfo.site_id) end)
+
+    local function hospital_row(z)
+        local location = nil
+        if site and z.location_id >= 0 then
+            for _, ab in ipairs(site.buildings) do
+                if ab.id == z.location_id then location = ab break end
+            end
+        end
+        local c = location and try(function() return location.contents end)
+        if not c then return {id = z.id} end
+        local have, max = {}, {}
+        for _, name in ipairs(COUNTED_SUPPLIES) do
+            have[name] = try(function() return c['count_' .. name] end)
+            max[name] = try(function() return c['desired_' .. name] end)
+        end
+        local short = arr{}
+        for _, name in ipairs(HOSPITAL_SUPPLIES) do
+            if try(function() return c.need_more[name] end) then short[#short + 1] = name end
+        end
+        return {id = z.id, have = have, max = max, short = short}
+    end
+
+    local patients, doctors, hospitals = arr{}, arr{}, arr{}
+    for _, u in ipairs(df.global.world.units.active) do
+        if try(dfhack.units.isCitizen, u, true) and not try(dfhack.units.isDead, u) then
+            local p = try(patient_row, u)
+            if p then patients[#patients + 1] = p end
+            local labors = arr{}
+            for _, token in ipairs(MEDICAL_LABORS) do
+                local id = df.unit_labor[token]
+                if id and try(function() return u.status.labors[id] end) then
+                    labors[#labors + 1] = token
+                end
+            end
+            if #labors > 0 then doctors[#doctors + 1] = {unit = u.id, labors = labors} end
+        end
+    end
+    local zones = try(function() return df.global.world.buildings.other.ANY_ZONE end) or {}
+    for _, z in ipairs(zones) do
+        if try(function() return z.type == df.civzone_type.Hospital end) then
+            hospitals[#hospitals + 1] = try(hospital_row, z) or {id = z.id}
+        end
+    end
+    return {patients = patients, doctors = doctors, hospitals = hospitals}
+end
+
+local HISTORY_COLUMNS = arr{'id', 'type', 'year', 'tick', 'here', 'hfs', 'fields', 'extra'}
+
+local function collect_history(world, dead_rows)
+    local events = df.global.world.history.events
+    local count = #events
+    local last_id = count > 0 and events[count - 1].id or -1
+    local key = (world.save_dir or '') .. ':' .. tostring(world.site_id)
+    local from = history_key == key and history_from or -1
+    if from > last_id then from = -1 end
+
+    local start
+    if from >= 0 then
+        start = first_event_after(events, function(ev) return ev.id > from end)
+    else
+        local site = df.world_site.find(world.site_id)
+        local founded = site and try(function() return site.created_year end)
+        if not founded or founded < 0 then founded = world.year - 1 end
+        start = first_event_after(events, function(ev) return ev.year >= founded end)
+    end
+
+    local ours = history_people(world.group_id, dead_rows)
+    local rows, figures = {}, {}
+    local stop = math.min(count, start + HISTORY_SCAN_MAX)
+    local scanned = from
+    for i = start, stop - 1 do
+        local ev = events[i]
+        scanned = ev.id
+        local kind = enum_name(df.history_event_type, ev:getType())
+        if kind and HISTORY_TYPES[kind] then
+            local ok, fields, hfs = pcall(event_fields, ev, kind)
+            if ok then
+                local here = fields.site == world.site_id or fields.site_id == world.site_id
+                local named = false
+                for _, id in ipairs(hfs) do
+                    if ours[id] then named = true; break end
+                end
+                if here or named then
+                    local extra = try(event_extra, fields, hfs, figures) or {}
+                    rows[#rows + 1] = row(ev.id, kind, ev.year, ev.seconds, here, arr(hfs), fields, extra)
+                end
+            end
+        end
+    end
+    local done = stop >= count
+    return {
+        key = key,
+        from = from,
+        scanned = done and last_id or scanned,
+        last_id = last_id,
+        done = done,
+        events = {columns = HISTORY_COLUMNS, rows = arr(rows)},
+        figures = figures,
+    }
+end
+
+-- ---------------------------------------------------------------------------
 -- Buildings
 -- ---------------------------------------------------------------------------
 
@@ -3048,6 +3506,8 @@ local function run()
             fort_hfs[u.hist_figure_id] = true
         end
     end
+    local dead_rows = try(collect_dead) or {}
+    local history = try(collect_history, world, dead_rows)
 
     progress('items')
     local artifact_rows = try(collect_artifacts, fort_hfs) or {}
@@ -3083,6 +3543,8 @@ local function run()
 
     progress('diplomacy')
     local diplomacy = try(collect_diplomacy)
+    local automation = try(collect_automation)
+    local health = try(collect_health)
 
     progress('writing')
     local tmp_path = out_path .. '.tmp'
@@ -3098,8 +3560,12 @@ local function run()
     f:write(',"squads":'); write_table(f, SQUAD_COLUMNS, squad_rows)
     f:write(',"artifacts":'); write_table(f, ARTIFACT_COLUMNS, artifact_rows)
     f:write(',"figures":'); write_table(f, FIGURE_COLUMNS, figure_rows)
+    f:write(',"dead":'); write_table(f, DEAD_COLUMNS, dead_rows)
+    f:write(',"history":' .. jval(history))
     f:write(',"announcements":'); write_table(f, ANNOUNCEMENT_COLUMNS, announcement_rows)
     f:write(',"diplomacy":' .. jval(diplomacy))
+    f:write(',"automation":' .. jval(automation))
+    f:write(',"health":' .. jval(health))
     if with_map then
         progress('map')
         f:write(',"map":'); write_map(f)

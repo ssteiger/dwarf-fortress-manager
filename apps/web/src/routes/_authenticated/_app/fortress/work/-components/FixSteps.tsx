@@ -17,7 +17,6 @@ import * as React from 'react'
 
 import { ConsoleCommandCard } from '~/lib/assistant/ConsoleCommandCard'
 import type { FixNote, FixStep } from '~/lib/fortress/fixes'
-import { FORT_SLOW_REFRESH_MS } from '~/lib/fortress/queries'
 import { getFortFixes } from '~/lib/fortress/server'
 
 /** Opens the work orders that make what the stuck jobs lack, one step at a time. */
@@ -58,7 +57,6 @@ function FixPlan() {
   const { data, isLoading } = useQuery({
     queryKey: ['fort', 'fixes'],
     queryFn: () => getFortFixes(),
-    refetchInterval: FORT_SLOW_REFRESH_MS,
   })
   if (isLoading || !data) {
     return (

@@ -5,10 +5,12 @@
 	"type": "module",
 	"exports": {
 		".": "./src/index.ts",
-		"./fortress-types": "./src/fortress-types.ts"
+		"./fortress-types": "./src/fortress-types.ts",
+		"./snapshots": "./src/snapshots.ts"
 	},
 	"scripts": {
-		"introspect": "npx drizzle-kit introspect:pg"
+		"introspect": "npx drizzle-kit introspect:pg",
+		"test": "bun test"
 	},
 	"dependencies": {
 		"@sinclair/typebox": "^0.34.9",

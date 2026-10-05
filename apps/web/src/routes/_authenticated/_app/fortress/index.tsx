@@ -1,14 +1,17 @@
-import type { FortEvent, FortSummary } from '@fortress/db-drizzle'
+import type { FortEvent, FortSummary, FortUnit } from '@fortress/db-drizzle'
 import { STRESS_LABELS } from '@fortress/db-drizzle/fortress-types'
-import { Card, CardContent, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { Button, Card, CardContent, CardHeader, CardTitle, cn } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
 import {
+  ArrowRightIcon,
   BeerIcon,
   CoinsIcon,
+  EyeIcon,
   HeartIcon,
   HistoryIcon,
+  PanelRightIcon,
   ScrollTextIcon,
   ShieldAlertIcon,
   SwordsIcon,
@@ -20,6 +23,7 @@ import * as React from 'react'
 import { fortAdvice, situations } from '~/lib/fortress/advisor'
 import {
   STRESS_BAR_COLORS,
+  formatGameTick,
   formatNumber,
   formatValue,
   isLiving,
@@ -30,9 +34,9 @@ import {
   type Feeling,
   type Notice,
   STORY_KINDS,
-  type StoryKind,
   absTicks,
   activityBoard,
+  concernScore,
   firstName,
   fortFeelings,
   fortNotices,
@@ -40,26 +44,33 @@ import {
   gameTimeOf,
   makeNameLinker,
   storyKind,
+  unitConcerns,
 } from '~/lib/fortress/insights'
 import { useLastSeen } from '~/lib/fortress/lastSeen'
+import { LIFE_TONE_DOT } from '~/lib/fortress/lifeEvents'
 import {
-  FORT_SLOW_REFRESH_MS,
   useFortConcerns,
   useFortOverview,
+  useFortRecap,
   useFortSupplies,
   useFortUnits,
 } from '~/lib/fortress/queries'
+import { buildRecap, lead, ownGroupsOf, seasonAt, seasonIndex } from '~/lib/fortress/recap'
 import { getFortWork } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatusBanner } from './-components/FortChrome'
+import { useWatchList } from '~/lib/fortress/watch'
+import { watchNews } from '~/lib/fortress/watchChanges'
+import { EmptyState, PageHeader, SectionBoundary, StatusBanner } from './-components/FortChrome'
 import { GuideProvider, useOpenGuide } from './-components/Guide'
 import {
   ActivityBoard,
   AlertsMenu,
+  AnnouncementText,
   FeelingsPanel,
   NoticeList,
   StoryFeed,
-  StoryIcon,
 } from './-components/Insights'
+import { TrendsCard } from './-components/Trends'
+import { HelpStrip } from './dwarves/-components/PeoplePanels'
 
 const KEY_STOCKS = [
   'drink',
@@ -96,7 +107,6 @@ function OverviewBody() {
   const work = useQuery({
     queryKey: ['fort', 'work'],
     queryFn: () => getFortWork(),
-    refetchInterval: FORT_SLOW_REFRESH_MS,
   })
   const openGuide = useOpenGuide()
   const state = data?.state ?? null
@@ -152,6 +162,17 @@ function OverviewBody() {
 
   const hostiles = units.filter((u) => isLiving(u) && unitGroup(u) === 'hostile')
   const unseen = hostiles.filter((u) => u.flags.includes('hidden')).length
+  const dangers = notices.filter((n) => n.severity === 'danger')
+  const ownGroups = React.useMemo(() => ownGroupsOf(world), [world])
+  const struggling = React.useMemo(
+    () =>
+      units
+        .filter((u) => isLiving(u) && unitGroup(u) === 'citizen')
+        .map((unit) => ({ unit, concerns: unitConcerns(unit, now) }))
+        .filter((entry) => entry.concerns.length > 0)
+        .sort((a, b) => concernScore(b.concerns) - concernScore(a.concerns)),
+    [units, now],
+  )
 
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
@@ -172,20 +193,41 @@ function OverviewBody() {
         updatedAt={state?.captured_at ?? dataUpdatedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
-        actions={<AlertsMenu />}
+        actions={
+          <>
+            <GlanceButton />
+            <AlertsMenu />
+          </>
+        }
       />
 
       <StatusBanner state={state} />
 
       {summary ? (
         <>
+          {dangers.length ? (
+            <SectionBoundary name="What is dangerous right now">
+              <DangerStrip notices={dangers} onGuide={guideNotice} />
+            </SectionBoundary>
+          ) : null}
+
           {lastSeen ? (
-            <SinceLastLook
-              lastSeen={lastSeen}
-              events={events}
-              now={now}
-              fortName={state?.fort_name ?? 'the fortress'}
-            />
+            <SectionBoundary name="What changed since your last look">
+              <SinceLastLook
+                lastSeen={lastSeen}
+                events={events}
+                now={now}
+                fortName={state?.fort_name ?? 'the fortress'}
+                units={units}
+                ownGroups={ownGroups}
+              />
+            </SectionBoundary>
+          ) : null}
+
+          {struggling.length ? (
+            <SectionBoundary name="Who is struggling">
+              <HelpStrip entries={struggling} />
+            </SectionBoundary>
           ) : null}
 
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-4">
@@ -250,7 +292,18 @@ function OverviewBody() {
                   </p>
                 </CardHeader>
                 <CardContent>
-                  <NoticeList notices={notices} onGuide={guideNotice} />
+                  <SectionBoundary name="The list of problems">
+                    {dangers.length && dangers.length === notices.length ? (
+                      <p className="text-sm text-muted-foreground">
+                        Nothing else needs you right now.
+                      </p>
+                    ) : (
+                      <NoticeList
+                        notices={notices.filter((n) => n.severity !== 'danger')}
+                        onGuide={guideNotice}
+                      />
+                    )}
+                  </SectionBoundary>
                 </CardContent>
               </Card>
 
@@ -265,17 +318,21 @@ function OverviewBody() {
                   </p>
                 </CardHeader>
                 <CardContent>
-                  <FeelingsPanel feelings={feelings} onGuide={guideFeeling} />
+                  <SectionBoundary name="The fortress’s feelings">
+                    <FeelingsPanel feelings={feelings} onGuide={guideFeeling} />
+                  </SectionBoundary>
                 </CardContent>
               </Card>
 
-              <StoryCard
-                events={events}
-                link={link}
-                newAfter={lastSeen?.eventId ?? null}
-                undone={data?.undone ?? 0}
-                present={world ? `${world.day} ${world.month_name} ${world.year}` : null}
-              />
+              <SectionBoundary name="The story so far">
+                <StoryCard
+                  events={events}
+                  link={link}
+                  newAfter={lastSeen?.eventId ?? null}
+                  undone={data?.undone ?? 0}
+                  present={world ? `${world.day} ${world.month_name} ${world.year}` : null}
+                />
+              </SectionBoundary>
             </div>
 
             <div className="flex min-w-0 flex-col gap-4">
@@ -287,8 +344,10 @@ function OverviewBody() {
                   </p>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-5">
-                  <MoodBar counts={summary.mood} />
-                  <ActivityBoard groups={board} />
+                  <SectionBoundary name="What everyone is doing">
+                    <MoodBar counts={summary.mood} />
+                    <ActivityBoard groups={board} />
+                  </SectionBoundary>
                 </CardContent>
               </Card>
 
@@ -299,9 +358,15 @@ function OverviewBody() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Stores summary={summary} population={population} />
+                  <SectionBoundary name="The stores">
+                    <Stores summary={summary} population={population} />
+                  </SectionBoundary>
                 </CardContent>
               </Card>
+
+              <SectionBoundary name="The trends">
+                <TrendsCard />
+              </SectionBoundary>
             </div>
           </div>
         </>
@@ -312,6 +377,63 @@ function OverviewBody() {
         </EmptyState>
       )}
     </div>
+  )
+}
+
+/** What is dangerous right now, a line each, above the story; the guide holds who and how. */
+function DangerStrip({
+  notices,
+  onGuide,
+}: {
+  notices: Notice[]
+  onGuide: (notice: Notice) => void
+}) {
+  return (
+    <section
+      aria-label="Dangerous right now"
+      className="rounded-xl border border-red-500/40 bg-red-500/5 dark:bg-red-500/10"
+    >
+      <ul className="divide-y divide-red-500/20">
+        {notices.map((notice) => (
+          <li key={notice.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5">
+            <ShieldAlertIcon className="size-4 shrink-0 text-red-600 dark:text-red-400" />
+            <span className="min-w-0 flex-1">
+              <span className="font-semibold">{notice.title}</span>
+              {notice.detail ? (
+                <span className="text-sm text-muted-foreground"> · {notice.detail}</span>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              onClick={() => onGuide(notice)}
+              className="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              How to fix it
+              <ArrowRightIcon className="size-3.5" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** Opens the compact view in a narrow window of its own, to keep beside the game. */
+function GlanceButton() {
+  return (
+    <Button
+      size="sm"
+      variant="outline"
+      className="gap-1.5"
+      title="A narrow view for beside the game: what needs you, who is struggling, the dwarves you watch and the chronicle’s last lines."
+      onClick={() => {
+        const opened = window.open('/glance', 'dfm-glance', 'popup,width=440,height=900')
+        if (!opened) window.location.assign('/glance')
+      }}
+    >
+      <PanelRightIcon className="size-3.5" />
+      While playing
+    </Button>
   )
 }
 
@@ -345,58 +467,156 @@ function Reading({
   )
 }
 
-/** What changed since the overview was last open, in wall-clock and in game time. */
+const LEAD_SENTENCES = 4
+const WATCHED_LINES = 6
+
+/** What happened since the overview was last open, told as a story, in wall-clock and in game time. */
 function SinceLastLook({
   lastSeen,
   events,
   now,
   fortName,
+  units,
+  ownGroups,
 }: {
   lastSeen: NonNullable<ReturnType<typeof useLastSeen>>
   events: FortEvent[]
   now: ReturnType<typeof gameTimeOf>
   fortName: string
+  units: FortUnit[]
+  ownGroups: ReadonlySet<number> | undefined
 }) {
+  const source = useFortRecap(
+    lastSeen.game ? { year: lastSeen.game.year, tick: lastSeen.game.tick + 1 } : null,
+  )
+  const { ids: watched } = useWatchList()
+  const recap = React.useMemo(
+    () => (source.data ? buildRecap(source.data, { units, watched, ownGroups }) : null),
+    [source.data, units, watched, ownGroups],
+  )
   const fresh = events.filter((e) => e.id > lastSeen.eventId)
-  const counts = new Map<StoryKind, number>()
-  for (const e of fresh) {
-    const kind = storyKind(e)
-    if (STORY_KINDS[kind].story) counts.set(kind, (counts.get(kind) ?? 0) + 1)
-  }
+  const story = recap ? lead(recap, LEAD_SENTENCES) : []
+  // Without anything for the headline, the other lines speak for themselves.
+  const told = recap?.told.length ? story : story.slice(1)
+  const shifts = recap?.sections.find((s) => s.key === 'fortress')?.lines ?? []
+  const news = watchNews(units, watched, lastSeen.game)
   const passed = now && lastSeen.game ? absTicks(now) - absTicks(lastSeen.game) : null
   const wentBack = passed !== null && passed < 0
-  if (!fresh.length && !wentBack && (passed === null || passed < 1200)) return null
+  if (
+    !fresh.length &&
+    !told.length &&
+    !news.length &&
+    !wentBack &&
+    (passed === null || passed < 1200)
+  )
+    return null
   const when = formatDistanceToNow(lastSeen.at, { addSuffix: true })
   const span =
     passed !== null && passed >= 1200 ? `${gameSpan(passed)} passed in ${fortName}` : null
+  const noteworthy = told.length > 0 || news.length > 0
+  const seasons =
+    now && lastSeen.game ? seasonIndex(seasonAt(now)) - seasonIndex(seasonAt(lastSeen.game)) + 1 : 1
+  const headline = told[0]?.key === 'headline' ? told[0] : null
+  const lines = headline ? told.slice(1) : told
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
-      <HistoryIcon className="size-4 shrink-0 text-primary" />
-      <span>
-        {wentBack ? (
-          <>
-            You last looked {when}. Since then {fortName} has gone back {gameSpan(-(passed ?? 0))}:
-            an earlier save was loaded.
-          </>
-        ) : (
-          <>
-            You last looked {when}. Since then{' '}
-            {span
-              ? `${span}${counts.size ? ':' : ', with nothing of note.'}`
-              : counts.size
-                ? ':'
-                : 'nothing of note happened.'}
-          </>
-        )}
-      </span>
-      {[...counts.entries()].map(([kind, n]) => (
-        <span key={kind} className="inline-flex items-center gap-1.5">
-          <StoryIcon kind={kind} />
-          {n} {STORY_KINDS[kind].noun[n === 1 ? 0 : 1]}
+    <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+      <p className="flex items-start gap-2">
+        <HistoryIcon className="mt-0.5 size-4 shrink-0 text-primary" />
+        <span>
+          {wentBack ? (
+            <>
+              You last looked {when}. Since then {fortName} has gone back {gameSpan(-(passed ?? 0))}
+              : an earlier save was loaded.
+            </>
+          ) : (
+            <>
+              You last looked {when}. Since then{' '}
+              {span
+                ? `${span}${noteworthy ? ':' : ', with nothing of note.'}`
+                : noteworthy
+                  ? 'this happened:'
+                  : 'nothing of note happened.'}
+            </>
+          )}
         </span>
-      ))}
-      {fresh.length ? (
-        <span className="text-muted-foreground">New entries are marked below.</span>
+      </p>
+      {!wentBack && (told.length || news.length || shifts.length) ? (
+        <div className="flex flex-col gap-2 pl-6">
+          {headline ? (
+            <p className="text-base leading-snug font-medium text-pretty">
+              <AnnouncementText parts={headline.parts} />
+            </p>
+          ) : null}
+          {lines.length ? (
+            <ul className="flex flex-col gap-1">
+              {lines.map((line) => (
+                <li key={line.key} className="flex gap-2">
+                  {line.watched ? (
+                    <EyeIcon
+                      className="mt-0.5 size-3.5 shrink-0 text-primary"
+                      aria-label="Watched"
+                    />
+                  ) : (
+                    <span
+                      className={cn(
+                        'mt-1.5 size-1.5 shrink-0 rounded-full',
+                        LIFE_TONE_DOT[line.tone ?? 'neutral'],
+                      )}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <AnnouncementText parts={line.parts} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {news.length ? (
+            <ul className="flex flex-col gap-1" aria-label="The dwarves you watch">
+              {news.slice(0, WATCHED_LINES).map((item) => (
+                <li
+                  key={`${item.unit.id}-${item.year}-${item.tick}-${item.phrase}`}
+                  className="flex gap-2"
+                >
+                  <EyeIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-label="Watched" />
+                  <span className="min-w-0 flex-1">
+                    <AnnouncementText
+                      parts={[
+                        { text: firstName(item.unit), unit: item.unit },
+                        { text: ` ${item.phrase}` },
+                      ]}
+                    />
+                  </span>
+                  <span className="shrink-0 text-muted-foreground tabular-nums">
+                    {formatGameTick(item.year, item.tick)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {shifts.length ? (
+            <p className="text-muted-foreground">
+              {shifts.map((line) => line.parts.map((p) => p.text).join('')).join(' ')}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      {!wentBack && (told.length || fresh.length) ? (
+        <p className="flex flex-wrap gap-x-4 gap-y-1 pl-6">
+          {told.length ? (
+            <Link
+              to="/fortress/chronicle"
+              search={{ view: 'seasons' }}
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              {seasons > 1 ? 'Read it season by season' : 'Read the whole season'}
+            </Link>
+          ) : null}
+          {fresh.length ? (
+            <span className="text-muted-foreground">New entries are marked below.</span>
+          ) : null}
+        </p>
       ) : null}
     </div>
   )

@@ -31,7 +31,6 @@ import { ItemSprite } from '~/lib/df-assets/components'
 import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
 import { gameTimeOf } from '~/lib/fortress/insights'
 import {
-  FORT_SLOW_REFRESH_MS,
   useFortConcerns,
   useFortOverview,
   useFortSupplies,
@@ -195,7 +194,6 @@ function ItemsBody() {
   const work = useQuery({
     queryKey: ['fort', 'work'],
     queryFn: () => getFortWork(),
-    refetchInterval: FORT_SLOW_REFRESH_MS,
   })
   const state = overview.data?.state ?? null
   const summary = state?.summary ?? null
@@ -351,7 +349,6 @@ function ItemList() {
           sortDir,
         },
       }),
-    refetchInterval: FORT_SLOW_REFRESH_MS,
     placeholderData: keepPreviousData,
   })
   const setView = (next: ItemView) =>

@@ -19,6 +19,7 @@
 		"dev:web": "turbo run dev --filter=@fortress/web",
 		"dev:worker": "turbo run dev --filter=@fortress/worker",
 		"typecheck": "turbo run typecheck",
+		"test": "turbo run test",
 		"lint": "turbo run biome:check",
 		"format": "turbo run biome:format",
 		"env:check": "node scripts.js env:check",

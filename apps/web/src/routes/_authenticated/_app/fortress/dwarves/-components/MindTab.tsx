@@ -71,9 +71,9 @@ export function MindTab({
       {unit.thoughts?.length ? (
         <Section title="Thoughts" count={unit.thoughts.length}>
           <ul className="flex flex-col gap-2">
-            {unit.thoughts.map((thought) => (
+            {unit.thoughts.map((thought, i) => (
               <ThoughtRow
-                key={`${thought[0]}-${thought[1]}-${thought[3]}-${thought[4]}`}
+                key={`${i}-${thought[0]}-${thought[3]}-${thought[4]}`}
                 thought={thought}
                 now={now}
               />

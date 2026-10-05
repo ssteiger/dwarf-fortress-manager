@@ -66,6 +66,12 @@ const KINDS: { kind: AlertKind; label: string; what: string; urgent: boolean }[]
     urgent: true,
   },
   {
+    kind: 'watched',
+    label: 'Dwarves you watch',
+    what: 'One of them grows unhappy or gets over it, is hurt, falls into a mood or has a bad new thought.',
+    urgent: false,
+  },
+  {
     kind: 'artifact',
     label: 'Artifacts',
     what: 'A dwarf in a mood finishes a legendary artifact.',

@@ -2,13 +2,13 @@ import {
   type FortBuilding,
   type FortItem,
   type FortUnit,
-  decodeTable,
   postgres_db,
   schema,
 } from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
+import { dumpTable, readDump } from '../fortress/dumpCache'
 import { formatGameTick, humanize, isLiving, splitPascal, unitGroup } from '../fortress/format'
 import { searchRecordsByName } from '../legends/records'
 import {
@@ -126,16 +126,8 @@ export const globalSearch = createServerFn({ method: 'GET' })
     const q = data.q.trim()
     if (q.length < MIN_QUERY) return EMPTY_RESULTS
 
-    const [dumpRows, eventRows, worldId] = await Promise.all([
-      postgres_db
-        .select({
-          units: schema.fort_dump.units,
-          items: schema.fort_dump.items,
-          buildings: schema.fort_dump.buildings,
-        })
-        .from(schema.fort_dump)
-        .where(eq(schema.fort_dump.id, SINGLETON_ID))
-        .limit(1),
+    const [dump, eventRows, worldId] = await Promise.all([
+      readDump(),
       postgres_db
         .select({
           id: schema.fort_events.id,
@@ -159,9 +151,8 @@ export const globalSearch = createServerFn({ method: 'GET' })
       currentWorldId(),
     ])
 
-    const dump = dumpRows[0]
     const scoredDwarves: Scored<DwarfHit>[] = []
-    for (const unit of decodeTable<FortUnit>(dump?.units)) {
+    for (const unit of dumpTable<FortUnit>(dump, 'units')) {
       const extra = [unit.name, unit.readable, unit.profession, unit.race, ...unit.positions].join(
         ' ',
       )
@@ -187,7 +178,7 @@ export const globalSearch = createServerFn({ method: 'GET' })
     }
 
     const scoredItems: Scored<ItemHit>[] = []
-    for (const item of decodeTable<FortItem>(dump?.items)) {
+    for (const item of dumpTable<FortItem>(dump, 'items')) {
       const extra = [item.type, item.subtype, item.material, item.quality].filter(Boolean).join(' ')
       const rank = rankMatch(item.description, extra, q)
       if (rank === null) continue
@@ -196,7 +187,7 @@ export const globalSearch = createServerFn({ method: 'GET' })
     }
 
     const scoredPlaces: Scored<PlaceHit>[] = []
-    for (const b of decodeTable<FortBuilding>(dump?.buildings)) {
+    for (const b of dumpTable<FortBuilding>(dump, 'buildings')) {
       const label = buildingLabel(b)
       const rank = rankMatch(
         label,

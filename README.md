@@ -36,12 +36,15 @@ flowchart LR
 
 | Page | What it shows |
 | --- | --- |
-| **Overview** `/fortress` | Citizens, who is at work, created wealth and dangers on the map; what needs your attention, how the fortress feels, and the story so far, with entries since your last visit marked. |
-| **Dwarves** `/fortress/dwarves` | Everyone on the map as cards or a table, split into citizens, residents, visitors, animals and hostiles, with a "could use your help" strip on top. Click anyone for a drawer, or open their full page. |
+| **Overview** `/fortress` | The story first: what happened since your last look, told in a few sentences from the season's recap, then who is struggling, then what needs your attention. Anything dangerous right now (a siege, a fresh death, no food or drink) goes above all of it. Below: citizens, who is at work, created wealth and dangers on the map, how the fortress feels, the story so far with entries since your last visit marked, stores and trends. |
+| **Dwarves** `/fortress/dwarves` | The citizens: who could use your help, work groups, skill coverage and talents their labors waste, squads, and the bonds between them. Click anyone for a drawer, or open their full page. |
+| **Dwarves and creatures** `/fortress/dwarves-and-creatures` | Everyone on the map as cards or a table, split into citizens, residents, visitors, animals and hostiles. |
+| **The dead** `/fortress/dead` | Who died, when and how, by whose hand, where their remains lie, whether a memorial names them and who walks as a ghost; and the citizens who left and never came back. |
 | **Items** `/fortress/items` | What the fortress keeps, what it is running short of and what to do about it, then every item on the map. Each item has its own page. |
 | **Work** `/fortress/work` | A checklist of what needs seeing to, worst first, each with the steps to fix it; what is stuck (suspended jobs, jobs the game keeps cancelling and why, missing workshops, idle dwarves); the job queue; every workshop with who can work it; stockpiles, zones and furniture. Alongside: what the season brings and what to do when things go wrong. |
 | **Map** `/fortress/map` | One z-level at a time from the last map dump, with dwarves, creatures and hostiles marked. Zoom, pan, `<` / `>` to change level, and show unrevealed rock if you want to. |
-| **Chronicle** `/fortress/chronicle` | Every announcement since the worker started, filterable to notable events, cancellations or combat. Announcements undone by loading an earlier save are left out. |
+| **Diplomacy & War** `/fortress/diplomacy-and-war` | Who is at the fortress right now, what may come next, every neighbour on a map with their stance, their wars and relations, petitions, and what to do about each. |
+| **Chronicle** `/fortress/chronicle` | By season: the fortress's book, one recap per season (who came and went, what happened, the lives of its people, how the fortress changed, what the world's history records there), year by year. Every entry: each announcement since the worker started and what the world's history records of the fortress and its people, filterable to notable events, cancellations or combat. Whatever loading an earlier save undid is left out. |
 | **Nickname dwarves** `/nickname-dwarves` | Nickname ideas built on what only that dwarf has: what they eat, drink, love or detest, what they are missing, a mishap from the chronicle, an odd best skill, a parent's or partner's nickname ("Kettle Jr."), the dead dwarf whose trade they took over ("Hums II"). The ideas come in mixed forms (titles, "Hatch Cover Enjoyer", sequels, plain phrases) so a roster doesn't all sound alike, and a language model can write more. Keep your own list of favourite names and each goes to the dwarf it fits best. Shows how a name reads in the game, queues names into the game in one go, and keeps the reason behind each one for the dwarf's page. |
 
 Advice comes with step-by-step guides you can tick off. Where DFHack can do the fix (resume suspended jobs, turn on `tailor` or `autofarm`, import standard work orders, and so on), the guide offers it as a one-click command.
@@ -68,10 +71,12 @@ Import a world's exports and `/legends` becomes a reader for its history: an ove
 
 - **Search** in the header (⌘K / Ctrl+K) finds pages, dwarves and creatures from the last dump, items, buildings and zones, chronicle entries, and legends records by name. Results are grouped, show the game's sprites, and say when a group has more matches than fit.
 - **Ask how to…** next to the search (⌘J / Ctrl+J) opens a sidebar where a language model answers questions about playing, with a summary of your fortress attached: population, stocks, workshops, the job queue and what the app itself flags. DFHack commands it suggests (`workorder ConstructBed 10`, `orders import library/basic`, ...) show up as cards you can copy, or run after reading and confirming them if they are among the commands the app knows to be safe. Needs the model settings below.
-- **Alerts**: while the app is open in a tab it watches the fortress and speaks up about deaths, threats, strange moods, births, arrivals and more. Choose which in Settings.
+- **While playing**: the button of that name on the overview opens `/glance` in a narrow window to keep beside the game: the most urgent thing, the dwarves you watch, who is struggling, job and stock warnings and the chronicle's last lines, without scrolling.
+- **Watch list**: the Watch button on a dwarf's page puts them first in "since your last look", in the glance window and in their own kind of alert.
+- **Alerts**: while the app is open in a tab it watches the fortress and speaks up about deaths, threats, strange moods, births, arrivals, the dwarves you watch and more. Choose which in Settings.
 - **Walking dwarves**: your citizens potter along the bottom of the window. Knock them over with the cursor, or turn them off in Settings.
 - **Refresh** at the top right reads the game now and opens a window that follows the read step by step: waiting for the worker, dwarves, items, buildings and the rest, then what it found or why it stopped. Useful with automatic reads turned off.
-- **Settings** `/settings`: look, text size and motion; alerts; how often the game is read, or only on refresh; whether guides run DFHack commands in one click or show them to copy; the worker's connection status and recent commands; legends worlds and the narrator.
+- **Settings** `/settings`: look, text size and motion; alerts; how often the game is read, or only on refresh; whether guides run DFHack commands in one click or show them to copy; the worker's connection status, recent commands and which DFHack automation runs in the game; legends worlds and the narrator; a backup of your notes, nicknames with their reasons, the name list and the legends journal, as a file you can import again.
 - **Worker logs** `/activity-logs`: the worker's own log lines.
 
 ## How it talks to the game
@@ -176,9 +181,13 @@ fortress/
 | Table | Written by | Holds |
 | --- | --- | --- |
 | `fort_state` | worker | One row: whether the game is live, on a menu or offline, the world and date, the summary (including noble mandates and demands, and caravans). |
-| `fort_dump` | worker | One row: the last dump of units, items, buildings, jobs, manager work orders, squads, artifacts, the historical figures items name, and announcements, each as `columns` + `rows`. |
+| `fort_dump` | worker | One row: the last dump of units, items, buildings, jobs, manager work orders, squads, artifacts, the historical figures items name, the fortress's dead, and announcements, each as `columns` + `rows`; which DFHack plugins run, what citizens wait for from the doctors, and the dump version. |
 | `fort_map` | worker | One row: the last map dump, run-length encoded per 16×16 block, with the ore and gem veins and the minerals they are made of. |
 | `fort_events` | worker | Every announcement ever seen, append-only, keyed per save and site. |
+| `fort_snapshots` | worker | One row per fortress and in-game day: the totals and every citizen's stress, skills, bonds, wounds, squad and offices that day. |
+| `fort_life_events` | worker | What changed in a citizen's life between two snapshots: arrivals, births, deaths, skills, offices, bonds, moods, wounds. Season recaps and "since your last look" are built from these. |
+| `fort_unit_archive` | worker | The last sheet read of each citizen who died or left, so their page still opens. |
+| `fort_history_events`, `fort_history_cursors` | worker | The world's history events at the fortress or naming its people, read live from the game, and how far they have been read. |
 | `fort_commands` | web, then worker | The command queue described above. |
 | `fort_worker` | web and worker | One row: the dump schedule and refresh requests (web), request answers, the progress of the latest read and a heartbeat (worker). |
 | `fort_unit_notes` | web | Each player's role-play notes per fortress and unit. |
@@ -288,7 +297,10 @@ To import legends, export them from Legends mode in the game (DFHack's `exportle
 bun run typecheck     # tsc --noEmit on every workspace
 bun run lint          # biome check on every workspace
 bun run format        # biome format --write on every workspace
+bun run test          # bun test in apps/web and packages/db-drizzle, plus supabase db test
 ```
+
+The web tests run the advisor, notices, dossiers and job fixes over a real fortress cut from a dump (`apps/web/src/lib/fortress/__fixtures__/fort.json`) and check their prose against snapshots. After a deliberate change to the wording, review the diff and update them with `cd apps/web && bun test --update-snapshots`.
 
 ESLint also runs on `apps/web` if you call it directly (`cd apps/web && bunx eslint src`). A few vendored shadcn files in `packages/ui/src/components/ui/` are excluded from Biome in [packages/ui/biome.json](packages/ui/biome.json).
 

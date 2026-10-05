@@ -13,18 +13,20 @@ import {
 import type * as React from 'react'
 
 export function SettingsSection({
+  id,
   title,
   description,
   action,
   children,
 }: {
+  id?: string
   title: string
   description?: React.ReactNode
   action?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
-    <Card>
+    <Card id={id} className={id ? 'scroll-mt-20' : undefined}>
       <CardHeader>
         <CardTitle className="text-lg">{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
@@ -53,9 +55,7 @@ export function SettingRow({
         <Label htmlFor={id} className="text-sm font-medium">
           {label}
         </Label>
-        {description ? (
-          <p className="text-sm text-muted-foreground">{description}</p>
-        ) : null}
+        {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
       </div>
       <div className="shrink-0 pt-0.5">{children}</div>
     </div>

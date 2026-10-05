@@ -232,6 +232,7 @@ const NOTICE_ADVICE: Record<string, string> = {
   'threat-seen': 'threat',
   'threat-unseen': 'caverns',
   'dead-unburied': 'burial',
+  'dead-ghosts': 'burial',
   'health-hurt': 'hospital',
   stress: 'unhappy',
   'work-failing': 'failing',

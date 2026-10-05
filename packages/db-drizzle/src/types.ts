@@ -6,6 +6,7 @@ export { schema };
 export { and, asc, desc, eq, like, not, or } from "drizzle-orm";
 
 export * from "./fortress-types";
+export * from "./snapshots";
 
 export type Log = InferSelectModel<typeof schema.logs>;
 export type NewLog = InferInsertModel<typeof schema.logs>;
@@ -18,6 +19,10 @@ export type FortMap = InferSelectModel<typeof schema.fort_map>;
 export type FortWorker = InferSelectModel<typeof schema.fort_worker>;
 export type FortEvent = InferSelectModel<typeof schema.fort_events>;
 export type NewFortEvent = InferInsertModel<typeof schema.fort_events>;
+export type FortSnapshotRow = InferSelectModel<typeof schema.fort_snapshots>;
+export type FortLifeEvent = InferSelectModel<typeof schema.fort_life_events>;
+export type FortArchivedUnit = InferSelectModel<typeof schema.fort_unit_archive>;
+export type FortHistoryRow = InferSelectModel<typeof schema.fort_history_events>;
 export type FortCommand = InferSelectModel<typeof schema.fort_commands>;
 export type NewFortCommand = InferInsertModel<typeof schema.fort_commands>;
 export type FortUnitNote = InferSelectModel<typeof schema.fort_unit_notes>;

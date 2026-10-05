@@ -10,6 +10,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { eq, sql } from 'drizzle-orm'
 
 import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
+import { dumpHead } from './dumpCache'
 
 /*
  * When the worker reads the game. The web app only writes the schedule and
@@ -39,6 +40,10 @@ export interface DumpState {
   workerSeenAt: string | null
   /** When the worker last tried to read the game, and what it found. */
   lastDumpAt: string | null
+  /** When the fortress itself was last read; older than `lastDumpAt` while the game is away. */
+  dumpCapturedAt: string | null
+  /** The format of that read; null for reads from before the version was kept. */
+  dumpVersion: number | null
   status: FortStatus | null
   /** How long the game was paused for the last read. */
   elapsedMs: number | null
@@ -57,7 +62,7 @@ async function requireUser() {
 export const getDumpState = createServerFn({ method: 'GET' }).handler(
   async (): Promise<DumpState> => {
     await requireUser()
-    const [worker, state] = await Promise.all([
+    const [worker, state, head] = await Promise.all([
       postgres_db
         .select({
           auto: W.auto_dump,
@@ -79,6 +84,7 @@ export const getDumpState = createServerFn({ method: 'GET' }).handler(
         .from(schema.fort_state)
         .where(eq(schema.fort_state.id, SINGLETON_ID))
         .limit(1),
+      dumpHead(),
     ])
     const w = worker[0]
     const s = state[0]
@@ -89,6 +95,8 @@ export const getDumpState = createServerFn({ method: 'GET' }).handler(
       workerRunning: w?.workerRunning ?? false,
       workerSeenAt: w?.workerSeenAt ?? null,
       lastDumpAt: s?.capturedAt ?? null,
+      dumpCapturedAt: head?.capturedAt ?? null,
+      dumpVersion: head?.version ?? null,
       status: s?.status ?? null,
       elapsedMs: s?.elapsedMs ?? null,
       progress: parseDumpProgress(w?.progress ?? null),

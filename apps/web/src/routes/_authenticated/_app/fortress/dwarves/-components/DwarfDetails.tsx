@@ -53,11 +53,13 @@ import {
 } from '~/lib/fortress/format'
 import {
   type GameTime,
+  firstName,
   gameTimeOf,
   isCitizenish,
   makeNameLinker,
   moodNeedsText,
   moodText,
+  pronouns,
   storyKind,
   unitConcerns,
   unitStory,
@@ -65,10 +67,16 @@ import {
 import { getNicknameReason } from '~/lib/fortress/nicknames'
 import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/queries'
 import { type CarriedItem, type FortUnitDetail, getFortEvents } from '~/lib/fortress/server'
-import { EmptyState, StatCard, UnitConditionBadges } from '../../-components/FortChrome'
+import {
+  EmptyState,
+  SectionBoundary,
+  StatCard,
+  UnitConditionBadges,
+} from '../../-components/FortChrome'
 import { AnnouncementText, StoryIcon } from '../../-components/Insights'
 import { ActionsTab, ConcernRow } from './ActionsTab'
 import { BodyTab } from './BodyTab'
+import { LifeSection } from './LifeSection'
 import { MindTab, ThoughtRow } from './MindTab'
 import { PeopleTab } from './PeopleTab'
 import { RolePlayTab } from './RolePlayTab'
@@ -223,15 +231,17 @@ export function DwarfDetails({
     )
   }
 
+  const archived = data?.archived ?? null
   const living = isLiving(unit)
-  const concerns = unitConcerns(unit, now)
+  const concerns = archived ? [] : unitConcerns(unit, now)
 
   return (
     <div className="flex flex-col gap-4">
       <Card className="gap-3 py-4">
         <CardContent className="flex flex-col gap-3 px-4">
+          {archived ? <ArchivedNote unit={unit} archived={archived} /> : null}
           <p className="text-base">{unitStory(unit, now)}</p>
-          {concerns.length ? (
+          {archived ? null : concerns.length ? (
             <ul className="flex flex-col gap-2">
               {concerns.map((c) => (
                 <ConcernRow key={c.key} concern={c} unit={unit} />
@@ -253,43 +263,75 @@ export function DwarfDetails({
             <TabsTrigger key={key} value={key} className="flex-none gap-1.5 px-2.5">
               <Icon className="size-3.5" aria-hidden />
               {label}
-              {key === 'actions' && unit.sheet && !unit.sheet.error ? (
+              {key === 'actions' && !archived && unit.sheet && !unit.sheet.error ? (
                 <TipCount unit={unit} />
               ) : null}
             </TabsTrigger>
           ))}
         </TabsList>
         <TabsContent value="overview">
-          <OverviewTab
-            unit={unit}
-            detail={data}
-            now={now}
-            compact={compact}
-            legends={legends}
-            units={units}
-            onTab={setTab}
-          />
+          <SectionBoundary name="The overview">
+            <OverviewTab
+              unit={unit}
+              detail={data}
+              now={now}
+              compact={compact}
+              legends={legends}
+              units={units}
+              onTab={setTab}
+            />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="mind">
-          <MindTab unit={unit} now={now} compact={compact} />
+          <SectionBoundary name="The mind tab">
+            <MindTab unit={unit} now={now} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="body">
-          <BodyTab unit={unit} compact={compact} />
+          <SectionBoundary name="The skills and body tab">
+            <BodyTab unit={unit} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="people">
-          <PeopleTab unit={unit} units={units} compact={compact} />
+          <SectionBoundary name="The people tab">
+            <PeopleTab unit={unit} units={units} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="roleplay">
-          <RolePlayTab unit={unit} now={now} compact={compact} />
+          <SectionBoundary name="The role play tab">
+            <RolePlayTab unit={unit} now={now} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="actions">
-          <ActionsTab unit={unit} compact={compact} />
+          <SectionBoundary name="The actions tab">
+            <ActionsTab unit={unit} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
         <TabsContent value="gear">
-          <GearTab detail={data} compact={compact} />
+          <SectionBoundary name="The gear tab">
+            <GearTab detail={data} compact={compact} />
+          </SectionBoundary>
         </TabsContent>
       </Tabs>
     </div>
+  )
+}
+
+function ArchivedNote({
+  unit,
+  archived,
+}: {
+  unit: FortUnit
+  archived: NonNullable<FortUnitDetail['archived']>
+}) {
+  const p = pronouns(unit)
+  const when = formatGameTick(archived.year, archived.tick)
+  const what = archived.reason === 'died' ? 'died' : 'left the map'
+  return (
+    <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+      {firstName(unit)} {what} on {when}. The game no longer lists {p.them}, so this page shows{' '}
+      {p.them} as the worker last read {p.them}, before then.
+    </p>
   )
 }
 
@@ -326,15 +368,17 @@ function StatStrip({
       <StatCard
         title="Doing"
         value={
-          living
-            ? unit.strange_mood
-              ? 'Strange mood'
-              : unit.mood
-                ? (moodText(unit.mood)?.label ?? 'In a mood')
-                : unit.job
-                  ? 'Working'
-                  : 'Idle'
-            : 'Dead'
+          detail?.archived?.reason === 'left'
+            ? 'Left the map'
+            : living
+              ? unit.strange_mood
+                ? 'Strange mood'
+                : unit.mood
+                  ? (moodText(unit.mood)?.label ?? 'In a mood')
+                  : unit.job
+                    ? 'Working'
+                    : 'Idle'
+              : 'Dead'
         }
         hint={
           living && unit.job
@@ -611,9 +655,9 @@ function OverviewTab({
             }
           >
             <ul className="flex flex-col gap-2">
-              {unit.thoughts.slice(0, 6).map((thought) => (
+              {unit.thoughts.slice(0, 6).map((thought, i) => (
                 <ThoughtRow
-                  key={`${thought[0]}-${thought[1]}-${thought[3]}-${thought[4]}`}
+                  key={`${i}-${thought[0]}-${thought[3]}-${thought[4]}`}
                   thought={thought}
                   now={now}
                 />
@@ -623,6 +667,8 @@ function OverviewTab({
         ) : null}
         <ChronicleSection unit={unit} legends={legends} compact={compact} units={units} />
       </div>
+
+      {isCitizenish(unit) ? <LifeSection unit={unit} units={units} compact={compact} /> : null}
 
       {detail?.buildings.length ? (
         <Section title="Rooms and workshops">

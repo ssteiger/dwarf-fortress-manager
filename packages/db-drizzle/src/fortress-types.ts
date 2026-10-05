@@ -666,6 +666,131 @@ export interface FortFigure {
 	alive: boolean;
 }
 
+/** One of the fortress's own people who has died, as of version 12. */
+export interface FortDeadUnit {
+	id: number;
+	hf: number;
+	name: string | null;
+	name_english: string | null;
+	nickname: string | null;
+	race: string | null;
+	sex: number;
+	profession: string | null;
+	born_year: number;
+	died_year: number;
+	/** Ticks into `died_year`. */
+	died_tick: number;
+	/** A `death_type` token: OLD_AGE, HUNGER, THIRST, SHOT, BLEED, ... */
+	cause: string | null;
+	slayer: string | null;
+	slayer_race: string | null;
+	/** Walks the fortress as a ghost. */
+	ghost: boolean;
+	/** Where their remains are; 'none' once nothing is left or the game dropped them. */
+	body: "buried" | "unburied" | "none";
+	/** A slab is engraved in their memory. */
+	memorial: boolean;
+	kills: number | null;
+}
+
+/** Which DFHack plugins run in the game, as of version 12. */
+export interface FortAutomation {
+	/** Every plugin `enable` lists, on or off. */
+	enabled: Record<string, boolean>;
+	/** What autobutcher, autofarm, seedwatch and tailor report, when they are on. */
+	status: Record<string, string>;
+}
+
+/**
+ * What a citizen waits for from the doctors: the set bits of `unit.health.flags`
+ * (`rq_diagnosis`, `rq_setting`, `rq_suture`, …) and of each body part's flags.
+ */
+export interface FortPatient {
+	unit: number;
+	needs: string[];
+	parts: { part: string | null; needs: string[] }[];
+}
+
+export type HospitalSupply =
+	| "splints"
+	| "thread"
+	| "cloth"
+	| "crutches"
+	| "powder"
+	| "buckets"
+	| "soap";
+
+/** The supplies a hospital counts in whole items; the rest it measures in its own units. */
+export type CountedSupply = "splints" | "crutches" | "buckets";
+
+/**
+ * A hospital zone and what its location keeps: items in store and the
+ * limits set for them, and what the game says it needs more of.
+ */
+export interface FortHospital {
+	id: number;
+	have?: Partial<Record<CountedSupply, number>>;
+	max?: Partial<Record<CountedSupply, number>>;
+	short?: HospitalSupply[];
+}
+
+export interface FortHealth {
+	patients: FortPatient[];
+	/** Citizens with a medical labor on, and which (`DIAGNOSE`, `SURGERY`, …). */
+	doctors: { unit: number; labors: string[] }[];
+	hospitals: FortHospital[];
+}
+
+/** A scalar field of a history event as the game holds it; enums as their token. */
+export type HistoryFieldValue = string | number | boolean | null;
+
+/** [name, name in English, race, unit id, sex] of a figure a history event names. */
+export type HistoryFigure = [string | null, string | null, string | null, number | null, number];
+
+/** One history event at the site or naming one of its people, as of version 12. */
+export interface FortHistoryEvent {
+	id: number;
+	/** A `history_event_type` token: HIST_FIGURE_DIED, ADD_HF_HF_LINK, ... */
+	type: string;
+	year: number;
+	tick: number;
+	/** It happened at the fortress itself. */
+	here: boolean;
+	/** The historical figures it names. */
+	hfs: number[];
+	/** Every scalar field of the event, by the game's field names. */
+	fields: Record<string, HistoryFieldValue>;
+	/** Names the sentence needs that the fields only hold as ids. */
+	extra: {
+		artifact?: string | null;
+		artifact_native?: string | null;
+		title?: string | null;
+		item?: string | null;
+		position?: string | null;
+		entity?: string | null;
+		/** The slayer's or the creature's race. */
+		race?: string | null;
+	};
+}
+
+/**
+ * The history events read by one dump, from the last one the worker had seen
+ * (`from`, -1 to start at the fortress's founding) up to `scanned`.
+ */
+export interface FortHistoryPayload {
+	/** "save_dir:site_id". */
+	key: string;
+	from: number;
+	scanned: number;
+	/** The newest event the game holds; lower than before after loading an earlier save. */
+	last_id: number;
+	/** Every event up to `last_id` has been walked. */
+	done: boolean;
+	events: RowTable;
+	/** Keyed by historical figure id. */
+	figures: Record<string, HistoryFigure>;
+}
+
 export interface FortAnnouncement {
 	id: number;
 	year: number;
@@ -897,6 +1022,9 @@ export interface FortDiplomacy {
 	invaders_repelled: number | null;
 }
 
+/** The dump format this code reads; fortress-snapshot.lua must write the same DUMP_VERSION. */
+export const DUMP_VERSION = 12;
+
 export interface FortDumpPayload {
 	status: FortStatus;
 	dump_version: number;
@@ -915,6 +1043,11 @@ export interface FortDumpPayload {
 	announcements: RowTable | null;
 	/** Version 11 on. */
 	diplomacy?: FortDiplomacy | null;
+	/** Version 12 on. */
+	dead?: RowTable | null;
+	history?: FortHistoryPayload | null;
+	automation?: FortAutomation | null;
+	health?: FortHealth | null;
 	map: FortMapPayload | null;
 	error?: string;
 }
@@ -1028,6 +1161,12 @@ export const DFHACK_ACTIONS = {
 		label: "Make tombs for coffins",
 		what: "Creates a tomb zone for every built coffin that is not in one yet, so the dead can be buried there.",
 	},
+	autoslab: {
+		command: "enable",
+		args: ["autoslab"],
+		label: "Engrave slabs for ghosts",
+		what: "Turns on autoslab: it orders a memorial slab engraved for every ghost of the fortress that has none, and placing the slab puts the ghost to rest.",
+	},
 	tailor: {
 		command: "enable",
 		args: ["tailor"],
@@ -1045,6 +1184,36 @@ export const DFHACK_ACTIONS = {
 		args: ["autofarm"],
 		label: "Manage crops automatically",
 		what: "Turns on autofarm: farm plots are planted with whatever crop runs lowest, as long as there are seeds.",
+	},
+	seedwatchAll: {
+		command: "seedwatch",
+		args: ["all", "30"],
+		label: "Watch every kind of seed",
+		what: "Tells seedwatch to keep every kind of seed and its plant out of the kitchen while fewer than 30 are left. It acts once seedwatch is on.",
+	},
+	nestboxes: {
+		command: "enable",
+		args: ["nestboxes"],
+		label: "Let eggs hatch",
+		what: "Turns on nestboxes: fertile eggs laid in nest boxes are forbidden, so they hatch instead of going to the kitchen.",
+	},
+	dwarfvet: {
+		command: "enable",
+		args: ["dwarfvet"],
+		label: "Let doctors treat animals",
+		what: "Turns on dwarfvet: hurt animals are carried to the hospital and treated by your doctors the way dwarves are.",
+	},
+	fixDeadUnits: {
+		command: "fix/dead-units",
+		args: [],
+		label: "Clear out long-dead units",
+		what: "Removes long-dead units from the game's list of active units. When that list is full, migrants stop arriving.",
+	},
+	fixStuckMerchants: {
+		command: "fix/stuck-merchants",
+		args: [],
+		label: "Send stuck merchants home",
+		what: "Makes merchants stuck at the edge of the map leave, so the next caravan can come.",
 	},
 	recheckOrders: {
 		command: "orders",
@@ -1458,6 +1627,7 @@ const CONSOLE_COMMANDS: Record<string, (args: string[]) => string | null> = {
 	force: checkForce,
 	caravan: checkCaravan,
 	"fix/stuck-merchants": checkStuckMerchants,
+	"fix/dead-units": noArgs,
 	"fix/stuck-squad": noArgs,
 	"fix/civil-war": noArgs,
 	"list-agreements": checkListAgreements,

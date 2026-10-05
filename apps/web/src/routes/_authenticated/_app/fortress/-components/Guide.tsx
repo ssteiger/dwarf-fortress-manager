@@ -37,14 +37,17 @@ import {
   TerminalIcon,
   TriangleAlertIcon,
   XIcon,
+  ZapIcon,
 } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
 import { type ActionRun, listDfhackActionRuns, queueDfhackAction } from '~/lib/fortress/actions'
 import type { AdviceStatus, Shortcut } from '~/lib/fortress/advisor'
+import { pluginEnabledBy } from '~/lib/fortress/automation'
 import type { Guide } from '~/lib/fortress/guides'
 import { useStepProgress } from '~/lib/fortress/progress'
+import { useFortAutomation } from '~/lib/fortress/queries'
 import { usePreferences } from '~/lib/preferences'
 import { UnitChips } from './Insights'
 
@@ -149,15 +152,53 @@ function RunStatus({ run }: { run: ActionRun }) {
  */
 export function RunActionButton({ action }: { action: DfhackAction }) {
   const { oneClickActions } = usePreferences()
-  if (!oneClickActions) {
-    const spec: DfhackActionSpec = DFHACK_ACTIONS[action]
-    return (
-      <CopyCommand
-        shortcut={{ command: [spec.command, ...spec.args].join(' '), what: spec.what }}
-      />
-    )
-  }
+  const spec: DfhackActionSpec = DFHACK_ACTIONS[action]
+  const command = [spec.command, ...spec.args].join(' ')
+  const running = useRunningPlugin(command)
+  if (running) return <AlreadyOn plugin={running} />
+  if (!oneClickActions) return <CopyCommand shortcut={{ command, what: spec.what }} />
   return <RunAction action={action} />
+}
+
+/** The plugin a command would turn on, when the last read found it on already. */
+function useRunningPlugin(command: string): string | null {
+  const automation = useFortAutomation()
+  const plugin = pluginEnabledBy(command)
+  return plugin && automation.data?.automation?.enabled[plugin] ? plugin : null
+}
+
+/** The actions still worth offering: all but those turning on a plugin that is on. */
+export function useActionsToOffer(actions: readonly DfhackAction[] | undefined): DfhackAction[] {
+  const enabled = useFortAutomation().data?.automation?.enabled
+  return (actions ?? []).filter((action) => {
+    const spec: DfhackActionSpec = DFHACK_ACTIONS[action]
+    const plugin = pluginEnabledBy([spec.command, ...spec.args].join(' '))
+    return !(plugin && enabled?.[plugin])
+  })
+}
+
+/** Marks what DFHack can fix in one click, unless every fix is on already. */
+export function OneClickMark({ actions }: { actions?: readonly DfhackAction[] }) {
+  return useActionsToOffer(actions).length ? <ZapIcon className="size-3.5 text-primary" /> : null
+}
+
+function AlreadyOn({ plugin }: { plugin: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      <CircleCheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+      <span>
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{plugin}</code> is
+        already on in your game.
+      </span>
+      <Link
+        to="/settings/connection"
+        hash="automation"
+        className="underline-offset-4 hover:text-foreground hover:underline"
+      >
+        See what it is doing
+      </Link>
+    </div>
+  )
 }
 
 function RunAction({ action }: { action: DfhackAction }) {
@@ -225,6 +266,12 @@ function RunAction({ action }: { action: DfhackAction }) {
 }
 
 export function CopyCommand({ shortcut }: { shortcut: Shortcut }) {
+  const running = useRunningPlugin(shortcut.command)
+  if (running) return <AlreadyOn plugin={running} />
+  return <CopyShortcut shortcut={shortcut} />
+}
+
+function CopyShortcut({ shortcut }: { shortcut: Shortcut }) {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(shortcut.command)

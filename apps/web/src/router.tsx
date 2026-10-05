@@ -3,6 +3,7 @@ import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
 
 import { DefaultCatchBoundary } from '~/lib/components/DefaultCatchBoundary'
+import { DefaultPending } from '~/lib/components/DefaultPending'
 import { NotFound } from '~/lib/components/NotFound'
 import { routeTree } from './routeTree.gen'
 
@@ -22,6 +23,7 @@ export function getRouter() {
     // react-query handles data fetching & caching
     defaultPreloadStaleTime: 0,
     defaultErrorComponent: DefaultCatchBoundary,
+    defaultPendingComponent: DefaultPending,
     defaultNotFoundComponent: NotFound,
     scrollRestoration: true,
     defaultStructuralSharing: true,

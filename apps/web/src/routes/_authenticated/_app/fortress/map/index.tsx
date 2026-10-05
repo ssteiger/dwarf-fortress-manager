@@ -4,7 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { FORT_SLOW_REFRESH_MS, useFortOverview } from '~/lib/fortress/queries'
+import { useFortOverview } from '~/lib/fortress/queries'
 import { type FortMapLevel, getFortMapLevel } from '~/lib/fortress/server'
 import {
   DIG_LABELS,
@@ -36,7 +36,6 @@ function MapPage() {
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'map', z],
     queryFn: () => getFortMapLevel({ data: { z: z ?? undefined } }),
-    refetchInterval: FORT_SLOW_REFRESH_MS,
     placeholderData: keepPreviousData,
   })
 

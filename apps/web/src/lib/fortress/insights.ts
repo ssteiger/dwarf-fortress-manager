@@ -10,7 +10,7 @@ import type {
 import { CARAVAN_TICKS_PER_DAY, MANDATE_WARN_LEFT } from '@fortress/db-drizzle/fortress-types'
 
 import { humanize, isLiving, splitPascal, stressLabel, unitGroup, unitNeeds } from './format'
-import type { FortConcerns } from './server'
+import type { FortConcerns, UnburiedBody } from './server'
 
 /*
  * Client-safe readings of a fortress dump: what needs the player, what
@@ -83,9 +83,28 @@ export function isGrownCitizen(unit: FortUnit): boolean {
   )
 }
 
+/** The restless ghost of one of the fortress's own dead. */
+export function isOwnGhost(unit: FortUnit): boolean {
+  return (
+    unit.flags.includes('ghost') &&
+    (unit.flags.includes('citizen') ||
+      unit.flags.includes('own_civ') ||
+      unit.flags.includes('resident'))
+  )
+}
+
 /** "Thelma" for a nicknamed or named dwarf, the readable name for anyone else. */
 export function firstName(unit: Pick<FortUnit, 'name' | 'nickname' | 'readable'>): string {
   return unit.nickname || unit.name.split(/\s+/)[0] || unit.readable
+}
+
+/** "Hilda’s skeleton": the game's word for the remains, with their owner named as elsewhere. */
+export function remainsOf(
+  body: Pick<UnburiedBody, 'name' | 'description'>,
+  owner: FortUnit | undefined,
+): string {
+  const what = body.description.slice(body.name.length).replace(/^['’]s /, '') || 'body'
+  return `${owner ? firstName(owner) : body.name}’s ${what}`
 }
 
 export function pronouns(unit: Pick<FortUnit, 'sex'>) {
@@ -283,11 +302,17 @@ const THOUGHTS: Record<string, ThoughtText> = {
   LoveReunited: { phrase: 'was reunited with a loved one' },
 }
 
-export function thoughtPhrase(thought: string, emotion?: string): string {
+/** The thought in words; give `subject` when the sentence names whose thought it was. */
+export function thoughtPhrase(
+  thought: string,
+  emotion?: string,
+  subject?: Pick<FortUnit, 'sex'>,
+): string {
   if (thought === 'Syndrome' && emotion)
     return `felt ${humanize(emotion).toLowerCase()} from a syndrome`
   const known = THOUGHTS[thought]
-  if (known) return known.phrase
+  if (known)
+    return subject ? known.phrase.replace(/\btheir\b/g, pronouns(subject).their) : known.phrase
   const words = splitPascal(thought).toLowerCase()
   return emotion ? `felt ${humanize(emotion).toLowerCase()} (${words})` : words
 }
@@ -495,7 +520,7 @@ export function unitStory(unit: FortUnit, now: GameTime | null): string {
     ...recent.filter((t) => emotionTone(t[1]) === 'bad'),
     ...recent.filter((t) => emotionTone(t[1]) !== 'bad' && t[0] !== 'SatisfiedAtWork'),
   ]) {
-    const phrase = thoughtPhrase(t[0], t[1])
+    const phrase = thoughtPhrase(t[0], t[1], unit)
     if (!lately.includes(phrase)) lately.push(phrase)
     if (lately.length === 3) break
   }
@@ -811,6 +836,11 @@ export function creatureCounts(units: Pick<FortUnit, 'race'>[]): string {
 }
 
 const CANCELLATION_HINTS: [RegExp, string][] = [
+  [/potash/i, 'Make potash from ash at an ashery.'],
+  [
+    /charcoal|coke|fuel/i,
+    'Make charcoal from logs at a wood furnace, or coke from coal at a smelter.',
+  ],
   [/iron bars|bars/i, 'Smelt ore into bars at a smelter, or trade for them.'],
   [
     /boulders|stone/i,
@@ -824,7 +854,6 @@ const CANCELLATION_HINTS: [RegExp, string][] = [
     /processable plant|unrotten/i,
     'Grow or gather plants, and cancel repeating jobs you have no plants for.',
   ],
-  [/potash/i, 'Make potash from ash at an ashery.'],
   [/spawn|seeds/i, 'Gather or buy seeds for this crop.'],
   [/table|chair|bed|door|cabinet|coffer/i, 'Build the furniture it needs first.'],
   [
@@ -912,20 +941,39 @@ export function fortNotices({
     const dead = concerns.unburied
       .map((b) => byId.get(b.unitId))
       .filter((u): u is FortUnit => u !== undefined)
+    const [only] = concerns.unburied
+    const onlyOwner = byId.get(only.unitId)
     notices.push({
       key: 'dead-unburied',
       severity: 'warning',
       kind: 'dead',
       title:
         concerns.unburied.length === 1
-          ? `${concerns.unburied[0].name} lies unburied`
+          ? `${onlyOwner ? firstName(onlyOwner) : only.name} lies unburied`
           : `${concerns.unburied.length} of your dead lie unburied`,
       lines: concerns.unburied.map((b) => ({
-        label: b.description,
+        label: remainsOf(b, byId.get(b.unitId)),
         detail: b.x !== null ? `${b.x},${b.y} z${b.z}` : undefined,
       })),
       hint: `Seeing the dead shakes your dwarves, and the unburied dead of a fortress can return as ghosts. ${concerns.coffins ? `You have ${plural(concerns.coffins, 'coffin')} built: put ${concerns.coffins === 1 ? 'it' : 'them'} in a tomb zone.` : 'Build a coffin and place it in a tomb zone.'}`,
       units: dead,
+    })
+  }
+
+  // Ghosts: the dead who found no rest.
+  const ghosts = units.filter(isOwnGhost)
+  if (ghosts.length) {
+    notices.push({
+      key: 'dead-ghosts',
+      severity: 'danger',
+      kind: 'dead',
+      title:
+        ghosts.length === 1
+          ? `The ghost of ${firstName(ghosts[0])} walks the fortress`
+          : `${ghosts.length} ghosts walk the fortress`,
+      detail: 'Ghosts frighten the living and haunt their dreams, and some of them do harm.',
+      hint: 'A ghost rests once its body lies in a coffin in a tomb, or once a memorial slab engraved for it is placed. Slabs are made at a mason’s workshop and engraved at a craftsdwarf’s workshop.',
+      units: ghosts,
     })
   }
 
@@ -1300,6 +1348,8 @@ export function alertLevel(event: Pick<FortEvent, 'type' | 'text'>): 'urgent' | 
 export interface TextPart {
   text: string
   unit?: FortUnit
+  /** A historical figure off the map, for a link to their legends. */
+  hf?: number
 }
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
