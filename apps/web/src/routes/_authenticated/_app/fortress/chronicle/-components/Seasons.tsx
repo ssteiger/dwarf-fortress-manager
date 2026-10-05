@@ -2,20 +2,17 @@ import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '
 import { EyeIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { formatGameTick } from '~/lib/fortress/format'
-import { LIFE_TONE_DOT } from '~/lib/fortress/lifeEvents'
-import { useFortOverview, useFortSeasons, useFortUnits } from '~/lib/fortress/queries'
 import {
   type Recap,
   type RecapSection,
-  type SeasonRef,
   buildRecap,
   ownGroupsOf,
-  seasonAt,
-  seasonIndex,
-  seasonTitle,
-} from '~/lib/fortress/recap'
-import { useWatchList } from '~/lib/fortress/watch'
+} from '~/lib/fortress/chronicle/recap'
+import { useFortOverview, useFortSeasons, useFortUnits } from '~/lib/fortress/client/queries'
+import { useWatchList } from '~/lib/fortress/client/watch'
+import { formatGameTick } from '~/lib/fortress/format'
+import { LIFE_TONE_DOT } from '~/lib/fortress/people/lifeEvents'
+import { type SeasonRef, seasonAt, seasonIndex, seasonTitle } from '~/lib/fortress/time'
 import { EmptyState } from '../../-components/FortChrome'
 import { AnnouncementText } from '../../-components/Insights'
 import { useFortLegendsWorldId, useKnownHistFigures } from '../../dwarves/-components/UnitLinks'

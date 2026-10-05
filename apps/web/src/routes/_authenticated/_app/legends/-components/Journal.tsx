@@ -10,7 +10,7 @@ import {
   deleteNote,
   listNotes,
   upsertNote,
-} from '~/lib/legends/journal'
+} from '~/lib/legends/server/journal'
 
 export const journalKey = (worldId: number) => ['legends', 'journal', worldId] as const
 

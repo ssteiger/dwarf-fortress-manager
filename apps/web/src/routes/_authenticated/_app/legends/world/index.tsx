@@ -7,7 +7,6 @@ import * as React from 'react'
 import { useDfAssets } from '~/lib/df-assets'
 import { LegendsSprite, TerrainChip, TileChip } from '~/lib/df-assets/legends'
 import { formatNumber } from '~/lib/fortress/format'
-import { getSiteHistory, getSpanDigest } from '~/lib/legends/chronicle'
 import {
   raceColor,
   racePlural,
@@ -17,7 +16,9 @@ import {
   words,
 } from '~/lib/legends/model'
 import { summarizeSpan } from '~/lib/legends/prose'
-import { type LegendsWorldSummary, getLegendsMap } from '~/lib/legends/server'
+import { getSiteHistory, getSpanDigest } from '~/lib/legends/server/chronicle'
+import { getLegendsMap } from '~/lib/legends/server/map'
+import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import { changesBySite, holdingsAt, siteStatesAt } from '~/lib/legends/timeline'
 import { siteSpriteNameFor } from '~/lib/legends/worldTiles'
 import {

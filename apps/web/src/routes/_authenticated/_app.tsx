@@ -25,10 +25,10 @@ import { AssistantProvider } from '~/lib/assistant/AssistantProvider'
 import { logoutFn } from '~/lib/auth/server'
 import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
 import { GlobalSearch } from '~/lib/components/GlobalSearch'
-import { FortWatcher } from '~/lib/fortress/FortWatcher'
-import { ReadGameButton } from '~/lib/fortress/ReadGameButton'
+import { FortWatcher } from '~/lib/fortress/client/FortWatcher'
+import { ReadGameButton } from '~/lib/fortress/client/ReadGameButton'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
-import { getFortUnits } from '~/lib/fortress/server'
+import { getFortUnits } from '~/lib/fortress/server/units'
 import { usePreferences, usePreferencesSync } from '~/lib/preferences'
 
 const EDGE_DWARF_COUNT = 12

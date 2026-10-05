@@ -27,15 +27,15 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import { STRESS_CLASSES, isLiving, stressLabel, unitNeeds } from '~/lib/fortress/format'
-import { firstName } from '~/lib/fortress/insights'
 import {
   type FailingRead,
   useFailingFortReads,
   useLastDumpState,
   useTick,
-} from '~/lib/fortress/queries'
-import { useWatchList } from '~/lib/fortress/watch'
+} from '~/lib/fortress/client/queries'
+import { useWatchList } from '~/lib/fortress/client/watch'
+import { STRESS_CLASSES, isLiving, stressLabel, unitNeeds } from '~/lib/fortress/format'
+import { firstName } from '~/lib/fortress/people/units'
 
 /** Title row shared by every fortress page. */
 export function PageHeader({

@@ -34,15 +34,15 @@ import { CircleAlertIcon, PlugZapIcon, RefreshCwIcon, TriangleAlertIcon } from '
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { PLUGIN_WHAT } from '~/lib/fortress/automation'
-import { type DumpState, setDumpSchedule } from '~/lib/fortress/dump'
+import { PLUGIN_WHAT } from '~/lib/fortress/advice/automation'
 import {
   DUMP_STATE_KEY,
   useDumpState,
   useFortAutomation,
   useFortUnits,
   useTick,
-} from '~/lib/fortress/queries'
+} from '~/lib/fortress/client/queries'
+import { type DumpState, setDumpSchedule } from '~/lib/fortress/server/worker'
 import { setPreference, usePreferences } from '~/lib/preferences'
 import {
   type ConnectionStatus,

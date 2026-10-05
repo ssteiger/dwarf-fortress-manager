@@ -12,8 +12,8 @@ import {
 } from '@fortress/ui'
 import { BookMarkedIcon } from 'lucide-react'
 
+import { type Guide, playbookGuide } from '~/lib/fortress/advice/guides'
 import { type Stance, powerName } from '~/lib/fortress/diplomacy'
-import { type Guide, playbookGuide } from '~/lib/fortress/guides'
 import { GuideBody } from '../../-components/Guide'
 import { CommandItem, type DiplomacyCommand } from './shared'
 

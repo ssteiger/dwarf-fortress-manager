@@ -44,7 +44,7 @@ import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { formatValue } from '~/lib/fortress/format'
 import { kindLabel } from '~/lib/legends/model'
-import type { LegendsHit } from '~/lib/legends/server'
+import type { LegendsHit } from '~/lib/legends/types'
 import {
   type AppPath,
   type DwarfHit,

@@ -151,12 +151,25 @@ fortress/
 │   ├── web/                TanStack Start app.
 │   │   └── src/
 │   │       ├── routes/     File routes; `-components/` folders are route-private.
-│   │       └── lib/
-│   │           ├── fortress/   Server reads, advice, guides, insights, dwarf
-│   │           │               readings and nickname ideas (character.ts,
-│   │           │               dossier.ts, nameList.ts), role play and
-│   │           │               command queueing.
-│   │           ├── legends/    Legends reads, chronicle, stories, narrator, journal.
+│   │       └── lib/        Shared by the routes. Areas with a lot of code split
+│   │           │           by where it runs: `server/` (server functions and
+│   │           │           server-only helpers), `client/` (browser-only hooks,
+│   │           │           localStorage, components), the rest client-safe.
+│   │           ├── fortress/
+│   │           │   ├── server/     One file per page's reads (overview, units,
+│   │           │   │               items, work, map, ...), the cached dump,
+│   │           │   │               history, command queueing, role play.
+│   │           │   ├── client/     React Query hooks, watched creatures, alerts.
+│   │           │   ├── people/     Units, thoughts, activity, troubles, the
+│   │           │   │               character sheet, dossiers, life events.
+│   │           │   ├── advice/     Checks, notices, situations, stores, fixes,
+│   │           │   │               workshops, health and the guides.
+│   │           │   ├── chronicle/  Announcements, history events, recaps.
+│   │           │   ├── nicknames/  Nickname ideas, alliteration, name lists.
+│   │           │   └── time.ts, format.ts, types.ts, diplomacy.ts, mapGrid.ts
+│   │           ├── legends/    `server/` holds the reads (worlds, browse, record,
+│   │           │               map, ...), chronicle, stories, lives, narrator and
+│   │           │               journal; event prose, model and types beside it.
 │   │           ├── df-assets/  Sprite lookup and dwarf compositing from the
 │   │           │               extracted layer rules.
 │   │           ├── search/     Global search.
@@ -199,7 +212,7 @@ fortress/
 
 ### Server functions next to their screens
 
-[apps/web/src/routes/\_authenticated/\_app/activity-logs/index.tsx](apps/web/src/routes/_authenticated/_app/activity-logs/index.tsx) shows the smallest version of the pattern in one file: a `createServerFn` that queries Postgres through Drizzle, a component that calls it with `useQuery`, and the file-route binding. The fortress and legends pages share their reads instead, in [apps/web/src/lib/fortress/server.ts](apps/web/src/lib/fortress/server.ts) and [apps/web/src/lib/legends/server.ts](apps/web/src/lib/legends/server.ts), because several pages read the same dump.
+[apps/web/src/routes/\_authenticated/\_app/activity-logs/index.tsx](apps/web/src/routes/_authenticated/_app/activity-logs/index.tsx) shows the smallest version of the pattern in one file: a `createServerFn` that queries Postgres through Drizzle, a component that calls it with `useQuery`, and the file-route binding. The fortress and legends pages share their reads instead, in [apps/web/src/lib/fortress/server/](apps/web/src/lib/fortress/server) and [apps/web/src/lib/legends/server/](apps/web/src/lib/legends/server), because several pages read the same dump.
 
 Browser code that needs the fortress constants (`STRESS_LABELS`, `DF_MONTHS`, `FORT_FLAG`, `DFHACK_ACTIONS`, `UNIT_ACTIONS`) imports them from `@fortress/db-drizzle/fortress-types`. The package entry also creates the Postgres client, which must never reach the client bundle.
 
@@ -311,7 +324,7 @@ ESLint also runs on `apps/web` if you call it directly (`cd apps/web && bunx esl
 ### Adding a screen + query
 
 1. Create the file route under `apps/web/src/routes/...` (TanStack Router conventions: `index.tsx`, `_authenticated.tsx` for layout segments, `-components/` for route-private components). The sidebar entries live in [apps/web/src/routes/\_authenticated/\_app.tsx](apps/web/src/routes/_authenticated/_app.tsx); add the page to `PAGES` in [apps/web/src/lib/search/model.ts](apps/web/src/lib/search/model.ts) so search can find it.
-2. Define a `createServerFn({ method: 'GET' }).handler(async () => …)` that uses `postgres_db` + `schema.*` from `@fortress/db-drizzle`, either in the route file or in `apps/web/src/lib/<area>/server.ts` when several pages share it.
+2. Define a `createServerFn({ method: 'GET' }).handler(async () => …)` that uses `postgres_db` + `schema.*` from `@fortress/db-drizzle`, either in the route file or in `apps/web/src/lib/<area>/server.ts` (`lib/<area>/server/<page>.ts` for fortress and legends) when several pages share it. Server functions that act for the player start with `requireSignedInUser()` from `~/lib/utils/supabase/server`.
 3. Call it from `useQuery` (or `useMutation` for writes). Errors thrown server-side surface in React Query's `error`.
 
 ### Adding to the dump

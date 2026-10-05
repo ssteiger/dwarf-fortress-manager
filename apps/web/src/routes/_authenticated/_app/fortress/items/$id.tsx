@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 
 import { ItemSprite } from '~/lib/df-assets/components'
-import { useFortItem, useFortOverview } from '~/lib/fortress/queries'
+import { useFortItem, useFortOverview } from '~/lib/fortress/client/queries'
 import { FortBreadcrumbs, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
 

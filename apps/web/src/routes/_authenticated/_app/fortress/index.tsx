@@ -20,7 +20,21 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import { fortAdvice, situations } from '~/lib/fortress/advisor'
+import { fortAdvice } from '~/lib/fortress/advice/checks'
+import { noticeGuide } from '~/lib/fortress/advice/guides'
+import { type Notice, fortNotices } from '~/lib/fortress/advice/notices'
+import { situations } from '~/lib/fortress/advice/situations'
+import { STORY_KINDS, makeNameLinker, storyKind } from '~/lib/fortress/chronicle/announcements'
+import { buildRecap, lead, ownGroupsOf } from '~/lib/fortress/chronicle/recap'
+import { useLastSeen } from '~/lib/fortress/client/lastSeen'
+import {
+  useFortConcerns,
+  useFortOverview,
+  useFortRecap,
+  useFortSupplies,
+  useFortUnits,
+} from '~/lib/fortress/client/queries'
+import { useWatchList } from '~/lib/fortress/client/watch'
 import {
   STRESS_BAR_COLORS,
   formatGameTick,
@@ -29,36 +43,15 @@ import {
   isLiving,
   unitGroup,
 } from '~/lib/fortress/format'
-import { noticeGuide } from '~/lib/fortress/guides'
-import {
-  type Feeling,
-  type Notice,
-  STORY_KINDS,
-  absTicks,
-  activityBoard,
-  concernScore,
-  firstName,
-  fortFeelings,
-  fortNotices,
-  gameSpan,
-  gameTimeOf,
-  makeNameLinker,
-  storyKind,
-  unitConcerns,
-} from '~/lib/fortress/insights'
-import { useLastSeen } from '~/lib/fortress/lastSeen'
-import { LIFE_TONE_DOT } from '~/lib/fortress/lifeEvents'
-import {
-  useFortConcerns,
-  useFortOverview,
-  useFortRecap,
-  useFortSupplies,
-  useFortUnits,
-} from '~/lib/fortress/queries'
-import { buildRecap, lead, ownGroupsOf, seasonAt, seasonIndex } from '~/lib/fortress/recap'
-import { getFortWork } from '~/lib/fortress/server'
-import { useWatchList } from '~/lib/fortress/watch'
-import { watchNews } from '~/lib/fortress/watchChanges'
+import { activityBoard } from '~/lib/fortress/people/activity'
+import { LIFE_TONE_DOT } from '~/lib/fortress/people/lifeEvents'
+import { type Feeling, fortFeelings } from '~/lib/fortress/people/thoughts'
+import { concernScore, unitConcerns } from '~/lib/fortress/people/troubles'
+import { firstName } from '~/lib/fortress/people/units'
+import { watchNews } from '~/lib/fortress/people/watchChanges'
+import { getFortWork } from '~/lib/fortress/server/work'
+import { absTicks, gameSpan, gameTimeOf } from '~/lib/fortress/time'
+import { seasonAt, seasonIndex } from '~/lib/fortress/time'
 import { EmptyState, PageHeader, SectionBoundary, StatusBanner } from './-components/FortChrome'
 import { GuideProvider, useOpenGuide } from './-components/Guide'
 import {

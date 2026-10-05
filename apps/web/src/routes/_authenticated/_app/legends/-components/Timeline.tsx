@@ -13,7 +13,8 @@ import * as React from 'react'
 
 import { EVENT_CATEGORIES, ROUTINE_TYPES, eventCategory, yearSpan } from '~/lib/legends/events'
 import { words } from '~/lib/legends/model'
-import { type NameIndex, getLegendsEvents } from '~/lib/legends/server'
+import { getLegendsEvents } from '~/lib/legends/server/recordEvents'
+import type { NameIndex } from '~/lib/legends/types'
 import { EventLine, Section } from './LegendsChrome'
 
 const PAGE_SIZE = 40

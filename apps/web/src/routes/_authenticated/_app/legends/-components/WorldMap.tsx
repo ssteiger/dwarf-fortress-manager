@@ -11,7 +11,6 @@ import {
   useSpriteSheets,
 } from '~/lib/df-assets'
 import { TerrainChip, TileChip } from '~/lib/df-assets/legends'
-import type { SiteHistory } from '~/lib/legends/chronicle'
 import {
   RACE_COLORS,
   raceColor,
@@ -20,7 +19,8 @@ import {
   titleCase,
   words,
 } from '~/lib/legends/model'
-import type { LegendsMapData, MapRegion, MapSite } from '~/lib/legends/server'
+import type { SiteHistory } from '~/lib/legends/server/chronicle'
+import type { LegendsMapData, MapRegion, MapSite } from '~/lib/legends/server/map'
 import { type SiteSnapshot, changesBySite, siteStatesAt } from '~/lib/legends/timeline'
 import {
   type TerrainPlan,

@@ -1,7 +1,7 @@
 import { cn } from '@fortress/ui'
 import * as React from 'react'
 
-import type { TimelineBin } from '~/lib/legends/server'
+import type { TimelineBin } from '~/lib/legends/server/summary'
 
 export interface YearSpan {
   from: number

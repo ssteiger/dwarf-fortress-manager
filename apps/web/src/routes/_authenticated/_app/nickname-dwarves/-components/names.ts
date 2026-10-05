@@ -1,4 +1,3 @@
-
 export const SSTEIGER_NAMES = [
   'Urist Mc OSHA Violation',
   'Gravy Jones',

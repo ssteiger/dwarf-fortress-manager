@@ -5,6 +5,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
+import { recordVisit } from '~/lib/legends/client/trail'
 import { plusOf, str } from '~/lib/legends/events'
 import {
   browseTabForKind,
@@ -15,8 +16,8 @@ import {
   titleCase,
   words,
 } from '~/lib/legends/model'
-import { getLegendsMap, getLegendsRecord } from '~/lib/legends/server'
-import { recordVisit } from '~/lib/legends/trail'
+import { getLegendsMap } from '~/lib/legends/server/map'
+import { getLegendsRecord } from '~/lib/legends/server/record'
 import { FortressTieLine } from '../-components/FortressTie'
 import { PinButton } from '../-components/Journal'
 import {

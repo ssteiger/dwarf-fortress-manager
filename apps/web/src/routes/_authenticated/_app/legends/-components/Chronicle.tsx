@@ -5,10 +5,10 @@ import { ChevronLeftIcon, ChevronRightIcon, MinusIcon, PlusIcon } from 'lucide-r
 import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
-import { type SpanDigest, getSpanDigest } from '~/lib/legends/chronicle'
 import { yearSpan } from '~/lib/legends/events'
 import { titleCase, words } from '~/lib/legends/model'
 import { spanLabel, tellSpan } from '~/lib/legends/prose'
+import { type SpanDigest, getSpanDigest } from '~/lib/legends/server/chronicle'
 import type { YearSpan } from './HistoryChart'
 import { PinButton } from './Journal'
 import { EventLine, RecordLink, Section, Telling } from './LegendsChrome'

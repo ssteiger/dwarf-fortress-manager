@@ -5,7 +5,7 @@ import { InfoIcon } from 'lucide-react'
 import type * as React from 'react'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
-import type { Standing, Tone } from '~/lib/fortress/character'
+import type { Standing, Tone } from '~/lib/fortress/people/character'
 
 /** A titled card; `count` shows as a badge next to the title. */
 export function Section({

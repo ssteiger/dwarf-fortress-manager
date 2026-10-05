@@ -1,5 +1,5 @@
-import type { SiteChange, SiteHistory } from './chronicle'
-import type { MapSite } from './server'
+import type { SiteChange, SiteHistory } from './server/chronicle'
+import type { MapSite } from './server/map'
 
 /** Client-safe: what the site history says about each site in a given year. */
 

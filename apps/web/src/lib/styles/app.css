@@ -97,8 +97,9 @@ pre {
   font-family: var(--font-mono);
 }
 
+/* clip rather than hidden: hidden makes this a scroll container and breaks position: sticky inside pages. */
 [data-slot="sidebar-inset"] {
-  overflow: hidden;
+  overflow: clip;
 }
 
 [data-slot="table"] {

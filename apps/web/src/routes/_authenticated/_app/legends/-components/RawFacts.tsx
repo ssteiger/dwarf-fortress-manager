@@ -2,7 +2,7 @@ import type { JsonObject } from '@fortress/db-drizzle'
 import * as React from 'react'
 
 import { words } from '~/lib/legends/model'
-import type { NameIndex } from '~/lib/legends/server'
+import type { NameIndex } from '~/lib/legends/types'
 import { RecordLink } from './LegendsChrome'
 
 /** Payload keys shown elsewhere on the page, or pure noise. */

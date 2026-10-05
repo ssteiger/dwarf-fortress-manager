@@ -3,7 +3,7 @@ import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from
 import { SwordsIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { plural } from '~/lib/fortress/advisor'
+import { plural } from '~/lib/fortress/advice/phrasing'
 import { isOngoing, warSpan, warTally } from '~/lib/fortress/diplomacy'
 import { EntityName, LegendsLink, type OpenPower } from './shared'
 

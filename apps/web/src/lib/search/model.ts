@@ -1,6 +1,6 @@
 import type { FortItem, FortUnit } from '@fortress/db-drizzle'
 
-import type { LegendsHit } from '../legends/server'
+import type { LegendsHit } from '~/lib/legends/types'
 
 /*
  * Client-safe: what the app can be searched for. The pages are listed here;

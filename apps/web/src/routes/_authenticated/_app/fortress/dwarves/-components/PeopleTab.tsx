@@ -2,8 +2,8 @@ import type { FortUnit } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 import * as React from 'react'
 
-import { type PeopleGroup, type Relation, relations } from '~/lib/fortress/character'
 import { humanize, splitPascal } from '~/lib/fortress/format'
+import { type PeopleGroup, type Relation, relations } from '~/lib/fortress/people/character'
 import { Muted, PersonName, Section, SheetMissing, TONE_TEXT, capitalize } from './SheetParts'
 
 const GROUPS: { key: PeopleGroup; title: string; empty: string; description?: string }[] = [

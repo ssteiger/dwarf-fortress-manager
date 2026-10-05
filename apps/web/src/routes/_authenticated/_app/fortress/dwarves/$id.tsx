@@ -2,8 +2,8 @@ import { Badge } from '@fortress/ui'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 
 import { UnitPortrait } from '~/lib/df-assets/components'
+import { useFortOverview, useFortUnit } from '~/lib/fortress/client/queries'
 import { humanize, isLiving, sexLabel, unitDisplayName, unitGroup } from '~/lib/fortress/format'
-import { useFortOverview, useFortUnit } from '~/lib/fortress/queries'
 import {
   FortBreadcrumbs,
   MoodBadge,

@@ -8,15 +8,7 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { count, desc, eq, max } from 'drizzle-orm'
 
-import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
-
-async function requireUser() {
-  const {
-    data: { user },
-  } = await getSupabaseServerClient().auth.getUser()
-  if (!user) throw new Error('You must be signed in')
-  return user
-}
+import { requireSignedInUser } from '~/lib/utils/supabase/server'
 
 // ---------------------------------------------------------------------------
 // Game connection
@@ -63,7 +55,7 @@ export interface ConnectionStatus {
 
 export const getConnectionStatus = createServerFn({ method: 'GET' }).handler(
   async (): Promise<ConnectionStatus> => {
-    await requireUser()
+    await requireSignedInUser()
     const C = schema.fort_commands
     const [state, dump, map, events, commands] = await Promise.all([
       postgres_db.select().from(schema.fort_state).where(eq(schema.fort_state.id, 1)).limit(1),
@@ -130,7 +122,7 @@ export const getConnectionStatus = createServerFn({ method: 'GET' }).handler(
  */
 export const cancelWaitingCommands = createServerFn({ method: 'POST' }).handler(
   async (): Promise<{ cancelled: number }> => {
-    await requireUser()
+    await requireSignedInUser()
     const C = schema.fort_commands
     const rows = await postgres_db
       .update(C)
@@ -166,7 +158,7 @@ export interface LegendsLibrary {
 
 export const getLegendsLibrary = createServerFn({ method: 'GET' }).handler(
   async (): Promise<LegendsLibrary> => {
-    const user = await requireUser()
+    const user = await requireSignedInUser()
     const N = schema.legends_notes
     const I = schema.legends_imports
     const [worlds, files, notes, state] = await Promise.all([

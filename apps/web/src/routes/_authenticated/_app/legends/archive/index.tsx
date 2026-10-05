@@ -17,11 +17,11 @@ import { EVENT_CATEGORIES, yearSpan } from '~/lib/legends/events'
 import { BROWSE_TABS, kindLabel, racePlural, titleCase, words } from '~/lib/legends/model'
 import {
   type LegendsBrowseQuery,
-  type LegendsHit,
   type LegendsSortKey,
-  type LegendsWorldSummary,
   browseLegends,
-} from '~/lib/legends/server'
+} from '~/lib/legends/server/browse'
+import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
+import type { LegendsHit } from '~/lib/legends/types'
 import { EventsArchive, YearInput } from '../-components/EventsArchive'
 import {
   LegendsShell,

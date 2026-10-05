@@ -28,15 +28,6 @@ import {
 import * as React from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
-import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
-import { gameTimeOf } from '~/lib/fortress/insights'
-import {
-  useFortConcerns,
-  useFortOverview,
-  useFortSupplies,
-  useFortUnits,
-} from '~/lib/fortress/queries'
-import { type ItemSortKey, getFortItems, getFortWork } from '~/lib/fortress/server'
 import {
   type ItemView,
   isItemView,
@@ -44,7 +35,17 @@ import {
   storeSituations,
   storeTiles,
   storesAdvice,
-} from '~/lib/fortress/stores'
+} from '~/lib/fortress/advice/stores'
+import {
+  useFortConcerns,
+  useFortOverview,
+  useFortSupplies,
+  useFortUnits,
+} from '~/lib/fortress/client/queries'
+import { formatNumber, formatValue, humanize } from '~/lib/fortress/format'
+import { type ItemSortKey, getFortItems } from '~/lib/fortress/server/items'
+import { getFortWork } from '~/lib/fortress/server/work'
+import { gameTimeOf } from '~/lib/fortress/time'
 import { NextSteps, SituationList } from '../-components/Advice'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'

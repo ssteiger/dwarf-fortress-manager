@@ -1,7 +1,7 @@
-import type { SpanDigest } from './chronicle'
 import { type Fragment, describeEvent } from './events'
 import { cleanName, racePlural, titleCase } from './model'
-import type { NameIndex } from './server'
+import type { SpanDigest } from './server/chronicle'
+import type { NameIndex } from './types'
 
 /** Client-safe sentences about a span of years, from its digest alone. */
 

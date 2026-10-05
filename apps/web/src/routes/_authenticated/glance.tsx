@@ -12,29 +12,23 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import { FortWatcher } from '~/lib/fortress/FortWatcher'
-import { formatGameTick, isLiving, stressLabel, unitGroup } from '~/lib/fortress/format'
-import {
-  type Notice,
-  STORY_KINDS,
-  cleanAnnouncement,
-  emotionTone,
-  firstName,
-  fortNotices,
-  gameTimeOf,
-  moodText,
-  storyKind,
-  thoughtPhrase,
-} from '~/lib/fortress/insights'
+import { type Notice, fortNotices } from '~/lib/fortress/advice/notices'
+import { STORY_KINDS, cleanAnnouncement, storyKind } from '~/lib/fortress/chronicle/announcements'
+import { FortWatcher } from '~/lib/fortress/client/FortWatcher'
 import {
   useFailingFortReads,
   useFortConcerns,
   useFortOverview,
   useFortUnits,
   useTick,
-} from '~/lib/fortress/queries'
-import { useWatchList } from '~/lib/fortress/watch'
-import { latestThought } from '~/lib/fortress/watchChanges'
+} from '~/lib/fortress/client/queries'
+import { useWatchList } from '~/lib/fortress/client/watch'
+import { formatGameTick, isLiving, stressLabel, unitGroup } from '~/lib/fortress/format'
+import { emotionTone, thoughtPhrase } from '~/lib/fortress/people/thoughts'
+import { moodText } from '~/lib/fortress/people/troubles'
+import { firstName } from '~/lib/fortress/people/units'
+import { latestThought } from '~/lib/fortress/people/watchChanges'
+import { gameTimeOf } from '~/lib/fortress/time'
 import { usePreferencesSync } from '~/lib/preferences'
 import { MoodBadge, SectionBoundary } from './_app/fortress/-components/FortChrome'
 import { StoryIcon } from './_app/fortress/-components/Insights'

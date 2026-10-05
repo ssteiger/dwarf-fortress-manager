@@ -4,8 +4,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { useFortOverview } from '~/lib/fortress/queries'
-import { type FortMapLevel, getFortMapLevel } from '~/lib/fortress/server'
+import { useFortOverview } from '~/lib/fortress/client/queries'
 import {
   DIG_LABELS,
   type LevelGrid,
@@ -14,7 +13,8 @@ import {
   isHidden,
   mineralColor,
   tileStyle,
-} from '~/lib/fortress/tiles'
+} from '~/lib/fortress/mapGrid'
+import { type FortMapLevel, getFortMapLevel } from '~/lib/fortress/server/map'
 import { MapHint, MapMinimap, MapZoomControls } from '~/lib/map/MapControls'
 import { usePanZoom } from '~/lib/map/usePanZoom'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'

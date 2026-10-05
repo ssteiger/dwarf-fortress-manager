@@ -1,6 +1,12 @@
 import { createServerClient } from '@supabase/ssr'
 import { getCookies, setCookie } from '@tanstack/react-start/server'
 
+/*
+ * Server only: Supabase as the signed-in user sees it, through the request's
+ * cookies. The app keeps its data in Postgres through Drizzle; Supabase is
+ * there for sign-in and for knowing who is asking.
+ */
+
 export function getSupabaseServerClient() {
   const supabaseUrl = process.env.SUPABASE_API_URL
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
@@ -27,4 +33,17 @@ export function getSupabaseServerClient() {
       },
     },
   })
+}
+
+/**
+ * The signed-in user, for server functions that act on their behalf. Throws
+ * `message` otherwise; the page shows it as the error, so each caller says
+ * what signing in is needed for.
+ */
+export async function requireSignedInUser(message = 'You must be signed in') {
+  const {
+    data: { user },
+  } = await getSupabaseServerClient().auth.getUser()
+  if (!user) throw new Error(message)
+  return user
 }

@@ -42,12 +42,16 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { type ActionRun, listDfhackActionRuns, queueDfhackAction } from '~/lib/fortress/actions'
-import type { AdviceStatus, Shortcut } from '~/lib/fortress/advisor'
-import { pluginEnabledBy } from '~/lib/fortress/automation'
-import type { Guide } from '~/lib/fortress/guides'
-import { useStepProgress } from '~/lib/fortress/progress'
-import { useFortAutomation } from '~/lib/fortress/queries'
+import { pluginEnabledBy } from '~/lib/fortress/advice/automation'
+import type { Guide } from '~/lib/fortress/advice/guides'
+import type { AdviceStatus, Shortcut } from '~/lib/fortress/advice/types'
+import { useStepProgress } from '~/lib/fortress/client/guideProgress'
+import { useFortAutomation } from '~/lib/fortress/client/queries'
+import {
+  type ActionRun,
+  listDfhackActionRuns,
+  queueDfhackAction,
+} from '~/lib/fortress/server/dfhackActions'
 import { usePreferences } from '~/lib/preferences'
 import { UnitChips } from './Insights'
 

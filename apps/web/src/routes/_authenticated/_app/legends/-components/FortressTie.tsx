@@ -3,7 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { HouseIcon } from 'lucide-react'
 
 import { displayName } from '~/lib/legends/prose'
-import { getFortressInLegends } from '~/lib/legends/server'
+import { getFortressInLegends } from '~/lib/legends/server/fortressLinks'
 
 import { useSelectedWorld } from './LegendsChrome'
 

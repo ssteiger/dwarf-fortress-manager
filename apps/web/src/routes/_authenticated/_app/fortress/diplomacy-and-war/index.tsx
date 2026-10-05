@@ -2,6 +2,7 @@ import type { FortCaravan, FortDiplomacy, FortPower, FortUnit } from '@fortress/
 import { createFileRoute } from '@tanstack/react-router'
 import * as React from 'react'
 
+import { useFortDiplomacy, useFortOverview, useFortUnits } from '~/lib/fortress/client/queries'
 import {
   type Stance,
   caravansOf,
@@ -10,7 +11,6 @@ import {
   presenceByPower,
   stanceOf,
 } from '~/lib/fortress/diplomacy'
-import { useFortDiplomacy, useFortOverview, useFortUnits } from '~/lib/fortress/queries'
 import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
 import { UnitDrawer } from '../dwarves/-components/UnitDrawer'
 import { useFortLegendsWorldId } from '../dwarves/-components/UnitLinks'

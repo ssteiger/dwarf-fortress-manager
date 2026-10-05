@@ -2,7 +2,7 @@ import { Button } from '@fortress/ui'
 import { createFileRoute } from '@tanstack/react-router'
 import * as React from 'react'
 
-import type { Stories, StoryGroup } from '~/lib/legends/chronicle'
+import type { Stories, StoryGroup } from '~/lib/legends/server/chronicle'
 import { LegendsShell, Section, parseWorldSearch } from '../-components/LegendsChrome'
 import { FeaturedStory, StoryCard, featuredStories, useStories } from '../-components/Stories'
 

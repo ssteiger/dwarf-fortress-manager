@@ -4,11 +4,16 @@ import { cn } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
 
+import type { TextPart } from '~/lib/fortress/chronicle/announcements'
+import { historyEventParts, historyTone } from '~/lib/fortress/chronicle/historyEvents'
 import { formatGameTick, stressLabel } from '~/lib/fortress/format'
-import { getFortHistory, getUnitHistory } from '~/lib/fortress/history'
-import { historyEventParts, historyTone } from '~/lib/fortress/historyEvents'
-import type { TextPart } from '~/lib/fortress/insights'
-import { LIFE_TONE, LIFE_TONE_DOT, type LifeTone, lifeEventParts } from '~/lib/fortress/lifeEvents'
+import {
+  LIFE_TONE,
+  LIFE_TONE_DOT,
+  type LifeTone,
+  lifeEventParts,
+} from '~/lib/fortress/people/lifeEvents'
+import { getFortHistory, getUnitHistory } from '~/lib/fortress/server/history'
 import { AnnouncementText } from '../../-components/Insights'
 import { Sparkline } from '../../-components/Trends'
 import { Muted, Section } from './SheetParts'

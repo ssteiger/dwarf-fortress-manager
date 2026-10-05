@@ -9,20 +9,20 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import { type ModelConfig, complete, readModelConfig } from '~/lib/ai/model'
+import { factIdeas } from '~/lib/fortress/nicknames/ideas'
+import { type ListState, matchNameList } from '~/lib/fortress/nicknames/nameList'
 import {
   type ChronicleEvent,
   type DwarfFact,
   type DwarfName,
   type NicknameIdea,
   buildDossiers,
-  factIdeas,
-} from '~/lib/fortress/dossier'
-import { pronouns } from '~/lib/fortress/insights'
-import { type ListState, matchNameList } from '~/lib/fortress/nameList'
-import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
+} from '~/lib/fortress/people/dossier'
+import { pronouns } from '~/lib/fortress/people/units'
+import { requireSignedInUser } from '~/lib/utils/supabase/server'
 import { isLivingCitizen, livingCitizens } from './-utils'
 
-export type { NicknameIdea } from '~/lib/fortress/dossier'
+export type { NicknameIdea } from '~/lib/fortress/people/dossier'
 
 const SINGLETON_ID = 1
 const MAX_BATCH_SIZE = 250
@@ -64,13 +64,7 @@ function validateNickname(value: string): string {
   return nickname
 }
 
-async function requireUser() {
-  const {
-    data: { user },
-  } = await getSupabaseServerClient().auth.getUser()
-  if (!user) throw new Error('You must be signed in to nickname citizens')
-  return user
-}
+const requireUser = () => requireSignedInUser('You must be signed in to nickname citizens')
 
 // ---------------------------------------------------------------------------
 // The fortress as the nickname pages see it

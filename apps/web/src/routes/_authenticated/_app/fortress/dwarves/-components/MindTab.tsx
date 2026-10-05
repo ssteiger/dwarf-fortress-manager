@@ -2,22 +2,17 @@ import type { FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 import { LightbulbIcon } from 'lucide-react'
 
+import { formatGameTick, humanize, splitPascal } from '~/lib/fortress/format'
 import {
   deityText,
   dreamText,
   needLevel,
   needText,
   preferenceGroups,
-} from '~/lib/fortress/character'
-import { facetPhrase, valuePhrase } from '~/lib/fortress/dossier'
-import { formatGameTick, humanize, splitPascal } from '~/lib/fortress/format'
-import {
-  type GameTime,
-  emotionTone,
-  gameAgo,
-  thoughtHint,
-  thoughtPhrase,
-} from '~/lib/fortress/insights'
+} from '~/lib/fortress/people/character'
+import { facetPhrase, valuePhrase } from '~/lib/fortress/people/dossier'
+import { emotionTone, thoughtHint, thoughtPhrase } from '~/lib/fortress/people/thoughts'
+import { type GameTime, gameAgo } from '~/lib/fortress/time'
 import {
   Meter,
   Muted,

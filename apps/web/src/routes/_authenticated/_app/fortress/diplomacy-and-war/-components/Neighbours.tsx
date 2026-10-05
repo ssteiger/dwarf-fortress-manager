@@ -14,7 +14,7 @@ import {
 import { UsersRoundIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { plural } from '~/lib/fortress/advisor'
+import { plural } from '~/lib/fortress/advice/phrasing'
 import {
   BEHAVIOUR,
   NEAR_TILES,

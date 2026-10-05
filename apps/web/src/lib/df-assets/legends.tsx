@@ -7,8 +7,8 @@ import {
   siteSpriteFor,
   tileSpriteByName,
 } from '~/lib/legends/worldTiles'
+import { type DfAssetIndex, useDfAssets } from './'
 import { CreatureSprite, DfTile } from './components'
-import { type DfAssetIndex, useDfAssets } from './index'
 
 /** The fields a legends row or record needs to pick its sprite. */
 export interface LegendsSpriteSubject {

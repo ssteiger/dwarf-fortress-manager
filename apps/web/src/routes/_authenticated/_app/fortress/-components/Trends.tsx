@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { TrendingUpIcon } from 'lucide-react'
 
 import { formatGameTick, formatNumber, formatValue } from '~/lib/fortress/format'
-import { type TrendPoint, getFortTrends } from '~/lib/fortress/history'
+import { type TrendPoint, getFortTrends } from '~/lib/fortress/server/history'
 
 /** A small line over evenly spaced readings; `min` and `max` fix the scale when given. */
 export function Sparkline({

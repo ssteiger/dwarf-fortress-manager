@@ -3,7 +3,7 @@ import { CARAVAN_TICKS_PER_DAY } from '@fortress/db-drizzle/fortress-types'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
 import { RadarIcon } from 'lucide-react'
 
-import { plural } from '~/lib/fortress/advisor'
+import { plural } from '~/lib/fortress/advice/phrasing'
 import { powerById, powerIdOf, presenceRole, presenceText } from '~/lib/fortress/diplomacy'
 import { humanize } from '~/lib/fortress/format'
 import { type OpenUnit, UnitChips } from '../../-components/Insights'

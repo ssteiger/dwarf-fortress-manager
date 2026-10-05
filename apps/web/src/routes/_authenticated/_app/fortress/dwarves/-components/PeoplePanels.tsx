@@ -11,10 +11,11 @@ import {
 import * as React from 'react'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
-import { skillLabel } from '~/lib/fortress/dossier'
 import { skillRank, unitDisplayName } from '~/lib/fortress/format'
-import { type Concern, firstName, isGrownCitizen } from '~/lib/fortress/insights'
-import type { FortBond, FortWastedTalent } from '~/lib/fortress/server'
+import { skillLabel } from '~/lib/fortress/people/dossier'
+import type { Concern } from '~/lib/fortress/people/troubles'
+import { firstName, isGrownCitizen } from '~/lib/fortress/people/units'
+import type { FortBond, FortWastedTalent } from '~/lib/fortress/server/units'
 import { ConcernBadges, type OpenUnit, UnitChip } from '../../-components/Insights'
 
 const SEVERITY_ORDER: Record<Concern['severity'], number> = { danger: 0, warning: 1, info: 2 }

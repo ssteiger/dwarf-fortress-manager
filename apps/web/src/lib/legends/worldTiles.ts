@@ -1,6 +1,6 @@
 import { type DfAssetIndex, type TileSprite, tileSprite, tileVariantAt } from '~/lib/df-assets'
 import { words } from './model'
-import type { LegendsMapData, MapSite } from './server'
+import type { LegendsMapData, MapSite } from './server/map'
 
 /** The game's world-map sprites for legends data: terrain, rivers, sites and artifacts. */
 

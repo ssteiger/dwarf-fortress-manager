@@ -5,10 +5,11 @@ import { Link } from '@tanstack/react-router'
 import { BookOpenIcon, ScrollTextIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { useFortOverview } from '~/lib/fortress/queries'
-import { getChronicleMentionCounts } from '~/lib/fortress/server'
+import { useFortOverview } from '~/lib/fortress/client/queries'
+import { getChronicleMentionCounts } from '~/lib/fortress/server/events'
 import { matchLegendsWorld } from '~/lib/legends/model'
-import { getFigureEventCounts, getKnownFigures, getLegendsOverview } from '~/lib/legends/server'
+import { getFigureEventCounts, getKnownFigures } from '~/lib/legends/server/fortressLinks'
+import { getLegendsOverview } from '~/lib/legends/server/worlds'
 
 export interface UnitLegendsRef {
   worldId: number

@@ -31,22 +31,19 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import {
-  fortAdvice,
-  jobQueue,
-  seasonNotes,
-  situations,
-  workshopBoard,
-} from '~/lib/fortress/advisor'
-import { formatNumber, jobNeedsText, splitPascal } from '~/lib/fortress/format'
-import { gameTimeOf, isGrownCitizen } from '~/lib/fortress/insights'
+import { fortAdvice } from '~/lib/fortress/advice/checks'
+import { seasonNotes, situations } from '~/lib/fortress/advice/situations'
+import { jobQueue, workshopBoard } from '~/lib/fortress/advice/workshops'
 import {
   useFortConcerns,
   useFortOverview,
   useFortSupplies,
   useFortUnits,
-} from '~/lib/fortress/queries'
-import { getFortWork } from '~/lib/fortress/server'
+} from '~/lib/fortress/client/queries'
+import { formatNumber, jobNeedsText, splitPascal } from '~/lib/fortress/format'
+import { isGrownCitizen } from '~/lib/fortress/people/units'
+import { getFortWork } from '~/lib/fortress/server/work'
+import { gameTimeOf } from '~/lib/fortress/time'
 import {
   FineChecks,
   JobQueueList,

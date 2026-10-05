@@ -15,10 +15,10 @@ import { LightbulbIcon, MapIcon, TriangleAlertIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
+import { type ItemHint, itemHints } from '~/lib/fortress/advice/stores'
+import { useFortItem } from '~/lib/fortress/client/queries'
 import { formatValue, humanize, splitPascal, unitDisplayName } from '~/lib/fortress/format'
-import { useFortItem } from '~/lib/fortress/queries'
-import type { ItemPerson } from '~/lib/fortress/server'
-import { type ItemHint, itemHints } from '~/lib/fortress/stores'
+import type { ItemPerson } from '~/lib/fortress/server/items'
 import { EmptyState, StatCard } from '../../-components/FortChrome'
 
 const PROMINENT_FLAGS = [

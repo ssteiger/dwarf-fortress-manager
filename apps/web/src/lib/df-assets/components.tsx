@@ -2,8 +2,6 @@ import type { FortUnit } from '@fortress/db-drizzle'
 import { cn } from '@fortress/ui'
 import * as React from 'react'
 
-import { beastLayers, generatedIcon } from './beasts'
-import { composeLayers } from './compose'
 import {
   type DfAssetIndex,
   type SpriteUnit,
@@ -11,7 +9,9 @@ import {
   pageUrl,
   simpleCreatureSprite,
   useDfAssets,
-} from './index'
+} from './'
+import { beastLayers, generatedIcon } from './beasts'
+import { composeLayers } from './compose'
 import { type SpriteItem, itemLook } from './items'
 import {
   type LayerSetKind,

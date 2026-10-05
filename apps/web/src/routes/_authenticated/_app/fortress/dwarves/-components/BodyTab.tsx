@@ -1,7 +1,15 @@
 import type { FortHealth, FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 
-import { list } from '~/lib/fortress/advisor'
+import {
+  type PatientNeed,
+  needBlockers,
+  needPhrase,
+  patientNeeds,
+} from '~/lib/fortress/advice/health'
+import { list } from '~/lib/fortress/advice/phrasing'
+import { useFortConcerns } from '~/lib/fortress/client/queries'
+import { SKILL_RANKS, humanize, skillRank, splitPascal } from '~/lib/fortress/format'
 import {
   SKILL_GROUP_ORDER,
   attributeLabel,
@@ -13,10 +21,7 @@ import {
   syndromeNames,
   wordsForWound,
   xpForNextLevel,
-} from '~/lib/fortress/character'
-import { SKILL_RANKS, humanize, skillRank, splitPascal } from '~/lib/fortress/format'
-import { type PatientNeed, needBlockers, needPhrase, patientNeeds } from '~/lib/fortress/health'
-import { useFortConcerns } from '~/lib/fortress/queries'
+} from '~/lib/fortress/people/character'
 import { Meter, Muted, Section, SheetMissing, capitalize } from './SheetParts'
 
 export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }) {

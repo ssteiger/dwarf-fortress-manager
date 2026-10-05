@@ -19,7 +19,7 @@ import {
   type NarratorSubject,
   getNarratorStatus,
   narrate,
-} from '~/lib/legends/narrator'
+} from '~/lib/legends/server/narrator'
 import { useJournalMutations } from './Journal'
 import { FilterChip } from './Timeline'
 

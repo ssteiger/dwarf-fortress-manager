@@ -30,14 +30,8 @@ import {
 import * as React from 'react'
 
 import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
-import {
-  careTips,
-  injuries,
-  needLevel,
-  needWant,
-  skillName,
-  syndromeNames,
-} from '~/lib/fortress/character'
+import { makeNameLinker, storyKind } from '~/lib/fortress/chronicle/announcements'
+import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/client/queries'
 import {
   formatGameTick,
   formatValue,
@@ -51,22 +45,21 @@ import {
   stressLabel,
   thirstState,
 } from '~/lib/fortress/format'
+import { unitStory } from '~/lib/fortress/people/activity'
 import {
-  type GameTime,
-  firstName,
-  gameTimeOf,
-  isCitizenish,
-  makeNameLinker,
-  moodNeedsText,
-  moodText,
-  pronouns,
-  storyKind,
-  unitConcerns,
-  unitStory,
-} from '~/lib/fortress/insights'
-import { getNicknameReason } from '~/lib/fortress/nicknames'
-import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/queries'
-import { type CarriedItem, type FortUnitDetail, getFortEvents } from '~/lib/fortress/server'
+  careTips,
+  injuries,
+  needLevel,
+  needWant,
+  skillName,
+  syndromeNames,
+} from '~/lib/fortress/people/character'
+import { moodNeedsText, moodText, unitConcerns } from '~/lib/fortress/people/troubles'
+import { firstName, isCitizenish, pronouns } from '~/lib/fortress/people/units'
+import { getFortEvents } from '~/lib/fortress/server/events'
+import { getNicknameReason } from '~/lib/fortress/server/nicknames'
+import type { CarriedItem, FortUnitDetail } from '~/lib/fortress/server/units'
+import { type GameTime, gameTimeOf } from '~/lib/fortress/time'
 import {
   EmptyState,
   SectionBoundary,

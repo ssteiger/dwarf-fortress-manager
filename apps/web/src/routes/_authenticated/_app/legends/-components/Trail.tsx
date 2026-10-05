@@ -5,8 +5,8 @@ import { FootprintsIcon } from 'lucide-react'
 import type * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
+import { type TrailEntry, clearTrail, useTrail } from '~/lib/legends/client/trail'
 import { kindLabel } from '~/lib/legends/model'
-import { type TrailEntry, clearTrail, useTrail } from '~/lib/legends/trail'
 
 function TrailLink({
   entry,

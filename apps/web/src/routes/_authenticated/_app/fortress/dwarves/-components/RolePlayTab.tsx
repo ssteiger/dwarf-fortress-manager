@@ -14,15 +14,14 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
+import { formatGameTick, unitDisplayName } from '~/lib/fortress/format'
 import {
   type CharacterSheet,
   VOICE_MODES,
   type VoiceMode,
   characterSheet,
   storyHooks,
-} from '~/lib/fortress/character'
-import { formatGameTick, unitDisplayName } from '~/lib/fortress/format'
-import type { GameTime } from '~/lib/fortress/insights'
+} from '~/lib/fortress/people/character'
 import {
   type VoiceTurn,
   type Voiced,
@@ -31,7 +30,8 @@ import {
   getVoiceStatus,
   saveUnitNote,
   speakAs,
-} from '~/lib/fortress/roleplay'
+} from '~/lib/fortress/server/roleplay'
+import type { GameTime } from '~/lib/fortress/time'
 import { Muted, Section, SheetLine, capitalize } from './SheetParts'
 
 const SHEET_ROWS: [keyof CharacterSheet, string][] = [

@@ -1,4 +1,4 @@
-import { DF_ASSETS_BASE, pageUrl } from './index'
+import { DF_ASSETS_BASE, pageUrl } from './'
 import type { Recolor, ResolvedLayer } from './layers'
 import type { DfAssetIndex } from './types'
 

@@ -8,9 +8,9 @@ import {
 import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, ilike, or, sql } from 'drizzle-orm'
 
-import { dumpTable, readDump } from '../fortress/dumpCache'
-import { formatGameTick, humanize, isLiving, splitPascal, unitGroup } from '../fortress/format'
-import { searchRecordsByName } from '../legends/records'
+import { formatGameTick, humanize, isLiving, splitPascal, unitGroup } from '~/lib/fortress/format'
+import { dumpTable, readDump } from '~/lib/fortress/server/dump'
+import { searchRecordsByName } from '~/lib/legends/server/records'
 import {
   type DwarfHit,
   EMPTY_RESULTS,

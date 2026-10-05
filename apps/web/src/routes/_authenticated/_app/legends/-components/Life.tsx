@@ -2,7 +2,7 @@ import { Skeleton } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import type * as React from 'react'
 
-import { getLifeStory } from '~/lib/legends/tellings'
+import { getLifeStory } from '~/lib/legends/server/tellings'
 
 import { Section, Telling } from './LegendsChrome'
 import { NarrateButton } from './Narrator'

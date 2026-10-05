@@ -37,26 +37,25 @@ import * as React from 'react'
 import { toast } from 'sonner'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
+import type { Notice } from '~/lib/fortress/advice/notices'
+import {
+  STORY_KINDS,
+  type StoryKind,
+  type TextPart,
+  storyKind,
+} from '~/lib/fortress/chronicle/announcements'
 import {
   type AlertMode,
   enableDesktopAlerts,
   setAlertMode,
   useAlertMode,
-} from '~/lib/fortress/alerts'
+} from '~/lib/fortress/client/alerts'
 import { formatGameTick } from '~/lib/fortress/format'
-import {
-  type ActivityGroup,
-  type Concern,
-  type Feeling,
-  type Notice,
-  STORY_KINDS,
-  type Severity,
-  type StoryKind,
-  type TextPart,
-  firstName,
-  seasonOf,
-  storyKind,
-} from '~/lib/fortress/insights'
+import type { ActivityGroup } from '~/lib/fortress/people/activity'
+import type { Feeling } from '~/lib/fortress/people/thoughts'
+import type { Concern, Severity } from '~/lib/fortress/people/troubles'
+import { firstName } from '~/lib/fortress/people/units'
+import { seasonOf } from '~/lib/fortress/time'
 
 export type OpenUnit = (unit: FortUnit) => void
 

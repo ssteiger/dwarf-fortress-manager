@@ -19,18 +19,22 @@ import * as React from 'react'
 
 import { CreatureSprite } from '~/lib/df-assets/components'
 import {
+  adviceGuide,
+  jobGroupGuide,
+  situationGuide,
+  workshopGuide,
+} from '~/lib/fortress/advice/guides'
+import type { Situation } from '~/lib/fortress/advice/situations'
+import {
   AREAS,
   AREA_ORDER,
   type Advice,
   type AdviceArea,
   type AdviceStatus,
-  type JobGroup,
-  type Situation,
-  type WorkshopRow,
-} from '~/lib/fortress/advisor'
+} from '~/lib/fortress/advice/types'
+import type { JobGroup, WorkshopRow } from '~/lib/fortress/advice/workshops'
 import { skillRank } from '~/lib/fortress/format'
-import { adviceGuide, jobGroupGuide, situationGuide, workshopGuide } from '~/lib/fortress/guides'
-import { firstName } from '~/lib/fortress/insights'
+import { firstName } from '~/lib/fortress/people/units'
 import { OneClickMark, useActionsToOffer, useOpenGuide } from './Guide'
 import { UnitChips } from './Insights'
 

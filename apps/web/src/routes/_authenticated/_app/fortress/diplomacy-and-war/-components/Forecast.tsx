@@ -2,7 +2,7 @@ import type { FortDiplomacy, FortPower } from '@fortress/db-drizzle'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
 import { TrendingUpIcon } from 'lucide-react'
 
-import { plural } from '~/lib/fortress/advisor'
+import { plural } from '~/lib/fortress/advice/phrasing'
 import {
   type FortProgressValues,
   MEASURES,

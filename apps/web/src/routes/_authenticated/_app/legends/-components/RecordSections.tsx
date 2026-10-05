@@ -24,13 +24,9 @@ import {
   titleCase,
   words,
 } from '~/lib/legends/model'
-import type {
-  HeldPosition,
-  LegendsHit,
-  LegendsMapData,
-  NameIndex,
-  RelatedRecords,
-} from '~/lib/legends/server'
+import type { LegendsMapData } from '~/lib/legends/server/map'
+import type { RelatedRecords } from '~/lib/legends/server/record'
+import type { HeldPosition, LegendsHit, NameIndex } from '~/lib/legends/types'
 import {
   EventLine,
   Facts,

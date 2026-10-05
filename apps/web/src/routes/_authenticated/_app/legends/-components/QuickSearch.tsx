@@ -22,9 +22,9 @@ import { ChevronsUpDownIcon, SearchIcon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
-import { quickSearch } from '~/lib/legends/chronicle'
 import { kindLabel, kindPlural } from '~/lib/legends/model'
-import type { LegendsHit } from '~/lib/legends/server'
+import { quickSearch } from '~/lib/legends/server/chronicle'
+import type { LegendsHit } from '~/lib/legends/types'
 import { recordName } from './LegendsChrome'
 
 function useDebounced<T>(value: T, ms: number): T {

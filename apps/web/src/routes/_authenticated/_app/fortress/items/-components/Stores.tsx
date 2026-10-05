@@ -4,17 +4,18 @@ import { ChevronRightIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { ItemSprite } from '~/lib/df-assets/components'
-import { type Advice, type AdviceStatus, WORKSHOPS } from '~/lib/fortress/advisor'
-import { formatNumber, formatValue, humanize, splitPascal } from '~/lib/fortress/format'
-import { adviceGuide, planGuide, viewGuide } from '~/lib/fortress/guides'
-import { firstName } from '~/lib/fortress/insights'
+import { adviceGuide, planGuide, viewGuide } from '~/lib/fortress/advice/guides'
 import {
   ITEM_VIEWS,
   ITEM_VIEW_INFO,
   type ItemView,
   type PlanRow,
   type StoreTile,
-} from '~/lib/fortress/stores'
+} from '~/lib/fortress/advice/stores'
+import type { Advice, AdviceStatus } from '~/lib/fortress/advice/types'
+import { WORKSHOPS } from '~/lib/fortress/advice/workshops'
+import { formatNumber, formatValue, humanize, splitPascal } from '~/lib/fortress/format'
+import { firstName } from '~/lib/fortress/people/units'
 import { StatusIcon } from '../../-components/Advice'
 import { GuideButton, OneClickMark, useOpenGuide } from '../../-components/Guide'
 

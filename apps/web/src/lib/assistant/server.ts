@@ -21,19 +21,17 @@ import { createServerFn } from '@tanstack/react-start'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 
 import { complete, readModelConfig } from '~/lib/ai/model'
-import {
-  type Advice,
-  compact,
-  fmt,
-  fortAdvice,
-  jobQueue,
-  plural,
-  workshopBoard,
-} from '~/lib/fortress/advisor'
+import { fortAdvice } from '~/lib/fortress/advice/checks'
+import { compact, fmt, plural } from '~/lib/fortress/advice/phrasing'
+import type { Advice } from '~/lib/fortress/advice/types'
+import { jobQueue, workshopBoard } from '~/lib/fortress/advice/workshops'
 import { formatGameTick, skillRank } from '~/lib/fortress/format'
-import { firstName, gameTimeOf } from '~/lib/fortress/insights'
-import { type FortSupplies, getFortConcerns, getFortSupplies } from '~/lib/fortress/server'
-import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
+import { firstName } from '~/lib/fortress/people/units'
+import { getFortSupplies } from '~/lib/fortress/server/items'
+import { getFortConcerns } from '~/lib/fortress/server/overview'
+import { gameTimeOf } from '~/lib/fortress/time'
+import type { FortSupplies } from '~/lib/fortress/types'
+import { requireSignedInUser } from '~/lib/utils/supabase/server'
 
 /*
  * The assistant in the header: a language model that answers questions about
@@ -48,13 +46,7 @@ const MAX_TURNS = 8
 const MAX_TURN = 3000
 const C = schema.fort_commands
 
-async function requireUser() {
-  const {
-    data: { user },
-  } = await getSupabaseServerClient().auth.getUser()
-  if (!user) throw new Error('Sign in to ask the assistant')
-  return user
-}
+const requireUser = () => requireSignedInUser('Sign in to ask the assistant')
 
 // ---------------------------------------------------------------------------
 // Status

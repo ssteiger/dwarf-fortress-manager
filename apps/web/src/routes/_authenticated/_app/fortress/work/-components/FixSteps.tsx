@@ -16,8 +16,8 @@ import { ListOrderedIcon, XIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { ConsoleCommandCard } from '~/lib/assistant/ConsoleCommandCard'
-import type { FixNote, FixStep } from '~/lib/fortress/fixes'
-import { getFortFixes } from '~/lib/fortress/server'
+import type { FixNote, FixStep } from '~/lib/fortress/advice/fixes'
+import { getFortFixes } from '~/lib/fortress/server/work'
 
 /** Opens the work orders that make what the stuck jobs lack, one step at a time. */
 export function FixStepsButton() {

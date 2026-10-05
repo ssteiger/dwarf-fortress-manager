@@ -1,8 +1,9 @@
 import type { JsonObject, LegendsPayload, LegendsRecord } from '@fortress/db-drizzle'
 // Client-safe subpath: the package entry also creates the Postgres client.
 import { DF_MONTHS } from '@fortress/db-drizzle/fortress-types'
+
 import { titleCase, words } from './model'
-import type { NameIndex } from './server'
+import type { NameIndex } from './types'
 
 export { titleCase }
 

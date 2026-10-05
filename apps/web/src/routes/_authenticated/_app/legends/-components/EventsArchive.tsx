@@ -8,8 +8,8 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
-import { type EventSearchQuery, searchEvents } from '~/lib/legends/chronicle'
 import { EVENT_CATEGORIES } from '~/lib/legends/events'
+import { type EventSearchQuery, searchEvents } from '~/lib/legends/server/chronicle'
 import { EventLine } from './LegendsChrome'
 import { type PickedRecord, RecordPicker } from './QuickSearch'
 import { FilterChip } from './Timeline'

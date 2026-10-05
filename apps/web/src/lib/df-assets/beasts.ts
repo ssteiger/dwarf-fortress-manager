@@ -1,6 +1,6 @@
 import type { GeneratedLook } from '@fortress/db-drizzle'
 
-import type { DfAssetIndex, TileSprite } from './index'
+import type { DfAssetIndex, TileSprite } from './'
 import type { Recolor, ResolvedLayer } from './layers'
 
 /**

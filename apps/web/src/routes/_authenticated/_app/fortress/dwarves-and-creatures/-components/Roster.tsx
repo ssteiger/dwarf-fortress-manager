@@ -14,17 +14,11 @@ import {
   unitGroup,
   unitNeeds,
 } from '~/lib/fortress/format'
-import {
-  type GameTime,
-  activityOf,
-  concernScore,
-  emotionTone,
-  gameAgo,
-  isCitizenish,
-  notableThought,
-  thoughtPhrase,
-  unitConcerns,
-} from '~/lib/fortress/insights'
+import { activityOf } from '~/lib/fortress/people/activity'
+import { emotionTone, notableThought, thoughtPhrase } from '~/lib/fortress/people/thoughts'
+import { concernScore, unitConcerns } from '~/lib/fortress/people/troubles'
+import { isCitizenish } from '~/lib/fortress/people/units'
+import { type GameTime, gameAgo } from '~/lib/fortress/time'
 import { EmptyState, MoodBadge, UnitConditionBadges } from '../../-components/FortChrome'
 import { ConcernBadges } from '../../-components/Insights'
 import {

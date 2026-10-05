@@ -8,7 +8,7 @@ import type {
   FortWar,
 } from '@fortress/db-drizzle'
 
-import { list, plural } from './advisor'
+import { list, plural } from './advice/phrasing'
 import { isLiving, splitPascal, unitGroup } from './format'
 
 /**

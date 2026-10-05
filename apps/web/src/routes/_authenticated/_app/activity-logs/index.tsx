@@ -25,7 +25,7 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { useDumpState } from '~/lib/fortress/queries'
+import { useDumpState } from '~/lib/fortress/client/queries'
 import {
   LOG_FILTERS,
   type LogEntry,

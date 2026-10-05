@@ -1,45 +1,22 @@
 import type { FortUnit } from '@fortress/db-drizzle/fortress-types'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Switch,
-  cn,
-} from '@fortress/ui'
+import { Badge, Button } from '@fortress/ui'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  BookmarkIcon,
-  ChevronDownIcon,
-  Loader2Icon,
-  SearchIcon,
-  SendIcon,
-  SparklesIcon,
-  WandSparklesIcon,
-} from 'lucide-react'
+import { Loader2Icon, SendIcon, SparklesIcon, WandSparklesIcon } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { CreatureSprite } from '~/lib/df-assets/components'
-import { alliterate, alliterateAll, alliterationKey } from '~/lib/fortress/alliteration'
-import type { DwarfName } from '~/lib/fortress/dossier'
-import { useFortOverview } from '~/lib/fortress/queries'
-import { getFortUnits } from '~/lib/fortress/server'
-import { EmptyState, PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
+import { useFortOverview } from '~/lib/fortress/client/queries'
+import { alliterate, alliterateAll, alliterationKey } from '~/lib/fortress/nicknames/alliteration'
+import { getFortUnits } from '~/lib/fortress/server/units'
+import { PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
+import { Citizens } from './-components/Citizens'
 import { NameList } from './-components/NameList'
 import { NamePicker } from './-components/NamePicker'
 import {
-  type DossierFact,
   MAX_NICKNAME_LENGTH,
   type NicknameAssignment,
   type NicknameIdea,
-  type RememberedNickname,
   WRITE_BATCH_SIZE,
   getNicknameIdeas,
   queueDwarfNicknames,
@@ -217,6 +194,39 @@ function RouteComponent() {
   )
   const allWritten = visibleCitizens.every((unit) => written[unit.id]?.length)
 
+  const citizenById = React.useMemo(() => new Map(citizens.map((u) => [u.id, u])), [citizens])
+  /** Every name on the list that has a dwarf to go to, with the name as it would go into the game. */
+  const fromList = list.flatMap((entry) => {
+    if (entry.state !== 'fits' && entry.state !== 'wildcard') return []
+    const unit = entry.unitId !== null ? citizenById.get(entry.unitId) : undefined
+    if (!unit) return []
+    const nickname = present(unit, entry.name)
+    return nickname === (unit.nickname?.trim() ?? '') ? [] : [{ unit, name: entry.name, nickname }]
+  })
+
+  function applyList() {
+    const placed = fromList.slice(0, MAX_QUEUE)
+    mutation.mutate(
+      placed.map(({ unit, name, nickname }): NicknameAssignment => {
+        const key = name.toLowerCase()
+        const idea = dossiers
+          .get(unit.id)
+          ?.ideas.find((i) => i.source === 'list' && i.nickname.toLowerCase() === key)
+        return { unitId: unit.id, nickname, why: idea?.why ?? 'From your list.', source: 'list' }
+      }),
+      {
+        onSuccess: () => {
+          setDrafts((current) => {
+            const next = { ...current }
+            for (const { unit, name } of placed) next[unit.id] = { idea: name, listed: true }
+            return next
+          })
+          void ideasQuery.refetch()
+        },
+      },
+    )
+  }
+
   function queue(units: FortUnit[]) {
     mutation.mutate(
       units.slice(0, MAX_QUEUE).map((unit) => {
@@ -311,14 +321,7 @@ function RouteComponent() {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            Nickname dwarves
-            <Badge variant="outline" className="text-sm font-normal">
-              Proof of concept
-            </Badge>
-          </span>
-        }
+        title={<span className="flex flex-wrap items-center gap-3">Nickname dwarves</span>}
         description="Names worth shouting across the dining hall, each pinned on something only that dwarf has eaten, lost, loved, botched or survived. The worker applies queued names to the running game through DFHack on its next poll."
         updatedAt={data?.capturedAt}
         isFetching={isFetching || ideasQuery.isFetching}
@@ -375,14 +378,6 @@ function RouteComponent() {
       />
       <StatusBanner state={overview.data?.state} />
 
-      {ideasQuery.data ? (
-        <NameList
-          list={list}
-          calledBy={calledBy}
-          onChanged={() => void ideasQuery.refetch()}
-          onShow={show}
-        />
-      ) : null}
       <NamePicker
         target={
           picking !== null ? { unitId: picking, called: calledBy.get(picking) ?? 'them' } : null
@@ -395,321 +390,60 @@ function RouteComponent() {
         onClose={() => setPicking(null)}
       />
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Living citizens</CardTitle>
-          <CardDescription className="max-w-3xl">
-            Each idea rests on something real: a favourite food that is somebody's brain, a missing
-            toe, a parent's nickname, a job they are hopeless at, a mishap from the chronicle. Pick
-            one, edit it or type your own; an empty box clears the nickname.{' '}
-            {writer?.enabled
-              ? `${writer.model} can write more from the same facts.`
-              : 'Set LEGENDS_NARRATOR_PROVIDER and LEGENDS_NARRATOR_API_KEY to have a language model write them too.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className="relative w-full max-w-md">
-              <SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search citizens"
-                aria-label="Search citizens"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="nickname-unnamed"
-                checked={unnamedOnly}
-                onCheckedChange={setUnnamedOnly}
-              />
-              <Label htmlFor="nickname-unnamed" className="font-normal">
-                No nickname yet
-                <span className="text-muted-foreground tabular-nums">({withoutNickname})</span>
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="nickname-alliterate"
-                checked={alliterative}
-                onCheckedChange={setAlliterative}
-              />
-              <Label htmlFor="nickname-alliterate" className="font-normal">
-                Alliterate
-                <span className="text-muted-foreground">(Bad Bargain → Bob the Bad Bargain)</span>
-              </Label>
-            </div>
+      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+        {ideasQuery.data ? (
+          <div className="xl:sticky xl:top-6 xl:order-last xl:h-[calc(100svh-3rem)]">
+            <NameList
+              className="h-full"
+              list={list}
+              calledBy={calledBy}
+              onChanged={() => void ideasQuery.refetch()}
+              onShow={show}
+              apply={{
+                count: Math.min(fromList.length, MAX_QUEUE),
+                replacing: fromList.filter(({ unit }) => unit.nickname?.trim()).length,
+                pending: mutation.isPending,
+                disabled: !isLive,
+                onApply: applyList,
+              }}
+            />
           </div>
-
-          {visibleCitizens.length === 0 ? (
-            <EmptyState
-              title={
-                citizens.length === 0
-                  ? 'No living citizens found'
-                  : unnamedOnly && !query
-                    ? 'Everyone has a nickname'
-                    : 'No matches'
-              }
-            >
-              {citizens.length === 0
-                ? 'Wait for the worker to capture a loaded fortress.'
-                : unnamedOnly && !query
-                  ? 'Turn off "No nickname yet" to rename someone.'
-                  : 'Try a different search.'}
-            </EmptyState>
-          ) : (
-            <div className="divide-y rounded-lg border">
-              {visibleCitizens.map((unit) => {
-                const dossier = dossiers.get(unit.id)
-                return (
-                  <NicknameRow
-                    key={unit.id}
-                    unit={unit}
-                    draft={draftFor(unit)}
-                    ideas={ideasFor(unit).map((idea) => ({
-                      ...idea,
-                      label: present(unit, idea.nickname),
-                    }))}
-                    name={dossier?.name ?? null}
-                    facts={dossier?.facts ?? []}
-                    remembered={dossier?.remembered ?? null}
-                    flash={flash === unit.id}
-                    loadingIdeas={ideasQuery.isPending}
-                    disabled={!isLive || mutation.isPending}
-                    canAsk={Boolean(writer?.enabled)}
-                    asking={asking.has(unit.id)}
-                    onType={(typed) =>
-                      setDrafts((current) => ({ ...current, [unit.id]: { typed } }))
-                    }
-                    onPick={(idea) => setDrafts((current) => ({ ...current, [unit.id]: { idea } }))}
-                    onBrowse={list.length ? () => setPicking(unit.id) : null}
-                    onQueue={() => queue([unit])}
-                    onAsk={() => write([unit], true)}
-                  />
-                )
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-const SOURCE_LABEL: Record<NicknameIdea['source'], string> = {
-  facts: 'From their story',
-  model: 'Written by the AI',
-  list: 'From your list',
-}
-
-function SourceIcon({ source }: { source: NicknameIdea['source'] }) {
-  if (source === 'model') return <SparklesIcon className="size-3" aria-hidden />
-  if (source === 'list') return <BookmarkIcon className="size-3" aria-hidden />
-  return null
-}
-
-/** How the game prints it: `Nickname' Surname, then the surname in plain words. */
-function InGame({ nickname, name }: { nickname: string; name: DwarfName | null }) {
-  const text = nickname.trim()
-  if (!text || !name?.surname) return null
-  const meaning = name.meaning && name.meaning !== name.surname ? name.meaning : null
-  return (
-    <p className="text-sm text-muted-foreground">
-      In the game:{' '}
-      <span className="font-medium text-foreground">
-        `{text}' {name.surname}
-      </span>
-      {meaning ? (
-        <>
-          {' '}
-          · {text} {meaning}
-        </>
-      ) : null}
-    </p>
-  )
-}
-
-function NicknameRow({
-  unit,
-  draft,
-  ideas,
-  name,
-  facts,
-  remembered,
-  flash,
-  loadingIdeas,
-  disabled,
-  canAsk,
-  asking,
-  onType,
-  onPick,
-  onBrowse,
-  onQueue,
-  onAsk,
-}: {
-  unit: FortUnit
-  draft: string
-  /** `label` is the idea as it would go into the game. */
-  ideas: (NicknameIdea & { label: string })[]
-  name: DwarfName | null
-  facts: DossierFact[]
-  remembered: RememberedNickname | null
-  flash: boolean
-  loadingIdeas: boolean
-  disabled: boolean
-  canAsk: boolean
-  asking: boolean
-  onType: (value: string) => void
-  onPick: (nickname: string) => void
-  /** Opens the picker over the whole list; null while the list is empty. */
-  onBrowse: (() => void) | null
-  onQueue: () => void
-  onAsk: () => void
-}) {
-  const [open, setOpen] = React.useState(false)
-  const chosen = ideas.find((idea) => idea.label.toLowerCase() === draft.trim().toLowerCase())
-  return (
-    <form
-      id={`dwarf-${unit.id}`}
-      className={cn(
-        'grid scroll-mt-24 gap-3 p-3 transition-colors duration-700 md:grid-cols-[minmax(220px,1fr)_minmax(260px,440px)_auto] md:items-start',
-        flash && 'bg-primary/10',
-      )}
-      onSubmit={(event) => {
-        event.preventDefault()
-        onQueue()
-      }}
-    >
-      <div className="flex min-w-0 items-start gap-3 md:pt-1">
-        <CreatureSprite unit={unit} size={36} className="shrink-0" />
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate font-medium">{unit.readable}</span>
-            {unit.nickname ? <Badge variant="secondary">{unit.nickname}</Badge> : null}
-          </div>
-          <div className="truncate text-sm text-muted-foreground">
-            {unit.profession} · unit {unit.id}
-          </div>
-          {remembered?.why ? (
-            <p className="mt-1 line-clamp-2 text-sm text-muted-foreground" title={remembered.why}>
-              {remembered.source === 'list' ? remembered.why : `Named for: ${remembered.why}`}
-            </p>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="flex min-w-0 flex-col gap-2">
-        <Input
-          aria-label={`Nickname for ${unit.readable}`}
-          maxLength={MAX_NICKNAME_LENGTH}
-          value={draft}
-          placeholder="Type a nickname"
-          onChange={(event) => onType(event.target.value)}
-          disabled={disabled}
+        ) : null}
+        <Citizens
+          rows={visibleCitizens.map((unit) => {
+            const dossier = dossiers.get(unit.id)
+            return {
+              unit,
+              draft: draftFor(unit),
+              ideas: ideasFor(unit).map((idea) => ({
+                ...idea,
+                label: present(unit, idea.nickname),
+              })),
+              name: dossier?.name ?? null,
+              facts: dossier?.facts ?? [],
+              remembered: dossier?.remembered ?? null,
+              flash: flash === unit.id,
+              asking: asking.has(unit.id),
+            }
+          })}
+          total={citizens.length}
+          withoutNickname={withoutNickname}
+          writer={writer}
+          search={search}
+          onSearch={setSearch}
+          unnamedOnly={unnamedOnly}
+          onUnnamedOnly={setUnnamedOnly}
+          alliterative={alliterative}
+          onAlliterative={setAlliterative}
+          loadingIdeas={ideasQuery.isPending}
+          disabled={!isLive || mutation.isPending}
+          onType={(unitId, typed) => setDrafts((current) => ({ ...current, [unitId]: { typed } }))}
+          onPick={(unitId, idea) => setDrafts((current) => ({ ...current, [unitId]: { idea } }))}
+          onBrowse={list.length ? setPicking : null}
+          onQueue={(unit) => queue([unit])}
+          onAsk={(unit) => write([unit], true)}
         />
-        <InGame nickname={draft} name={name} />
-        {ideas.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {ideas.map((idea) => {
-              const active = idea === chosen
-              return (
-                <button
-                  key={idea.nickname}
-                  type="button"
-                  onClick={() => onPick(idea.nickname)}
-                  disabled={disabled}
-                  title={`${SOURCE_LABEL[idea.source]}. ${idea.why}`}
-                  aria-pressed={active}
-                  className={cn(
-                    'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50',
-                    idea.source === 'list' && !active && 'border-dashed',
-                    active && 'border-primary bg-primary/10 text-primary',
-                  )}
-                >
-                  <SourceIcon source={idea.source} />
-                  {idea.label}
-                </button>
-              )
-            })}
-          </div>
-        ) : loadingIdeas ? (
-          <p className="text-sm text-muted-foreground">Digging through their story…</p>
-        ) : null}
-        {chosen?.why ? <p className="text-sm text-muted-foreground">{chosen.why}</p> : null}
-        {facts.length || onBrowse ? (
-          <div>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-              {facts.length ? (
-                <button
-                  type="button"
-                  onClick={() => setOpen((v) => !v)}
-                  aria-expanded={open}
-                  className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline"
-                >
-                  What sets them apart
-                  <ChevronDownIcon
-                    className={cn('size-3.5 transition-transform', open && 'rotate-180')}
-                  />
-                </button>
-              ) : null}
-              {onBrowse ? (
-                <button
-                  type="button"
-                  onClick={onBrowse}
-                  disabled={disabled}
-                  className="inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50"
-                >
-                  <BookmarkIcon className="size-3.5" aria-hidden />
-                  Pick from your names
-                </button>
-              ) : null}
-            </div>
-            {open && facts.length ? (
-              <ul className="mt-1.5 flex flex-col gap-1 text-sm">
-                {facts.map((fact) => (
-                  <li key={fact.text} className="flex items-baseline gap-2">
-                    <span className="min-w-0 flex-1">
-                      {fact.text.charAt(0).toUpperCase()}
-                      {fact.text.slice(1)}
-                    </span>
-                    {fact.only ? (
-                      <Badge variant="outline" className="font-normal">
-                        only them
-                      </Badge>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
       </div>
-
-      <div className="flex items-center gap-2">
-        {canAsk ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="size-9"
-            onClick={onAsk}
-            disabled={asking}
-            title="Have the model write three new names for this dwarf"
-            aria-label={`Write new names for ${unit.readable}`}
-          >
-            {asking ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <SparklesIcon className="size-4" />
-            )}
-          </Button>
-        ) : null}
-        <Button type="submit" variant="outline" disabled={disabled}>
-          Queue
-        </Button>
-      </div>
-    </form>
+    </div>
   )
 }

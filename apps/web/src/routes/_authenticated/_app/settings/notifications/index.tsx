@@ -10,7 +10,7 @@ import {
   enableDesktopAlerts,
   setAlertMode,
   useAlertMode,
-} from '~/lib/fortress/alerts'
+} from '~/lib/fortress/client/alerts'
 import {
   type AlertKind,
   DEFAULT_PREFERENCES,

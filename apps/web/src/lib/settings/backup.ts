@@ -2,7 +2,7 @@ import { postgres_db, schema } from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
 import { type AnyColumn, count, eq, inArray, sql } from 'drizzle-orm'
 
-import { getSupabaseServerClient } from '~/lib/utils/supabase/server'
+import { requireSignedInUser } from '~/lib/utils/supabase/server'
 import {
   BACKUP_KIND,
   BACKUP_LIMITS,
@@ -13,13 +13,7 @@ import {
   readBackup,
 } from './backupFormat'
 
-async function requireUser(): Promise<string> {
-  const {
-    data: { user },
-  } = await getSupabaseServerClient().auth.getUser()
-  if (!user) throw new Error('Sign in to back up your writing')
-  return user.id
-}
+const requireUser = async () => (await requireSignedInUser('Sign in to back up your writing')).id
 
 /** A timestamp as JavaScript writes it, to the millisecond, so it reads back the same. */
 function iso(column: AnyColumn) {

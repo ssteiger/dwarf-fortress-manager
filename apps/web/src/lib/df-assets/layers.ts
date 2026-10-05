@@ -1,7 +1,7 @@
 import type { FortUnit, UnitLook, UnitTissue, UnitWornItem } from '@fortress/db-drizzle'
 import { useQuery } from '@tanstack/react-query'
 
-import { DF_ASSETS_BASE } from './index'
+import { DF_ASSETS_BASE } from './'
 import type {
   CreatureLayerRules,
   DfAssetIndex,

@@ -4,8 +4,8 @@ import { ArrowRightIcon } from 'lucide-react'
 import * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
-import type { StoryRef } from '~/lib/legends/chronicle'
 import { kindLabel, titleCase } from '~/lib/legends/model'
+import type { StoryRef } from '~/lib/legends/server/chronicle'
 import { PinButton } from '../-components/Journal'
 import {
   Breadcrumbs,

@@ -1,6 +1,6 @@
 import type { FortItem } from '@fortress/db-drizzle'
 
-import { type DfAssetIndex, type TileSprite, tileSprite } from './index'
+import { type DfAssetIndex, type TileSprite, tileSprite } from './'
 import type { Recolor } from './layers'
 
 /**

@@ -20,7 +20,7 @@ import {
   cn,
 } from '@fortress/ui'
 import { useMutation } from '@tanstack/react-query'
-import { BookmarkIcon, Loader2Icon, PlusIcon, XIcon } from 'lucide-react'
+import { BookmarkIcon, Loader2Icon, PlusIcon, SendIcon, XIcon } from 'lucide-react'
 import * as React from 'react'
 import { toast } from 'sonner'
 
@@ -41,12 +41,24 @@ export function NameList({
   calledBy,
   onChanged,
   onShow,
+  apply,
+  className,
 }: {
   list: ListedName[]
   /** Unit id -> what to call that dwarf in a few words. */
   calledBy: Map<number, string>
   onChanged: () => void
   onShow: (unitId: number) => void
+  /** Queues every name that has a dwarf to go to. */
+  apply: {
+    count: number
+    /** How many of those dwarves have a nickname that would be replaced. */
+    replacing: number
+    pending: boolean
+    disabled: boolean
+    onApply: () => void
+  }
+  className?: string
 }) {
   const [editing, setEditing] = React.useState(false)
   const [text, setText] = React.useState('')
@@ -85,7 +97,7 @@ export function NameList({
   const fits = list.filter((entry) => entry.state === 'fits').length
 
   return (
-    <Card>
+    <Card className={className}>
       <CardHeader className="max-sm:has-data-[slot=card-action]:grid-cols-1">
         <CardTitle className="flex items-center gap-2">
           Your names
@@ -102,6 +114,45 @@ export function NameList({
         </CardDescription>
         {list.length ? (
           <CardAction className="flex items-center gap-2 max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-3 max-sm:mt-2 max-sm:justify-self-start">
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  disabled={apply.disabled || apply.pending || apply.count === 0}
+                  title={
+                    apply.count
+                      ? 'Queue every name that has a dwarf to go to'
+                      : 'No name on your list has a dwarf to go to'
+                  }
+                >
+                  {apply.pending ? (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  ) : (
+                    <SendIcon className="size-4" />
+                  )}
+                  Apply {apply.count}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Give {apply.count} dwarf{apply.count === 1 ? '' : 'ves'} a name from your list?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Each name goes to the dwarf it fits best, or as a wild card to a dwarf without a
+                    nickname.{' '}
+                    {apply.replacing
+                      ? `${apply.replacing} dwarf${apply.replacing === 1 ? ' loses the nickname it has' : 'ves lose the nicknames they have'} now. `
+                      : ''}
+                    The worker applies them on its next poll.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Not yet</AlertDialogCancel>
+                  <AlertDialogAction onClick={apply.onApply}>Queue {apply.count}</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
             <Button size="sm" variant="outline" onClick={() => setEditing((on) => !on)}>
               <PlusIcon className="size-4" />
               Add names
@@ -130,7 +181,7 @@ export function NameList({
           </CardAction>
         ) : null}
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
         {entering ? (
           <form
             className="flex max-w-2xl flex-col gap-2"

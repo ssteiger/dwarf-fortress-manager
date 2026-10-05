@@ -5,8 +5,8 @@ import { formatDistanceToNow } from 'date-fns'
 import { CircleAlertIcon, SparklesIcon } from 'lucide-react'
 import { toast } from 'sonner'
 
-import { getNarratorStatus } from '~/lib/legends/narrator'
-import { clearTrail, useTrail } from '~/lib/legends/trail'
+import { clearTrail, useTrail } from '~/lib/legends/client/trail'
+import { getNarratorStatus } from '~/lib/legends/server/narrator'
 import { type LegendsLibraryWorld, getLegendsLibrary } from '~/lib/settings/server'
 import { SettingsSection } from '../-components/SettingsSection'
 

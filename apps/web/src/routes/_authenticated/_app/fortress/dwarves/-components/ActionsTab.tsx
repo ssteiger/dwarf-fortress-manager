@@ -32,16 +32,16 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
-import { careTips, preferenceGroups } from '~/lib/fortress/character'
+import { concernGuide } from '~/lib/fortress/advice/guides'
 import { isLiving } from '~/lib/fortress/format'
-import { concernGuide } from '~/lib/fortress/guides'
-import type { Concern } from '~/lib/fortress/insights'
+import { careTips, preferenceGroups } from '~/lib/fortress/people/character'
+import type { Concern } from '~/lib/fortress/people/troubles'
 import {
   type UnitCommandAction,
   type UnitCommandRun,
   listUnitCommands,
   queueUnitAction,
-} from '~/lib/fortress/unitActions'
+} from '~/lib/fortress/server/unitActions'
 import { usePreferences } from '~/lib/preferences'
 import { CopyCommand, GuideBody } from '../../-components/Guide'
 import { Muted, STANDING_TEXT, Section } from './SheetParts'

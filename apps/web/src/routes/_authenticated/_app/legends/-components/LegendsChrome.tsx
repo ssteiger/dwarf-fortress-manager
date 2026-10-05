@@ -27,8 +27,8 @@ import {
 import type * as React from 'react'
 
 import { LegendsSprite } from '~/lib/df-assets/legends'
+import { useFortOverview } from '~/lib/fortress/client/queries'
 import { formatNumber } from '~/lib/fortress/format'
-import { useFortOverview } from '~/lib/fortress/queries'
 import {
   type Fragment,
   describeEvent,
@@ -37,13 +37,9 @@ import {
   plusOf,
 } from '~/lib/legends/events'
 import { cleanName, kindLabel, kindPlural, titleCase, words } from '~/lib/legends/model'
-import {
-  type LegendsHit,
-  type LegendsWorldSummary,
-  type NameIndex,
-  getLegendsOverview,
-  getLegendsWorldSummary,
-} from '~/lib/legends/server'
+import { type LegendsWorldSummary, getLegendsWorldSummary } from '~/lib/legends/server/summary'
+import { getLegendsOverview } from '~/lib/legends/server/worlds'
+import type { LegendsHit, NameIndex } from '~/lib/legends/types'
 import { EmptyState, PageHeader } from '../../fortress/-components/FortChrome'
 import { PinButton } from './Journal'
 import { QuickSearch } from './QuickSearch'

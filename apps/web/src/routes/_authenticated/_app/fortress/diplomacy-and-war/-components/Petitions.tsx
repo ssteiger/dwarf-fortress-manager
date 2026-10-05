@@ -3,7 +3,7 @@ import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, cn } 
 import { ScrollTextIcon } from 'lucide-react'
 import * as React from 'react'
 
-import { plural } from '~/lib/fortress/advisor'
+import { plural } from '~/lib/fortress/advice/phrasing'
 import { humanize } from '~/lib/fortress/format'
 import { EntityName, type OpenPower } from './shared'
 
