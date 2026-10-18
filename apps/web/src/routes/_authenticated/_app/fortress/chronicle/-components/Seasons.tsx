@@ -1,4 +1,6 @@
+import type { SnapshotInvasion } from '@fortress/db-drizzle'
 import { Button, Skeleton, cn } from '@fortress/ui'
+import { Link } from '@tanstack/react-router'
 import { EyeIcon } from 'lucide-react'
 import * as React from 'react'
 
@@ -13,9 +15,10 @@ import { useWatchList } from '~/lib/fortress/client/watch'
 import { formatGameTick } from '~/lib/fortress/format'
 import { LIFE_TONE_DOT } from '~/lib/fortress/people/lifeEvents'
 import { type SeasonRef, seasonAt, seasonIndex, seasonTitle } from '~/lib/fortress/time'
+import { titleCase } from '~/lib/legends/model'
 import { EmptyState } from '../../-components/FortChrome'
 import { AnnouncementText } from '../../-components/Insights'
-import { useFortLegendsWorldId, useKnownHistFigures } from '../../dwarves/-components/UnitLinks'
+import { useFortLegendsWorldId, useKnownHistFigures } from '../../citizens/-components/UnitLinks'
 
 const SECTION_LINES = 8
 
@@ -44,12 +47,16 @@ export const Seasons = () => {
   )
 
   const years = React.useMemo(() => {
-    const out: { year: number; seasons: { season: SeasonRef; recap: Recap }[] }[] = []
+    const out: {
+      year: number
+      seasons: { season: SeasonRef; recap: Recap; invasions: SnapshotInvasion[] }[]
+    }[] = []
     for (const { season, source } of all) {
       const recap = buildRecap(source, { units: units ?? [], watched, ownGroups })
+      const entry = { season, recap, invasions: source.invasions ?? [] }
       const last = out[out.length - 1]
-      if (last?.year === season.year) last.seasons.push({ season, recap })
-      else out.push({ year: season.year, seasons: [{ season, recap }] })
+      if (last?.year === season.year) last.seasons.push(entry)
+      else out.push({ year: season.year, seasons: [entry] })
     }
     return out
   }, [all, units, watched, ownGroups])
@@ -81,11 +88,12 @@ export const Seasons = () => {
           <h2 className="bg-muted/30 px-4 py-2 text-lg font-medium tracking-tight tabular-nums">
             {year}
           </h2>
-          {inYear.map(({ season, recap }) => (
+          {inYear.map(({ season, recap, invasions }) => (
             <SeasonCard
               key={seasonIndex(season)}
               season={season}
               recap={recap}
+              invasions={invasions}
               current={seasonIndex(season) === current}
               startedIn={
                 startedIn && seasonIndex(season) < seasonIndex(startedIn) ? startedIn : null
@@ -116,12 +124,14 @@ export const Seasons = () => {
 const SeasonCard = ({
   season,
   recap,
+  invasions,
   current,
   startedIn,
   legends,
 }: {
   season: SeasonRef
   recap: Recap
+  invasions: SnapshotInvasion[]
   current: boolean
   /** When the worker began reading, for a season before it. */
   startedIn: SeasonRef | null
@@ -145,6 +155,7 @@ const SeasonCard = ({
             world’s history alone.
           </p>
         ) : null}
+        <SeasonWars invasions={invasions} worldId={legends?.worldId ?? null} />
       </div>
       {recap.sections.length ? (
         <div className="gap-x-10 lg:columns-2">
@@ -154,6 +165,49 @@ const SeasonCard = ({
         </div>
       ) : null}
     </section>
+  )
+}
+
+/** The wars this season's invaders came in, as the day's dump matched them by civilization. */
+const SeasonWars = ({
+  invasions,
+  worldId,
+}: {
+  invasions: SnapshotInvasion[]
+  worldId: number | null
+}) => {
+  const wars = [
+    ...new Map(
+      invasions.flatMap((i) => (i.war !== null ? [[i.war, i.war_name] as const] : [])),
+    ).entries(),
+  ]
+  if (!wars.length) return null
+  return (
+    <p className="text-sm">
+      <span className="text-muted-foreground">
+        {wars.length === 1 ? 'The war behind its invasion: ' : 'The wars behind its invasions: '}
+      </span>
+      {wars.map(([id, name], n) => {
+        const label = name ? titleCase(name) : 'an unnamed war'
+        return (
+          <React.Fragment key={id}>
+            {n > 0 ? (n === wars.length - 1 ? ' and ' : ', ') : null}
+            {worldId !== null ? (
+              <Link
+                to="/legends/$kind/$id"
+                params={{ kind: 'historical_event_collection', id: String(id) }}
+                search={{ world: worldId }}
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                {label}
+              </Link>
+            ) : (
+              <span className="font-medium">{label}</span>
+            )}
+          </React.Fragment>
+        )
+      })}
+    </p>
   )
 }
 

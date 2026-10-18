@@ -11,6 +11,7 @@ export function Section({
   action,
   collapsed = false,
   bleed = false,
+  anchor,
   className,
   children,
 }: {
@@ -24,6 +25,8 @@ export function Section({
   collapsed?: boolean
   /** The body runs edge to edge and to the bottom, for tables and maps; the title row keeps its padding. */
   bleed?: boolean
+  /** Element id, for in-page links to this band. */
+  anchor?: string
   className?: string
   children?: React.ReactNode
 }) {
@@ -50,7 +53,7 @@ export function Section({
   )
   if (collapsed) {
     return (
-      <section aria-labelledby={id} className={className}>
+      <section id={anchor} aria-labelledby={id} className={cn('scroll-mt-4', className)}>
         <details className="group">
           <summary className="cursor-pointer list-none p-4 select-none [&::-webkit-details-marker]:hidden">
             {head}
@@ -62,8 +65,13 @@ export function Section({
   }
   return (
     <section
+      id={anchor}
       aria-labelledby={id}
-      className={cn('flex flex-col gap-4 pt-4', bleed ? 'pb-0' : 'px-4 pb-4', className)}
+      className={cn(
+        'flex scroll-mt-4 flex-col gap-4 pt-4',
+        bleed ? 'pb-0' : 'px-4 pb-4',
+        className,
+      )}
     >
       {bleed ? <div className="px-4">{head}</div> : head}
       {children}

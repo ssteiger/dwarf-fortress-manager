@@ -37,6 +37,13 @@ export interface UnitCommandRun {
 const requireUser = () =>
   requireSignedInUser('You must be signed in to change anything in the game')
 
+function laborArg(value: string | undefined): string {
+  const text = (value ?? '').trim()
+  if (!/^[A-Z][A-Z0-9_]*:(on|off)$/.test(text))
+    throw new Error('A labor must look like MINING:on or MINE:off')
+  return text
+}
+
 function cleanText(value: string | undefined, what: string): string {
   const text = (value ?? '').trim()
   const chars = Array.from(text)
@@ -97,7 +104,12 @@ export const queueUnitAction = createServerFn({ method: 'POST' })
       return { id: row.id, reused: false }
     }
 
-    const arg = action === 'title' ? cleanText(data.text, 'Titles') : null
+    const arg =
+      action === 'title'
+        ? cleanText(data.text, 'Titles')
+        : action === 'labor'
+          ? laborArg(data.text)
+          : null
     if (action !== 'title') {
       // A second click while the first is still waiting should not run it twice.
       const waiting = await postgres_db
@@ -108,6 +120,7 @@ export const queueUnitAction = createServerFn({ method: 'POST' })
             eq(C.kind, 'unit_action'),
             eq(C.unit_id, unitId),
             eq(C.action, action),
+            ...(action === 'labor' && arg ? [eq(C.arg, arg)] : []),
             inArray(C.status, ['pending', 'processing']),
           ),
         )

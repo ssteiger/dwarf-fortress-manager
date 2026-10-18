@@ -225,6 +225,10 @@ export const EventsArchive = ({
 
       {results.isLoading ? (
         <p className="p-4 text-sm text-muted-foreground">Reading the chronicles…</p>
+      ) : results.isError && !data ? (
+        <p className="p-4 text-sm text-destructive">
+          The chronicles could not be read just now. Change a filter or reload to try again.
+        </p>
       ) : !data?.events.length ? (
         <p className="p-4 text-sm text-muted-foreground">
           {anyFilter

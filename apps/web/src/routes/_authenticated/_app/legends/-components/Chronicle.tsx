@@ -275,8 +275,11 @@ const ChronicleBody = ({
                           : ''}
                       </div>
                     </div>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {person.events}
+                    <span
+                      className="text-xs text-muted-foreground tabular-nums"
+                      title={`Named in ${person.events.toLocaleString()} events of these years`}
+                    >
+                      {person.events.toLocaleString()} event{person.events === 1 ? '' : 's'}
                     </span>
                   </li>
                 ))}

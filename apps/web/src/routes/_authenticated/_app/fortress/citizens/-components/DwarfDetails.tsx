@@ -35,7 +35,6 @@ import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/clien
 import {
   formatGameTick,
   formatValue,
-  humanize,
   hungerState,
   isLiving,
   sexLabel,
@@ -51,13 +50,17 @@ import {
   injuries,
   needLevel,
   needWant,
+  relations,
   skillName,
   syndromeNames,
 } from '~/lib/fortress/people/character'
+import { isHeadline, latestLifeSentence } from '~/lib/fortress/people/lifeEvents'
 import { moodNeedsText, moodText, unitConcerns } from '~/lib/fortress/people/troubles'
 import { firstName, isCitizenish, pronouns } from '~/lib/fortress/people/units'
 import { getFortEvents } from '~/lib/fortress/server/events'
+import { getUnitHistory } from '~/lib/fortress/server/history'
 import { getNicknameReason } from '~/lib/fortress/server/nicknames'
+import { getUnitSketch } from '~/lib/fortress/server/roleplay'
 import type { CarriedItem, FortUnitDetail } from '~/lib/fortress/server/units'
 import { type GameTime, gameTimeOf } from '~/lib/fortress/time'
 import {
@@ -73,8 +76,18 @@ import { LifeSection } from './LifeSection'
 import { MindTab, ThoughtRow } from './MindTab'
 import { PeopleTab } from './PeopleTab'
 import { RolePlayTab } from './RolePlayTab'
-import { Facts, Meter, Muted, STANDING_BAR, STANDING_TEXT, Section, capitalize } from './SheetParts'
+import {
+  Facts,
+  Meter,
+  Muted,
+  PersonName,
+  STANDING_BAR,
+  STANDING_TEXT,
+  Section,
+  capitalize,
+} from './SheetParts'
 import type { UnitLegendsRef } from './UnitLinks'
+import { FamousAncestorLine, WorldHistorySection } from './WorldHistory'
 
 export type DwarfTab = 'overview' | 'mind' | 'body' | 'people' | 'roleplay' | 'actions' | 'gear'
 
@@ -233,7 +246,10 @@ export const DwarfDetails = ({
       <div className="p-4">
         <div className="flex flex-col gap-3">
           {archived ? <ArchivedNote unit={unit} archived={archived} /> : null}
-          <p className="text-base">{unitStory(unit, now)}</p>
+          <OpeningStory unit={unit} now={now} />
+          {isCitizenish(unit) ? (
+            <FamousAncestorLine legends={legends} name={firstName(unit)} />
+          ) : null}
           {archived ? null : concerns.length ? (
             <ul className="flex flex-col gap-2">
               {concerns.map((c) => (
@@ -279,7 +295,7 @@ export const DwarfDetails = ({
         </TabsContent>
         <TabsContent value="mind">
           <SectionBoundary name="The mind tab">
-            <MindTab unit={unit} now={now} compact={compact} />
+            <MindTab unit={unit} now={now} compact={compact} legends={legends} />
           </SectionBoundary>
         </TabsContent>
         <TabsContent value="body">
@@ -309,6 +325,30 @@ export const DwarfDetails = ({
         </TabsContent>
       </Tabs>
     </SectionStack>
+  )
+}
+
+const OpeningStory = ({ unit, now }: { unit: FortUnit; now: GameTime | null }) => {
+  const history = useQuery({
+    queryKey: ['fort', 'unit-history', unit.id],
+    queryFn: () => getUnitHistory({ data: { unitId: unit.id } }),
+  })
+  const sketch = useQuery({
+    queryKey: ['fort', 'sketch', unit.id],
+    queryFn: () => getUnitSketch({ data: { unitId: unit.id } }),
+    staleTime: 30 * 60_000,
+  })
+  const latest = (history.data?.events ?? []).find(isHeadline)
+  const extra = latest ? latestLifeSentence(latest, unit, now) : undefined
+  return (
+    <>
+      <p className="text-base">{unitStory(unit, now, extra ? { latest: extra } : undefined)}</p>
+      {sketch.data?.text ? (
+        <p className="text-sm text-muted-foreground">
+          {sketch.data.text} <span className="italic">A reading, not a fact from the game.</span>
+        </p>
+      ) : null}
+    </>
   )
 }
 
@@ -553,13 +593,13 @@ const OverviewTab = ({
               { label: 'Kills', value: sheet?.kills ? sheet.kills.toLocaleString() : null },
             ]}
           />
-          <div className="mt-4 flex flex-wrap gap-1.5">
-            {unit.flags.map((flag) => (
-              <Badge key={flag} variant="outline">
-                {humanize(flag)}
-              </Badge>
-            ))}
-          </div>
+          {['child', 'baby', 'merchant'].some((flag) => unit.flags.includes(flag)) ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {unit.flags.includes('baby') ? <Badge variant="outline">Baby</Badge> : null}
+              {unit.flags.includes('child') ? <Badge variant="outline">Child</Badge> : null}
+              {unit.flags.includes('merchant') ? <Badge variant="outline">Merchant</Badge> : null}
+            </div>
+          ) : null}
         </Section>
 
         <Section title="Needs" action={sheet?.needs.length ? tabLink('mind', 'All needs') : null}>
@@ -665,6 +705,10 @@ const OverviewTab = ({
 
       {isCitizenish(unit) ? <LifeSection unit={unit} units={units} compact={compact} /> : null}
 
+      <ClosestPeople unit={unit} units={units} onTab={onTab} />
+
+      {isCitizenish(unit) ? <WorldHistorySection legends={legends} units={units} /> : null}
+
       {detail?.buildings.length ? (
         <Section title="Rooms and workshops">
           <div className="flex flex-wrap gap-2">
@@ -680,6 +724,55 @@ const OverviewTab = ({
         </Section>
       ) : null}
     </SectionStack>
+  )
+}
+
+const CLOSE_KIN = new Set(['SPOUSE', 'MOTHER', 'FATHER', 'CHILD', 'LOVER'])
+
+const ClosestPeople = ({
+  unit,
+  units,
+  onTab,
+}: {
+  unit: FortUnit
+  units: Map<number, FortUnit>
+  onTab: (tab: DwarfTab) => void
+}) => {
+  const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
+  if (!sheet) return null
+  const all = relations(sheet)
+  const family = all.filter((r) => CLOSE_KIN.has(r.person.kind))
+  const friend = all.find((r) => r.group === 'friends')
+  const shown = [...family, ...(friend && !family.includes(friend) ? [friend] : [])].slice(0, 8)
+  if (!shown.length) return null
+  return (
+    <Section
+      title="Closest people"
+      action={
+        <button
+          type="button"
+          className="text-primary underline-offset-4 hover:underline"
+          onClick={() => onTab('people')}
+        >
+          Everyone they know
+        </button>
+      }
+    >
+      <ul className="flex flex-col gap-2 text-sm">
+        {shown.map((r) => (
+          <li
+            key={`${r.person.kind}-${r.person.hf}`}
+            className="flex flex-wrap items-baseline justify-between gap-x-3"
+          >
+            <PersonName person={r.person} units={units} />
+            <span className="text-muted-foreground">
+              {r.label}
+              {r.detail ? ` · ${r.detail}` : ''}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Section>
   )
 }
 

@@ -13,7 +13,7 @@ import { getFortEvents } from '~/lib/fortress/server/events'
 import { getFortHistory } from '~/lib/fortress/server/history'
 import { PageHeader, StatusBand } from '../-components/FortChrome'
 import { AnnouncementText } from '../-components/Insights'
-import { useFortLegendsWorldId, useKnownHistFigures } from '../dwarves/-components/UnitLinks'
+import { useFortLegendsWorldId, useKnownHistFigures } from '../citizens/-components/UnitLinks'
 import { Seasons } from './-components/Seasons'
 
 type Filter = 'all' | 'notable' | 'history' | 'cancellations' | 'combat'

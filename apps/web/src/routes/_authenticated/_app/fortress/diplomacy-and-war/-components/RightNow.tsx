@@ -8,7 +8,7 @@ import { plural } from '~/lib/fortress/advice/phrasing'
 import { powerById, powerIdOf, presenceRole, presenceText } from '~/lib/fortress/diplomacy'
 import { humanize } from '~/lib/fortress/format'
 import { type OpenUnit, UnitChips } from '../../-components/Insights'
-import { EntityName, type OpenPower } from './shared'
+import { EntityName, type OpenPower, WarBehind } from './shared'
 
 const CARAVAN_STATE: Record<string, string> = {
   Approaching: 'is on its way to the depot',
@@ -55,6 +55,7 @@ interface Line {
   tone: 'danger' | 'warn' | 'info'
   body: React.ReactNode
   units?: FortUnit[]
+  more?: React.ReactNode
 }
 
 /** Invaders, envoys, caravans and armies: what is happening between the fortress and the world now. */
@@ -62,12 +63,15 @@ export const RightNow = ({
   d,
   presence,
   caravans,
+  worldId,
   onOpenPower,
   onOpenUnit,
 }: {
   d: FortDiplomacy
   presence: Map<number, FortUnit[]>
   caravans: FortCaravan[]
+  /** The legends world the fortress stands in, when imported. */
+  worldId: number | null
   onOpenPower: OpenPower
   onOpenUnit: OpenUnit
 }) => {
@@ -86,6 +90,7 @@ export const RightNow = ({
           {invasion.size ? `, ${invasion.size} strong` : ''}. They are on the map or close to it.
         </>
       ),
+      more: <WarBehind d={d} civId={invasion.civ_id} worldId={worldId} />,
     })
   }
 
@@ -172,6 +177,7 @@ export const RightNow = ({
               />
               <div className="flex min-w-0 flex-col gap-1.5 text-sm">
                 <p>{line.body}</p>
+                {line.more}
                 {line.units?.length ? (
                   <UnitChips units={line.units} onOpen={onOpenUnit} max={8} />
                 ) : null}

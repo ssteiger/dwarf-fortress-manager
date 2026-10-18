@@ -10,6 +10,7 @@ import {
   pronouns,
   remainsOf,
 } from '../people/units'
+import { type CursedDwarf, cursedDwarves } from './curses'
 import {
   CORE_MEDICAL_LABORS,
   MEDICAL_LABOR_LABEL,
@@ -27,6 +28,7 @@ import {
 } from './health'
 import { cancellationHint, creatureCounts } from './notices'
 import { compact, fmt, list, names, plural } from './phrasing'
+import { CURSE_STEPS } from './situations'
 import type { Advice, AdviceStatus, AdvisorInput } from './types'
 import { DIG_JOBS, SHOP_TYPES, skilledIn } from './workshops'
 
@@ -441,6 +443,38 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
       units: inSight,
       link: { to: '/fortress/map', label: 'Open the map' },
     })
+  {
+    const cursed = cursedDwarves(units, input.legendsCurses)
+    if (cursed.length) {
+      const kinds = new Set(cursed.map((c) => c.kind))
+      const people = [...new Map(cursed.map((c) => [c.unit.id, c.unit])).values()]
+      const said = (c: CursedDwarf) =>
+        `${firstName(c.unit)} is ${c.kind === 'undead' ? 'undead' : `a ${c.what}`}, ${
+          c.source === 'dump'
+            ? 'by the curse the game shows on them'
+            : 'as the world’s history records it'
+        }.`
+      add({
+        key: 'cursed',
+        area: 'safety',
+        status: 'attention',
+        weight: 110,
+        title:
+          people.length === 1
+            ? `Keep an eye on ${firstName(people[0])}`
+            : `Keep an eye on ${plural(people.length, 'cursed dwarf', 'cursed dwarves')}`,
+        why: cursed.map(said).join(' '),
+        steps: compact([
+          CURSE_STEPS.culprit,
+          kinds.has('vampire') && CURSE_STEPS.vampire,
+          kinds.has('werebeast') && CURSE_STEPS.werebeast,
+          (kinds.has('necromancer') || kinds.has('undead')) && CURSE_STEPS.corpses,
+        ]),
+        units: people,
+        link: { to: '/fortress/citizens', label: 'Open the citizens' },
+      })
+    }
+  }
   if (unseen.length)
     add({
       key: 'caverns',
@@ -843,7 +877,7 @@ export function fortAdvice(input: AdvisorInput): Advice[] {
           'Keep them away from corpses, miasma, rain and fighting.',
         ],
         units: unhappy,
-        link: { to: '/fortress/dwarves', label: 'Open the dwarves' },
+        link: { to: '/fortress/citizens', label: 'Open the citizens' },
       })
   }
 

@@ -50,6 +50,8 @@ export interface LegendsBrowseQuery {
   /** Figures: born in this range of years. */
   bornFrom?: number
   bornTo?: number
+  /** Only these record ids, e.g. the fortress's people. */
+  ids?: number[]
 }
 
 export interface LegendsBrowseResult {
@@ -367,6 +369,10 @@ export const browseLegends = createServerFn({ method: 'GET' })
           ? sql`((${R.payload}->'plus'->>'civ_id')::int = ${data.entityId} or (${R.payload}->'plus'->>'cur_owner_id')::int = ${data.entityId})`
           : sql`${R.entity_ids} @> array[${data.entityId}]::int[]`,
       )
+    }
+    if (data.ids) {
+      const ids = data.ids.filter((id) => Number.isInteger(id) && id >= 0).slice(0, 2000)
+      conditions.push(ids.length ? inArray(R.id, ids) : sql`false`)
     }
     if (data.bornFrom !== undefined)
       conditions.push(sql`(${R.payload}->>'birth_year')::int >= ${Math.floor(data.bornFrom)}`)

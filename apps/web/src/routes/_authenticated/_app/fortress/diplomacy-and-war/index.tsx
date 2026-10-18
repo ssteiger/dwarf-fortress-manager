@@ -1,5 +1,6 @@
 import type { FortCaravan, FortDiplomacy, FortPower, FortUnit } from '@fortress/db-drizzle'
-import { createFileRoute } from '@tanstack/react-router'
+import { Button } from '@fortress/ui'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import * as React from 'react'
 
 import { useFortDiplomacy, useFortOverview, useFortUnits } from '~/lib/fortress/client/queries'
@@ -18,8 +19,8 @@ import {
   SectionStack,
   StatusBand,
 } from '../-components/FortChrome'
-import { UnitDrawer } from '../dwarves/-components/UnitDrawer'
-import { useFortLegendsWorldId } from '../dwarves/-components/UnitLinks'
+import { UnitDrawer } from '../citizens/-components/UnitDrawer'
+import { useFortLegendsWorldId } from '../citizens/-components/UnitLinks'
 import { Forecast } from './-components/Forecast'
 import { NeighbourMap } from './-components/NeighbourMap'
 import { Neighbours } from './-components/Neighbours'
@@ -91,6 +92,15 @@ const DiplomacyAndWarPage = () => {
       updatedAt={data?.capturedAt}
       isFetching={isFetching}
       onRefresh={() => refetch()}
+      actions={
+        worldId !== null ? (
+          <Button asChild variant="outline" size="sm">
+            <Link to="/legends/around" search={{ world: worldId }}>
+              Beasts and lairs nearby
+            </Link>
+          </Button>
+        ) : null
+      }
     />
   )
 
@@ -124,6 +134,7 @@ const DiplomacyAndWarPage = () => {
             d={d}
             presence={presence}
             caravans={caravans}
+            worldId={worldId}
             onOpenPower={setPowerId}
             onOpenUnit={setUnit}
           />

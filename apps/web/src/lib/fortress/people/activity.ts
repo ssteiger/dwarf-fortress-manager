@@ -2,6 +2,7 @@ import type { FortUnit } from '@fortress/db-drizzle'
 
 import { isLiving, stressLabel } from '../format'
 import { type GameTime, TICKS_PER_MONTH, absTicks } from '../time'
+import { personName } from './character'
 import { emotionTone, thoughtPhrase } from './thoughts'
 import { firstName, isCitizenish, pronouns } from './units'
 
@@ -117,16 +118,29 @@ function article(word: string): string {
  * A few sentences on who they are and how they are doing, for the top of
  * their page: "Thelma is a 46-year-old stone carver. Right now she is hauling…"
  */
-export function unitStory(unit: FortUnit, now: GameTime | null): string {
+export function unitStory(
+  unit: FortUnit,
+  now: GameTime | null,
+  extra?: { latest?: string },
+): string {
   const name = firstName(unit)
   const p = pronouns(unit)
   const They = p.they.charAt(0).toUpperCase() + p.they.slice(1)
   if (!isLiving(unit)) return `${name} is dead.`
   const age = Math.floor(unit.age)
-  const role = unit.profession ? unit.profession.toLowerCase() : unit.race
+  const young = unit.flags.includes('baby') ? 'baby' : unit.flags.includes('child') ? 'child' : null
+  const role = young ?? (unit.profession ? unit.profession.toLowerCase() : unit.race)
+  const race =
+    unit.race && !role.includes(unit.race) && unit.race !== 'dwarf' ? ` (${unit.race})` : ''
   const sentences: string[] = [
-    `${name} is ${article(String(age))} ${age}-year-old ${role}${unit.race && !role.includes(unit.race) && unit.race !== 'dwarf' ? ` (${unit.race})` : ''}.`,
+    young === 'baby'
+      ? `${name} is a baby${race}.`
+      : `${name} is ${article(String(age))} ${age}-year-old ${role}${race}.`,
   ]
+  const kin = kinClause(unit)
+  if (kin) sentences.push(kin)
+  const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
+  if (sheet?.pregnant) sentences.push(`${They} ${p.is} expecting a child.`)
   const positions = unit.positions.filter((pos) => pos.toLowerCase() !== role)
   if (positions.length) sentences.push(`${They} ${p.is} the fortress’s ${positions.join(' and ')}.`)
   const activity = activityOf(unit)
@@ -137,21 +151,48 @@ export function unitStory(unit: FortUnit, now: GameTime | null): string {
     `Right now ${p.they} ${p.is} ${verb}${unit.job && activity.key !== 'idle' && activity.key !== 'mood' ? `: ${unit.job.toLowerCase()}` : ''}.`,
   )
   if (isCitizenish(unit)) sentences.push(`${They} ${p.is} ${stressLabel(unit.stress_category)}.`)
-  const recent = (unit.thoughts ?? []).filter(
-    (t) => !now || absTicks(now) - absTicks({ year: t[3], tick: t[4] }) <= TICKS_PER_MONTH,
-  )
-  const lately: string[] = []
-  for (const t of [
-    ...recent.filter((t) => emotionTone(t[1]) === 'bad'),
-    ...recent.filter((t) => emotionTone(t[1]) !== 'bad' && t[0] !== 'SatisfiedAtWork'),
-  ]) {
-    const phrase = thoughtPhrase(t[0], t[1], unit)
-    if (!lately.includes(phrase)) lately.push(phrase)
-    if (lately.length === 3) break
-  }
-  if (lately.length)
-    sentences.push(
-      `Lately ${p.they} ${lately.length > 1 ? `${lately.slice(0, -1).join(', ')} and ${lately[lately.length - 1]}` : lately[0]}.`,
+  if (extra?.latest) sentences.push(extra.latest)
+  else {
+    const recent = (unit.thoughts ?? []).filter(
+      (t) => !now || absTicks(now) - absTicks({ year: t[3], tick: t[4] }) <= TICKS_PER_MONTH,
     )
-  return sentences.join(' ')
+    const lately: string[] = []
+    for (const t of [
+      ...recent.filter((t) => emotionTone(t[1]) === 'bad'),
+      ...recent.filter((t) => emotionTone(t[1]) !== 'bad' && t[0] !== 'SatisfiedAtWork'),
+    ]) {
+      const phrase = thoughtPhrase(t[0], t[1], unit)
+      if (!lately.includes(phrase)) lately.push(phrase)
+      if (lately.length === 3) break
+    }
+    if (lately.length)
+      sentences.push(
+        `Lately ${p.they} ${lately.length > 1 ? `${lately.slice(0, -1).join(', ')} and ${lately[lately.length - 1]}` : lately[0]}.`,
+      )
+  }
+  return sentences.slice(0, 5).join(' ')
+}
+
+function kinClause(unit: FortUnit): string | null {
+  const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
+  if (!sheet) return null
+  const p = pronouns(unit)
+  const They = p.they.charAt(0).toUpperCase() + p.they.slice(1)
+  const parent = sheet.people.find(
+    (person) =>
+      (person.kind === 'MOTHER' || person.kind === 'FATHER') &&
+      person.unit !== null &&
+      person.alive !== false,
+  )
+  const spouse = sheet.people.find(
+    (person) =>
+      (person.kind === 'SPOUSE' || person.kind === 'LOVER') &&
+      person.unit !== null &&
+      person.alive !== false,
+  )
+  if (parent && (unit.flags.includes('baby') || unit.flags.includes('child')))
+    return `${They} ${p.is} the ${unit.sex === 0 ? 'daughter' : unit.sex === 1 ? 'son' : 'child'} of ${personName(parent)}.`
+  if (spouse)
+    return `${They} ${p.is} ${spouse.kind === 'LOVER' ? 'the lover of' : unit.sex === 1 ? 'the husband of' : unit.sex === 0 ? 'the wife of' : 'married to'} ${personName(spouse)}.`
+  return null
 }

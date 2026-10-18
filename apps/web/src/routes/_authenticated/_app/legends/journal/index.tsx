@@ -37,7 +37,20 @@ function targetLink(note: LegendsNote, worldId: number) {
       params: { key: note.target_id },
       search: { world: worldId },
     }
-  if (note.target_kind === 'event' || note.target_kind === 'narration') return null
+  if (note.target_kind === 'event')
+    return {
+      to: '/legends/$kind/$id' as const,
+      params: { kind: 'historical_event', id: note.target_id },
+      search: { world: worldId },
+    }
+  if (note.target_kind === 'narration') {
+    // "span:12-40:style", "site:7:style", "story:key:style": the subject, then the narrator's style.
+    const parts = note.target_id.split(':')
+    if (parts.length < 3) return null
+    const [kind, ...rest] = parts.slice(0, -1)
+    const id = rest.join(':')
+    return targetLink({ ...note, target_kind: kind, target_id: id }, worldId)
+  }
   return {
     to: '/legends/$kind/$id' as const,
     params: { kind: note.target_kind, id: note.target_id },

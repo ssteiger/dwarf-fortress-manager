@@ -405,6 +405,8 @@ export interface UnitSheet {
 	wounds: SheetWound[];
 	syndromes: string[];
 	work_details: string[];
+	/** Enabled labor tokens (MINE, CARPENTER, …), from a dedicated read of unit.status.labors. */
+	labors?: string[];
 	/** [year, year tick]. */
 	birth?: [number, number] | null;
 	kills?: number | null;
@@ -1023,7 +1025,7 @@ export interface FortDiplomacy {
 }
 
 /** The dump format this code reads; fortress-snapshot.lua must write the same DUMP_VERSION. */
-export const DUMP_VERSION = 12;
+export const DUMP_VERSION = 13;
 
 export interface FortDumpPayload {
 	status: FortStatus;
@@ -1658,7 +1660,7 @@ export function checkConsoleCommand(text: unknown): string | null {
 
 /**
  * What the web app may do to a single unit. It sends the key, the unit id and,
- * for `title`, the text; unit-action.lua in the worker does the rest.
+ * for `title` and `labor`, the text; unit-action.lua in the worker does the rest.
  */
 export interface UnitActionSpec {
 	label: string;
@@ -1686,6 +1688,12 @@ export const UNIT_ACTIONS = {
 		what: "Sets a custom profession, which the game shows in place of their profession everywhere. An empty title brings the usual one back.",
 		command:
 			'lua df.unit.find({id}).custom_profession = dfhack.utf2df("{text}")',
+	},
+	labor: {
+		label: "Assign a labor",
+		what: "Turns one labor on or off for them in the game, so they may or may not do that work.",
+		command:
+			'lua local u=df.unit.find({id}); local t,s=("{text}"):match("^([A-Z0-9_]+):(on|off)$"); local id=df.unit_labor[t] or (df.job_skill[t] and df.job_skill.attrs[df.job_skill[t]].labor); if id and id>=0 then u.status.labors[id]=(s=="on") end',
 	},
 	calm: {
 		label: "Clear their stress",

@@ -4,6 +4,7 @@ import type {
   FortLifeEvent,
   FortUnit,
   HistoryFieldValue,
+  SnapshotInvasion,
   SnapshotTotals,
 } from '@fortress/db-drizzle'
 
@@ -73,6 +74,8 @@ export interface RecapSource {
   /** The fortress's totals on the first and the last day of the span the worker kept. */
   first: SnapshotPoint | null
   last: SnapshotPoint | null
+  /** Each invasion any day of the span kept, once per civilization. */
+  invasions?: SnapshotInvasion[]
 }
 
 export interface Recap {

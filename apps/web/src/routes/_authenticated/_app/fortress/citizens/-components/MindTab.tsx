@@ -1,6 +1,7 @@
 import type { FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 import { LightbulbIcon } from 'lucide-react'
+import * as React from 'react'
 
 import { SectionGrid } from '~/lib/components/Section'
 import { formatGameTick, humanize, splitPascal } from '~/lib/fortress/format'
@@ -14,6 +15,8 @@ import {
 import { facetPhrase, valuePhrase } from '~/lib/fortress/people/dossier'
 import { emotionTone, thoughtHint, thoughtPhrase } from '~/lib/fortress/people/thoughts'
 import { type GameTime, gameAgo } from '~/lib/fortress/time'
+import { godName, matchDeities, useFortressGods } from '../../../legends/-components/Gods'
+import { RecordLink } from '../../../legends/-components/LegendsChrome'
 import {
   Meter,
   Muted,
@@ -23,6 +26,7 @@ import {
   SheetMissing,
   capitalize,
 } from './SheetParts'
+import type { UnitLegendsRef } from './UnitLinks'
 
 export function tokenLabel(token: string): string {
   if (token.includes('_')) return humanize(token)
@@ -47,10 +51,12 @@ export const MindTab = ({
   unit,
   now,
   compact,
+  legends = null,
 }: {
   unit: FortUnit
   now: GameTime | null
   compact?: boolean
+  legends?: UnitLegendsRef | null
 }) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const noMind = unit.traits == null && unit.values == null && unit.thoughts == null
@@ -62,7 +68,7 @@ export const MindTab = ({
       ) : (
         <PersonalitySection unit={unit} />
       )}
-      {sheet ? <DrivesSection unit={unit} sheet={sheet} /> : null}
+      {sheet ? <DrivesSection unit={unit} sheet={sheet} legends={legends} /> : null}
       {sheet ? <LikesSection sheet={sheet} /> : null}
       {unit.thoughts?.length ? (
         <Section title="Thoughts" count={unit.thoughts.length}>
@@ -218,9 +224,25 @@ const PersonalitySection = ({ unit }: { unit: FortUnit }) => {
   )
 }
 
-const DrivesSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) => {
+const DrivesSection = ({
+  unit,
+  sheet,
+  legends,
+}: {
+  unit: FortUnit
+  sheet: UnitSheet
+  legends: UnitLegendsRef | null
+}) => {
   const religions = sheet.groups.filter(
     ([, type, link]) => type === 'Religion' && !/^FORMER/.test(link),
+  )
+  const gods = useFortressGods(
+    sheet.deities.length ? (legends?.worldId ?? null) : null,
+    legends ? [legends.figureId] : [],
+  )
+  const inRecord = React.useMemo(
+    () => matchDeities(sheet.deities, gods.data ?? []),
+    [sheet.deities, gods.data],
   )
   if (!sheet.dreams.length && !sheet.deities.length && !religions.length) return null
   return (
@@ -238,12 +260,26 @@ const DrivesSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) =>
         ))}
         {sheet.deities.length ? (
           <ul className="flex flex-col gap-2">
-            {sheet.deities.map((deity) => (
-              <li key={deity[0]} className="flex flex-col gap-1">
-                <span>{deityText(deity)}</span>
-                <Meter pct={deity[1]} className="max-w-48" label={`Devotion to ${deity[0]}`} />
-              </li>
-            ))}
+            {sheet.deities.map((deity) => {
+              const god = inRecord.get(deity[0])
+              return (
+                <li key={deity[0]} className="flex flex-col gap-1">
+                  <span>
+                    {deityText(deity)}
+                    {god && legends ? (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · in the record as{' '}
+                        <RecordLink kind="historical_figure" id={god.id} worldId={legends.worldId}>
+                          {godName(god)}
+                        </RecordLink>
+                      </span>
+                    ) : null}
+                  </span>
+                  <Meter pct={deity[1]} className="max-w-48" label={`Devotion to ${deity[0]}`} />
+                </li>
+              )
+            })}
           </ul>
         ) : (
           <Muted>They worship no god.</Muted>

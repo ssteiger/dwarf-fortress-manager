@@ -84,6 +84,27 @@ function ACTIONS.heal()
     return true
 end
 
+function ACTIONS.labor()
+    local ok, why = ours_and_alive()
+    if not ok then return false, why end
+    local token, state = (text or ''):match('^([A-Z][A-Z0-9_]*):(on|off)$')
+    if not token then return false, 'expected a labor as TOKEN:on or TOKEN:off' end
+    local id = df.unit_labor[token]
+    if not id then
+        local skill = df.job_skill[token]
+        if skill then
+            local attrs = df.job_skill.attrs[skill]
+            if attrs and attrs.labor ~= nil and attrs.labor >= 0 then id = attrs.labor end
+        end
+    end
+    if not id or id < 0 then return false, 'unknown labor "' .. token .. '"' end
+    if unit.flags1.merchant or unit.flags1.forest or unit.flags1.diplomat then
+        return false, 'visitors keep their own work'
+    end
+    unit.status.labors[id] = (state == 'on')
+    return true
+end
+
 local run = ACTIONS[action or '']
 if not run then
     fail('unknown action "' .. tostring(action) .. '"')

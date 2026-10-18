@@ -18,13 +18,15 @@ import {
 } from '~/lib/legends/model'
 import { getLegendsMap } from '~/lib/legends/server/map'
 import { getLegendsRecord } from '~/lib/legends/server/record'
-import { FortressTieLine } from '../-components/FortressTie'
+import { FortressTieLine, Yours, recordTie, useFortressContext } from '../-components/FortressTie'
 import { PinButton } from '../-components/Journal'
 import {
   Breadcrumbs,
+  LegendsNav,
   Section,
   SectionGrid,
   SectionStack,
+  Telling,
   parseWorldSearch,
   recordName,
   useLegendsWorlds,
@@ -36,6 +38,7 @@ import {
   ArtifactSections,
   CollectionSections,
   EntitySections,
+  EventSections,
   FigureSections,
   PlaceSections,
   ProseSections,
@@ -44,6 +47,7 @@ import {
   SiteSections,
   WrittenSections,
   describeRecord,
+  figureJumps,
 } from '../-components/RecordSections'
 import { Timeline } from '../-components/Timeline'
 import { TrailBar } from '../-components/Trail'
@@ -164,9 +168,12 @@ const RecordPage = () => {
   if (kind === 'region' && typeof plus.evilness === 'string' && plus.evilness !== 'neutral')
     chips.push(plus.evilness)
   const statusChips = [...new Set(chips)]
+  const fort = useFortressContext(worldId)
+  const ourTie = record ? recordTie(fort, kind, numericId, payload) : null
 
   return (
     <div className="flex flex-1 flex-col">
+      {worldId !== null ? <LegendsNav section={null} worldId={worldId} /> : null}
       <div className="flex flex-col gap-4 border-b p-4">
         <Breadcrumbs
           items={[
@@ -205,14 +212,18 @@ const RecordPage = () => {
               {kindLabel(kind)}
               {subtitle ? ` · ${subtitle}` : null}
             </p>
-            {statusChips.length ? (
-              <div className="mt-3 flex flex-wrap gap-1.5">
+            {statusChips.length || ourTie ? (
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                {ourTie ? <Yours>{ourTie}</Yours> : null}
                 {statusChips.map((chip) => (
                   <Badge key={chip} variant="outline" className="text-sm font-normal">
                     {chip}
                   </Badge>
                 ))}
               </div>
+            ) : null}
+            {kind === 'historical_figure' && worldId !== null && record ? (
+              <FortressTieLine worldId={worldId} figureId={numericId} className="mt-3" />
             ) : null}
           </div>
           {record && worldId !== null ? (
@@ -247,12 +258,31 @@ const RecordPage = () => {
       ) : (
         <SectionStack className="border-b">
           {kind === 'historical_figure' ? (
-            <TheirLife
-              worldId={worldId}
-              id={numericId}
-              title={title}
-              before={<FortressTieLine worldId={worldId} figureId={numericId} />}
-            />
+            <>
+              <TheirLife worldId={worldId} id={numericId} title={title} />
+              <nav
+                aria-label="On this page"
+                className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm"
+              >
+                <span className="text-muted-foreground">Jump to</span>
+                {figureJumps(payload, detail.data?.related ?? {}, detail.data?.positions ?? []).map(
+                  (jump) => (
+                    <a
+                      key={jump.anchor}
+                      href={`#${jump.anchor}`}
+                      className="font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      {jump.label}
+                    </a>
+                  ),
+                )}
+              </nav>
+            </>
+          ) : null}
+          {detail.data?.opening?.length ? (
+            <div className="p-4">
+              <Telling paragraphs={[detail.data.opening]} worldId={worldId} />
+            </div>
           ) : null}
           <SectionGrid className="lg:grid-cols-3">
             <KindSections
@@ -325,6 +355,8 @@ const KindSections = (props: SectionProps) => {
       return <WrittenSections {...props} />
     case 'historical_event_collection':
       return <CollectionSections {...props} />
+    case 'historical_event':
+      return <EventSections {...props} />
     case 'region':
     case 'underground_region':
       return <RegionSections {...props} />

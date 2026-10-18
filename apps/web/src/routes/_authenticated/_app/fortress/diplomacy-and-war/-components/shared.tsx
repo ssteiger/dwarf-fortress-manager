@@ -1,11 +1,24 @@
 import type { FortDiplomacy } from '@fortress/db-drizzle'
 import { checkConsoleCommand } from '@fortress/db-drizzle/fortress-types'
 import { Badge, cn } from '@fortress/ui'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { BookOpenIcon } from 'lucide-react'
 
 import { ConsoleCommandCard } from '~/lib/assistant/ConsoleCommandCard'
-import { STANCE_CLASSES, type Stance, entityName, powerById } from '~/lib/fortress/diplomacy'
+import {
+  STANCE_CLASSES,
+  type Stance,
+  entityName,
+  powerById,
+  warBehind,
+  warSides,
+  warSpan,
+  warTally,
+} from '~/lib/fortress/diplomacy'
+import { titleCase } from '~/lib/legends/model'
+import { getWarTelling } from '~/lib/legends/server/tellings'
+import { Fragments } from '../../../legends/-components/LegendsChrome'
 
 export interface DiplomacyCommand {
   command: string
@@ -109,6 +122,65 @@ export const LegendsLink = ({
       <BookOpenIcon className="size-3.5" />
       {label}
     </Link>
+  )
+}
+
+export function useWarTelling(worldId: number | null, warId: number | null) {
+  return useQuery({
+    queryKey: ['legends', 'war-telling', worldId, warId],
+    queryFn: () => getWarTelling({ data: { worldId: worldId ?? -1, warId: warId ?? -1 } }),
+    enabled: worldId !== null && warId !== null,
+    staleTime: 10 * 60_000,
+  })
+}
+
+/**
+ * The war an invasion belongs to, matched by the invader's civilization id:
+ * the legends' telling when the export is of this world, the game's own
+ * tally otherwise. Nothing when no war of yours names them.
+ */
+export const WarBehind = ({
+  d,
+  civId,
+  worldId,
+  className,
+}: {
+  d: FortDiplomacy
+  civId: number
+  worldId: number | null
+  className?: string
+}) => {
+  const war = warBehind(d, civId)
+  const told = useWarTelling(worldId, war?.id ?? null)
+  if (!war) return null
+  return (
+    <div className={cn('flex flex-col gap-1 text-sm', className)}>
+      <p>
+        <span className="text-muted-foreground">The war behind it: </span>
+        {worldId !== null ? (
+          <Link
+            to="/legends/$kind/$id"
+            params={{ kind: 'historical_event_collection', id: String(war.id) }}
+            search={{ world: worldId }}
+            className="font-medium text-primary underline-offset-4 hover:underline"
+          >
+            {war.name ? titleCase(war.name) : 'an unnamed war'}
+          </Link>
+        ) : (
+          <span className="font-medium">{war.name ? titleCase(war.name) : 'an unnamed war'}</span>
+        )}
+        <span className="text-muted-foreground"> · {warSpan(war, d.year)}</span>
+      </p>
+      {told.data?.length ? (
+        <p className="max-w-[70ch] leading-relaxed text-muted-foreground">
+          <Fragments fragments={told.data} worldId={worldId} />
+        </p>
+      ) : (
+        <p className="text-muted-foreground">
+          {warSides(d, war)}. {warTally(war)}.
+        </p>
+      )}
+    </div>
   )
 }
 

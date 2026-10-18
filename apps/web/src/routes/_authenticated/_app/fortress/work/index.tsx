@@ -42,6 +42,7 @@ import {
 } from '../-components/Advice'
 import { EmptyState, PageHeader, SectionBoundary, StatusBand } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
+import { useLegendsCurses } from '../citizens/-components/UnitLinks'
 import {
   FailingJobs,
   IdleHands,
@@ -131,6 +132,7 @@ const WorkPage = () => {
   const state = overview.data?.state ?? null
   const now = gameTimeOf(state)
 
+  const legendsCurses = useLegendsCurses(units)
   const advisorInput = React.useMemo(
     () => ({
       summary: state?.summary ?? null,
@@ -141,8 +143,19 @@ const WorkPage = () => {
       supplies: supplies.data ?? null,
       events: overview.data?.events ?? [],
       now,
+      legendsCurses,
     }),
-    [state, units, buildings, jobs, concerns.data, supplies.data, overview.data?.events, now],
+    [
+      state,
+      units,
+      buildings,
+      jobs,
+      concerns.data,
+      supplies.data,
+      overview.data?.events,
+      now,
+      legendsCurses,
+    ],
   )
   const advice = React.useMemo(() => fortAdvice(advisorInput), [advisorInput])
   const playbook = React.useMemo(() => situations(advisorInput), [advisorInput])

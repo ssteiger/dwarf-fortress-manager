@@ -16,7 +16,9 @@ import { formatNumber } from '~/lib/fortress/format'
 import { BROWSE_TABS, racePlural, raceToken, titleCase } from '~/lib/legends/model'
 import { getLegendsNames } from '~/lib/legends/server/fortressLinks'
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
+import { NearestDangers } from './-components/Around'
 import { useFortressInLegends } from './-components/FortressTie'
+import { OurGods } from './-components/Gods'
 import { HistoryChart } from './-components/HistoryChart'
 import { useJournal } from './-components/Journal'
 import {
@@ -26,9 +28,11 @@ import {
   RecordLink,
   Section,
   SectionStack,
+  isLiveWorld,
   parseWorldParam,
+  useLegendsWorlds,
 } from './-components/LegendsChrome'
-import { FeaturedStory, featuredStories, useStories } from './-components/Stories'
+import { FeaturedStory, featuredNote, featuredStories, useStories } from './-components/Stories'
 import { TrailList } from './-components/Trail'
 
 interface LegacySearch {
@@ -80,12 +84,35 @@ const OverviewBody = ({
     [stories.data, ourCiv],
   )
 
+  const story = featured.length ? (
+    <FeaturedStory
+      worldId={worldId}
+      candidates={featured}
+      title="A story to start with"
+      description={featuredNote(featured, ourCiv)}
+      start={ourCiv !== null ? 'first' : 'random'}
+      action={
+        <Button asChild variant="ghost" size="sm">
+          <Link to="/legends/stories" search={{ world: worldId }}>
+            All stories
+          </Link>
+        </Button>
+      }
+    />
+  ) : (
+    <Section title="A story to start with">
+      <p className="text-sm text-muted-foreground">
+        {stories.isLoading
+          ? 'Sifting the chronicles for a story…'
+          : stories.isError
+            ? 'The stories could not be read just now. Reload to try again.'
+            : 'No stories yet.'}
+      </p>
+    </Section>
+  )
+
   return (
     <SectionStack className="border-b">
-      <Section title="Other ways in">
-        <WaysIn worldId={worldId} />
-      </Section>
-
       <Section
         title="The size of the world"
         description={`What the export holds for ${worldName}. Each count opens that part of the archive.`}
@@ -93,45 +120,30 @@ const OverviewBody = ({
         <AtAGlance worldId={worldId} counts={counts} summary={summary} />
       </Section>
 
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="flex min-w-0 flex-col divide-y">
-          {featured.length ? (
-            <FeaturedStory
-              worldId={worldId}
-              candidates={featured}
-              title="A story to start with"
-              start={ourCiv !== null ? 'first' : 'random'}
-              action={
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/legends/stories" search={{ world: worldId }}>
-                    All stories
-                  </Link>
-                </Button>
-              }
-            />
-          ) : (
-            <Section title="A story to start with">
-              <p className="text-sm text-muted-foreground">
-                {stories.isLoading ? 'Sifting the chronicles for a story…' : 'No stories yet.'}
-              </p>
-            </Section>
-          )}
-          {live ? <PickUp worldId={worldId} /> : null}
-        </div>
-        <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
-          {live ? (
-            <YourFortress
-              worldId={worldId}
-              worldName={worldName}
-              live={live}
-              matchesLive={matchesLive}
-              summary={summary}
-            />
-          ) : (
+      <Section title="Other ways in">
+        <WaysIn worldId={worldId} />
+      </Section>
+
+      {live && !matchesLive ? <OtherWorld worldName={worldName} live={live} /> : null}
+
+      {live && matchesLive ? (
+        <div className="grid xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <div className="min-w-0">
+            <YourFortress worldId={worldId} live={live} summary={summary} />
+          </div>
+          <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
+            {story}
             <PickUp worldId={worldId} />
-          )}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="min-w-0">{story}</div>
+          <div className="min-w-0 border-t xl:border-t-0 xl:border-l">
+            <PickUp worldId={worldId} />
+          </div>
+        </div>
+      )}
 
       {summary?.timeline.length && years ? (
         <Section
@@ -156,6 +168,56 @@ const OverviewBody = ({
         </Section>
       ) : null}
     </SectionStack>
+  )
+}
+
+/** The fortress stands in another world than the one shown: say so, and how to fix it. */
+const OtherWorld = ({ worldName, live }: { worldName: string; live: LiveFortress }) => {
+  const navigate = useNavigate()
+  const legends = useLegendsWorlds()
+  const playing = (legends.data?.worlds ?? []).find((w) =>
+    isLiveWorld(w, live, legends.data?.liveWorldName),
+  )
+  const fortName = live.fortName ? titleCase(live.fortName) : 'Your fortress'
+  const liveWorld = live.worldName ? titleCase(live.worldName) : 'another world'
+  return (
+    <Section
+      title={playing ? 'These are not the legends of your world' : 'Your world is not imported yet'}
+      action={
+        playing ? (
+          <Button
+            size="sm"
+            onClick={() => navigate({ to: '/legends', search: { world: playing.id } })}
+          >
+            Read {titleCase(playing.name ?? playing.key)} instead
+          </Button>
+        ) : null
+      }
+    >
+      <div className="flex max-w-[70ch] flex-col gap-3 text-base leading-relaxed">
+        <p>
+          {fortName} stands in <span className="font-medium">{liveWorld}</span>, but this page shows
+          the legends of <span className="font-medium">{worldName}</span>. Nothing here is about
+          your dwarves, their kin or their civilization.
+        </p>
+        {playing ? null : (
+          <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+            <li>
+              Open the save that holds {fortName}, then open Legends mode, or run{' '}
+              <code>exportlegends</code> in DFHack while the fortress is loaded.
+            </li>
+            <li>
+              Leave the <code>*-legends.xml</code> and <code>*-legends_plus.xml</code> files in the
+              Dwarf Fortress folder.
+            </li>
+            <li>
+              The worker imports them on its next start. Then every Legends page shows your
+              civilization, your site and your people.
+            </li>
+          </ol>
+        )}
+      </div>
+    </Section>
   )
 }
 
@@ -196,30 +258,30 @@ const AtAGlance = ({
     { label: 'writings & arts', value: tabCount('culture'), archive: 'culture' },
   ]
   return (
-    <ul className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 xl:grid-cols-7">
+    <ul className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-4 xl:grid-cols-7">
       {items.map((item) => {
         const figure = (
           <>
             <span className="block text-lg font-medium tabular-nums">
               {item.value === null || item.value === undefined ? '—' : formatNumber(item.value)}
             </span>
-            <span className="block text-sm text-muted-foreground group-hover:text-foreground group-hover:underline">
+            <span className="block text-sm text-muted-foreground group-hover:text-foreground">
               {item.label}
             </span>
           </>
         )
         return (
-          <li key={item.label}>
+          <li key={item.label} className="min-w-0">
             {item.archive ? (
               <Link
                 to="/legends/archive"
                 search={{ world: worldId, archive: item.archive, type: item.type }}
-                className="group block underline-offset-4"
+                className="group -mx-2 block rounded-md px-2 py-2 transition-colors hover:bg-accent"
               >
                 {figure}
               </Link>
             ) : (
-              figure
+              <div className="py-2">{figure}</div>
             )}
           </li>
         )
@@ -263,15 +325,19 @@ const WAYS_IN = [
 
 const WaysIn = ({ worldId }: { worldId: number }) => {
   return (
-    <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
+    <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2 xl:grid-cols-5">
       {WAYS_IN.map((way) => {
         const Icon = way.icon
         return (
-          <li key={way.to}>
-            <Link to={way.to} search={{ world: worldId }} className="group flex gap-2.5">
+          <li key={way.to} className="min-w-0">
+            <Link
+              to={way.to}
+              search={{ world: worldId }}
+              className="group -mx-2 flex h-full gap-2.5 rounded-md px-2 py-2 transition-colors hover:bg-accent"
+            >
               <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
               <span className="min-w-0">
-                <span className="flex items-center gap-1 font-medium group-hover:underline">
+                <span className="flex items-center gap-1 font-medium">
                   {way.title}
                   <ArrowRightIcon className="size-3.5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </span>
@@ -288,15 +354,11 @@ const WaysIn = ({ worldId }: { worldId: number }) => {
 /** Where the running fortress stands in these legends, or why it does not. */
 const YourFortress = ({
   worldId,
-  worldName,
   live,
-  matchesLive,
   summary,
 }: {
   worldId: number
-  worldName: string
   live: LiveFortress
-  matchesLive: boolean
   summary: LegendsWorldSummary | undefined
 }) => {
   const refs = {
@@ -306,28 +368,11 @@ const YourFortress = ({
   const names = useQuery({
     queryKey: ['legends', 'names', worldId, refs],
     queryFn: () => getLegendsNames({ data: { worldId, refs } }),
-    enabled: matchesLive && (refs.entity.length > 0 || refs.site.length > 0),
+    enabled: refs.entity.length > 0 || refs.site.length > 0,
     staleTime: 10 * 60_000,
   })
-  const tie = useFortressInLegends(worldId, matchesLive)
+  const tie = useFortressInLegends(worldId, true)
   const fortName = live.fortName ? titleCase(live.fortName) : 'Your fortress'
-
-  if (!matchesLive) {
-    return (
-      <Section title="Your fortress">
-        <p className="text-sm text-muted-foreground">
-          <span className="text-foreground">{fortName}</span> stands in{' '}
-          <span className="text-foreground">
-            {live.worldName ? titleCase(live.worldName) : 'another world'}
-          </span>
-          , but these legends are from {worldName}. To read the history your dwarves were born into,
-          export legends from that save (Legends mode, or <code>exportlegends</code> in DFHack). The
-          worker imports it on its next start, and this panel will show your civilization, its wars
-          and your site.
-        </p>
-      </Section>
-    )
-  }
 
   const civ = summary?.civilizations.find((c) => c.id === live.civId) ?? null
   const civName = live.civId !== null ? names.data?.entity?.[live.civId] : undefined
@@ -391,6 +436,9 @@ const YourFortress = ({
             <Fragments fragments={told.civ} worldId={worldId} />
           </p>
         ) : null}
+
+        <NearestDangers worldId={worldId} live={live} />
+
         {told?.storied.length ? (
           <div>
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
@@ -410,7 +458,7 @@ const YourFortress = ({
                       worldId={worldId}
                     />
                     <Link
-                      to="/fortress/dwarves/$id"
+                      to="/fortress/citizens/$id"
                       params={{ id: String(dweller.unitId) }}
                       className="shrink-0 text-primary underline-offset-4 hover:underline"
                     >
@@ -431,6 +479,9 @@ const YourFortress = ({
             </ul>
           </div>
         ) : null}
+
+        <OurGods worldId={worldId} />
+
         {live.civId !== null && civName ? (
           <div className="flex flex-wrap gap-2">
             <Button asChild size="sm" variant="outline">

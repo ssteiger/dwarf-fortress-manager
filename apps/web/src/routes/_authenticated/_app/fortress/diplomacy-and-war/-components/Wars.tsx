@@ -5,8 +5,9 @@ import * as React from 'react'
 
 import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
-import { isOngoing, warSpan, warTally } from '~/lib/fortress/diplomacy'
-import { EntityName, LegendsLink, type OpenPower } from './shared'
+import { isOngoing, warBehind, warSpan, warTally } from '~/lib/fortress/diplomacy'
+import { Fragments } from '../../../legends/-components/LegendsChrome'
+import { EntityName, LegendsLink, type OpenPower, useWarTelling } from './shared'
 
 const EVENTS_SHOWN = 3
 
@@ -33,6 +34,12 @@ export const Wars = ({
       [...w.attackers, ...w.defenders].some((id) => nearIds.has(powerOf(id))),
   )
   const ongoing = ours.filter(isOngoing).length
+  const behind = new Set(
+    d.invasions
+      .filter((invasion) => invasion.flags.includes('active'))
+      .map((invasion) => warBehind(d, invasion.civ_id)?.id)
+      .filter((id): id is number => id !== undefined),
+  )
 
   return (
     <Section
@@ -46,7 +53,14 @@ export const Wars = ({
     >
       <div className="flex flex-col gap-3">
         {ours.map((war) => (
-          <WarItem key={war.id} d={d} war={war} worldId={worldId} onOpen={onOpen} />
+          <WarItem
+            key={war.id}
+            d={d}
+            war={war}
+            worldId={worldId}
+            onOpen={onOpen}
+            behindInvasion={behind.has(war.id)}
+          />
         ))}
         {between.length ? (
           <div className="flex flex-col gap-3 border-t pt-3">
@@ -92,14 +106,18 @@ export const WarItem = ({
   war,
   worldId,
   onOpen,
+  behindInvasion = false,
 }: {
   d: FortDiplomacy
   war: FortWar
   worldId: number | null
   onOpen: OpenPower
+  /** An active invasion of your fortress belongs to this war. */
+  behindInvasion?: boolean
 }) => {
   const [all, setAll] = React.useState(false)
   const events = all ? war.events : war.events.slice(0, EVENTS_SHOWN)
+  const told = useWarTelling(behindInvasion ? worldId : null, war.id)
   return (
     <div className="flex flex-col gap-2 border-l-2 py-1 pl-3">
       <div className="flex flex-wrap items-center gap-2">
@@ -113,6 +131,11 @@ export const WarItem = ({
             Over
           </Badge>
         )}
+        {behindInvasion ? (
+          <Badge variant="outline" className="font-normal">
+            Behind the invasion now
+          </Badge>
+        ) : null}
         <span className="ml-auto">
           <LegendsLink worldId={worldId} kind="historical_event_collection" id={war.id} />
         </span>
@@ -124,6 +147,11 @@ export const WarItem = ({
       <p className="text-sm text-muted-foreground">
         {warSpan(war, d.year)}. {warTally(war)}.
       </p>
+      {told.data?.length ? (
+        <p className="max-w-[70ch] text-sm leading-relaxed">
+          <Fragments fragments={told.data} worldId={worldId} />
+        </p>
+      ) : null}
       {events.length ? (
         <ul className="flex flex-col gap-1 border-l-2 pl-3 text-sm">
           {events.map((event, i) => (

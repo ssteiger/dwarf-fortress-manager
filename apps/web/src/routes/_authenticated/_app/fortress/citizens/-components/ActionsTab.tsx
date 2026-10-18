@@ -13,7 +13,6 @@ import {
   Input,
   cn,
 } from '@fortress/ui'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -37,18 +36,13 @@ import { concernGuide } from '~/lib/fortress/advice/guides'
 import { isLiving } from '~/lib/fortress/format'
 import { careTips, preferenceGroups } from '~/lib/fortress/people/character'
 import type { Concern } from '~/lib/fortress/people/troubles'
-import {
-  type UnitCommandAction,
-  type UnitCommandRun,
-  listUnitCommands,
-  queueUnitAction,
-} from '~/lib/fortress/server/unitActions'
+import type { UnitCommandAction, UnitCommandRun } from '~/lib/fortress/server/unitActions'
 import { usePreferences } from '~/lib/preferences'
 import { CopyCommand, GuideBody } from '../../-components/Guide'
+import { LaborButton } from './LaborButton'
 import { Muted, STANDING_TEXT, Section } from './SheetParts'
+import { useUnitCommands } from './useUnitCommands'
 
-/** A run older than this no longer shows as the result of its button. */
-const RECENT_MS = 30 * 60_000
 /** Pending this long without being picked up: the worker is probably not running. */
 const STALE_MS = 20_000
 
@@ -59,54 +53,6 @@ function commandFor(action: UnitCommandAction, unitId: number, text = ''): strin
   return template
     .replace('{id}', String(unitId))
     .replace('{text}', text.replace(/\\/g, '\\\\').replace(/"/g, '\\"'))
-}
-
-/** Recent actions on this unit, polled quickly while one is on its way. */
-export function useUnitCommands(unitId: number) {
-  const client = useQueryClient()
-  const key = ['fort', 'unit-commands', unitId]
-  const runs = useQuery({
-    queryKey: key,
-    queryFn: () => listUnitCommands({ data: { unitId } }),
-    refetchInterval: (query) =>
-      query.state.data?.some((r) => r.status === 'pending' || r.status === 'processing')
-        ? 1500
-        : 30_000,
-  })
-  // The worker dumps right after running a command; refresh what the page shows then.
-  const open = React.useRef(new Set<number>())
-  React.useEffect(() => {
-    let finished = false
-    for (const run of runs.data ?? []) {
-      if (run.status === 'pending' || run.status === 'processing') open.current.add(run.id)
-      else if (open.current.delete(run.id)) finished = true
-    }
-    if (finished) {
-      const timer = setTimeout(() => {
-        void client.invalidateQueries({ queryKey: ['fort', 'unit', unitId] })
-        void client.invalidateQueries({ queryKey: ['fort', 'units'] })
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [runs.data, client, unitId])
-  const queue = useMutation({
-    mutationFn: (input: { action: UnitCommandAction; text?: string }) =>
-      queueUnitAction({ data: { unitId, ...input } }),
-    onSuccess: ({ reused }) => {
-      if (reused) toast.message('That is already on its way to the game.')
-      void client.invalidateQueries({ queryKey: key })
-    },
-    onError: (error) => toast.error(error.message),
-  })
-  const latest = (action: UnitCommandAction): UnitCommandRun | undefined =>
-    runs.data?.find(
-      (r) =>
-        r.action === action &&
-        (r.status === 'pending' ||
-          r.status === 'processing' ||
-          Date.now() - new Date(r.completedAt ?? r.createdAt).getTime() < RECENT_MS),
-    )
-  return { runs, queue, latest }
 }
 
 const RunLine = ({ run }: { run: UnitCommandRun }) => {
@@ -431,9 +377,14 @@ export const ActionsTab = ({ unit, compact }: { unit: FortUnit; compact?: boolea
             {tips.map((tip) => (
               <li key={tip.key} className="py-2 text-sm first:pt-0 last:pb-0">
                 <div className={cn('font-medium', STANDING_TEXT[tip.standing])}>{tip.title}</div>
-                <div className="mt-0.5 flex gap-1.5 text-muted-foreground">
-                  <LightbulbIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
-                  {tip.text}
+                <div className="mt-0.5 flex flex-wrap items-center gap-2 text-muted-foreground">
+                  <span className="flex gap-1.5">
+                    <LightbulbIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
+                    {tip.text}
+                  </span>
+                  {tip.key.startsWith('labor:') ? (
+                    <LaborButton unit={unit} skill={tip.key.slice('labor:'.length)} on />
+                  ) : null}
                 </div>
               </li>
             ))}
@@ -513,7 +464,11 @@ export const ActionsTab = ({ unit, compact }: { unit: FortUnit; compact?: boolea
                       ? run.text
                         ? `Title “${run.text}”`
                         : 'Clear the title'
-                      : UNIT_ACTIONS[run.action as UnitAction].label}
+                      : run.action === 'labor'
+                        ? run.text?.endsWith(':off')
+                          ? `Stop ${run.text.split(':')[0]}`
+                          : `Allow ${run.text?.split(':')[0] ?? 'a labor'}`
+                        : UNIT_ACTIONS[run.action as UnitAction].label}
                 </span>
                 <RunLine run={run} />
               </li>

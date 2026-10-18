@@ -19,7 +19,7 @@ import {
   titleCase,
   words,
 } from '~/lib/legends/model'
-import type { SiteHistory } from '~/lib/legends/server/chronicle'
+import type { SiteHistory, SpanPin } from '~/lib/legends/server/chronicle'
 import type { LegendsMapData, MapRegion, MapSite } from '~/lib/legends/server/map'
 import { type SiteSnapshot, changesBySite, siteStatesAt } from '~/lib/legends/timeline'
 import {
@@ -53,7 +53,28 @@ export interface WorldMapProps {
    */
   year?: number | null
   history?: SiteHistory | null
+  /** The player's fortress site, ringed and named in the key. */
+  homeSite?: number | null
+  /** Places where the chosen years' events happened. */
+  pins?: SpanPin[] | null
 }
+
+/** Flare and pin colours, as r,g,b. */
+const EVENT_COLOUR: Record<SpanPin['kind'], string> = {
+  battle: '239,68,68',
+  attack: '249,115,22',
+  ruined: '127,29,29',
+  conquered: '245,158,11',
+  founded: '52,211,153',
+}
+const EVENT_LABEL: Record<SpanPin['kind'], string> = {
+  battle: 'Battle',
+  attack: 'Attack',
+  conquered: 'Conquered',
+  ruined: 'Ruined',
+  founded: 'Founded',
+}
+const HOME_RING = '#38bdf8'
 
 const OCEAN = '#28527f'
 const MAX_SCALE = 72
@@ -345,6 +366,8 @@ export const WorldMap = ({
   className,
   year = null,
   history = null,
+  homeSite = null,
+  pins = null,
 }: WorldMapProps) => {
   const inset = (variant ?? (showLegend ? 'full' : 'inset')) === 'inset'
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
@@ -425,6 +448,17 @@ export const WorldMap = ({
     }
     return out
   }, [history, year, data.sites])
+
+  const home = React.useMemo(
+    () => (homeSite === null ? null : (data.sites.find((s) => s.id === homeSite) ?? null)),
+    [data.sites, homeSite],
+  )
+  const eventKinds = React.useMemo(() => {
+    const seen = new Set<SpanPin['kind']>()
+    for (const f of flares) seen.add(f.kind)
+    for (const p of pins ?? []) seen.add(p.kind)
+    return (Object.keys(EVENT_LABEL) as SpanPin['kind'][]).filter((k) => seen.has(k))
+  }, [flares, pins])
 
   const orderedSites = React.useMemo(
     () =>
@@ -615,12 +649,7 @@ export const WorldMap = ({
     }
 
     // Flares: what just happened, fading over a few years.
-    const flareColour = {
-      battle: '239,68,68',
-      ruined: '127,29,29',
-      conquered: '245,158,11',
-      founded: '52,211,153',
-    }
+    const flareColour = EVENT_COLOUR
     for (const flare of flares) {
       const cx = ox + (flare.x + 0.5) * scale
       const cy = oy + (flare.y + 0.5) * scale
@@ -636,6 +665,25 @@ export const WorldMap = ({
         ctx.fillStyle = `rgba(${flareColour[flare.kind]},${(alpha * 0.25).toFixed(3)})`
         ctx.fill()
       }
+    }
+
+    // Pins: where the chosen years' events happened, as small diamonds.
+    for (const pin of pins ?? []) {
+      const cx = ox + (pin.x + 0.5) * scale
+      const cy = oy + (pin.y + 0.5) * scale
+      const r = Math.min(Math.max(scale * 0.35, 4), 9)
+      if (!visible(cx, cy, r)) continue
+      ctx.beginPath()
+      ctx.moveTo(cx, cy - r)
+      ctx.lineTo(cx + r, cy)
+      ctx.lineTo(cx, cy + r)
+      ctx.lineTo(cx - r, cy)
+      ctx.closePath()
+      ctx.fillStyle = `rgb(${EVENT_COLOUR[pin.kind]})`
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(0,0,0,0.8)'
+      ctx.lineWidth = 1
+      ctx.stroke()
     }
 
     // Names: regions when zoomed out a little, sites once there is room.
@@ -702,9 +750,12 @@ export const WorldMap = ({
       ctx.lineWidth = 1
       ctx.stroke()
     }
+    if (home && states?.get(home.id)?.exists !== false) ring(home.x, home.y, HOME_RING)
     if (focus) ring(focus.x, focus.y, '#fde68a')
     if (selected?.kind === 'site') ring(selected.site.x, selected.site.y, '#ffffff')
   }, [
+    home,
+    pins,
     view,
     size,
     cache,
@@ -859,6 +910,10 @@ export const WorldMap = ({
           <SelectionCard
             selection={selected}
             data={data}
+            state={selected.kind === 'site' ? (states?.get(selected.site.id) ?? null) : null}
+            year={states ? year : null}
+            civs={civs}
+            home={selected.kind === 'site' && selected.site.id === homeSite}
             compact={inset}
             onClose={() => setSelected(null)}
             onOpenSite={onSelectSite}
@@ -962,13 +1017,45 @@ export const WorldMap = ({
             </span>
           ))}
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block size-2.5 border border-white/50 bg-[#1c1917]" /> Lairs &
-            caves
+            <span className="inline-block size-2.5 border border-white/50 bg-[#1c1917]" /> Lairs,
+            shrines & caves
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="inline-block size-0 border-x-[5px] border-b-[9px] border-x-transparent border-b-[#f5f5f4]" />{' '}
             Peaks
           </span>
+        </div>
+      ) : null}
+
+      {showLegend && (home || eventKinds.length) ? (
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground',
+            !inset && 'px-4 pb-4',
+          )}
+        >
+          {home ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block size-3 rounded-full border-2"
+                style={{ borderColor: HOME_RING }}
+              />
+              Your fortress
+            </span>
+          ) : null}
+          {home && eventKinds.length ? <span className="mx-1 hidden border-l sm:inline" /> : null}
+          {eventKinds.map((kind) => (
+            <span key={kind} className="inline-flex items-center gap-1.5">
+              <span
+                className="inline-block size-2.5 rotate-45 border border-black/50"
+                style={{ backgroundColor: `rgb(${EVENT_COLOUR[kind]})` }}
+              />
+              {EVENT_LABEL[kind]}
+            </span>
+          ))}
+          {eventKinds.length ? (
+            <span className="text-muted-foreground/80">Rings fade over the following years.</span>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -978,6 +1065,10 @@ export const WorldMap = ({
 const SelectionCard = ({
   selection,
   data,
+  state,
+  year,
+  civs,
+  home,
   compact,
   onClose,
   onOpenSite,
@@ -985,6 +1076,11 @@ const SelectionCard = ({
 }: {
   selection: Selection
   data: LegendsMapData
+  /** The site as it stood in `year`, when the map shows a year. */
+  state: SiteSnapshot | null
+  year: number | null
+  civs: LegendsMapData['civs']
+  home: boolean
   compact: boolean
   onClose: () => void
   onOpenSite?: (site: MapSite) => void
@@ -995,14 +1091,22 @@ const SelectionCard = ({
   let open: (() => void) | null = null
   if (selection.kind === 'site') {
     const { site } = selection
-    const civ = site.civ !== null ? data.civs[site.civ] : null
-    const owner = site.owner !== null && site.owner !== site.civ ? data.civs[site.owner] : null
+    const holderId = state ? state.civ : site.civ
+    const civ = holderId !== null ? civs[holderId] : null
+    const owner =
+      !state && site.owner !== null && site.owner !== site.civ ? data.civs[site.owner] : null
+    const civName = civ
+      ? `${civ.name ? titleCase(civ.name) : 'unknown'}${civ.race ? ` (${words(civ.race)})` : ''}`
+      : null
     title = site.name ? titleCase(site.name) : `Site #${site.id}`
     detail = [
+      home ? 'your fortress' : null,
       words(site.type) || 'site',
-      civ
-        ? `of ${civ.name ? titleCase(civ.name) : 'unknown'}${civ.race ? ` (${words(civ.race)})` : ''}`
-        : 'unclaimed',
+      state?.ruined
+        ? `in ruins${year !== null ? ` in ${year}` : ''}`
+        : civName
+          ? `${state && year !== null ? `held in ${year} by` : 'of'} ${civName}`
+          : 'unclaimed',
       owner?.name ? `held by ${titleCase(owner.name)}` : null,
       `${site.x},${site.y}`,
     ]

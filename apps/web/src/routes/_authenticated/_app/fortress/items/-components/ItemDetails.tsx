@@ -134,7 +134,7 @@ const PersonLink = ({ person }: { person: ItemPerson | null }) => {
   if (person.unit)
     return (
       <Link
-        to="/fortress/dwarves/$id"
+        to="/fortress/citizens/$id"
         params={{ id: String(person.unit.id) }}
         className="text-primary underline-offset-4 hover:underline"
       >
@@ -238,7 +238,7 @@ export const ItemDetails = ({ itemId, compact }: { itemId: number; compact?: boo
               </Link>
             ) : data?.holder ? (
               <Link
-                to="/fortress/dwarves/$id"
+                to="/fortress/citizens/$id"
                 params={{ id: String(data.holder.id) }}
                 className="hover:text-foreground hover:underline"
               >
@@ -290,7 +290,7 @@ export const ItemDetails = ({ itemId, compact }: { itemId: number; compact?: boo
                 label: 'Owned by',
                 value: data?.owner ? (
                   <Link
-                    to="/fortress/dwarves/$id"
+                    to="/fortress/citizens/$id"
                     params={{ id: String(data.owner.id) }}
                     className="text-primary underline-offset-4 hover:underline"
                   >
@@ -359,7 +359,7 @@ export const ItemDetails = ({ itemId, compact }: { itemId: number; compact?: boo
                   label: 'Held by',
                   value: data.holder ? (
                     <Link
-                      to="/fortress/dwarves/$id"
+                      to="/fortress/citizens/$id"
                       params={{ id: String(data.holder.id) }}
                       className="text-primary underline-offset-4 hover:underline"
                     >

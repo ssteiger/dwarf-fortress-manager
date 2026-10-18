@@ -11,8 +11,8 @@ import { pronouns } from '~/lib/fortress/people/units'
 import type { FortDead, FortDeparted, FortFallen } from '~/lib/fortress/server/history'
 import { EmptyState, PageHeader, SectionStack, StatusBand } from '../-components/FortChrome'
 import { RunActionButton } from '../-components/Guide'
-import { Section, SheetMissing, capitalize } from '../dwarves/-components/SheetParts'
-import { useFortLegendsWorldId, useKnownHistFigures } from '../dwarves/-components/UnitLinks'
+import { Section, SheetMissing, capitalize } from '../citizens/-components/SheetParts'
+import { useFortLegendsWorldId, useKnownHistFigures } from '../citizens/-components/UnitLinks'
 
 function headline(data: FortDead | undefined): string {
   if (!data) return 'Who died in the fortress, how, and who still walks as a ghost.'
@@ -39,7 +39,7 @@ const nameOf = (person: { name: string }) => cleanAnnouncement(person.name)
 const FallenName = ({ fallen }: { fallen: Pick<FortFallen, 'id' | 'name' | 'page'> }) => {
   return fallen.page ? (
     <Link
-      to="/fortress/dwarves/$id"
+      to="/fortress/citizens/$id"
       params={{ id: String(fallen.id) }}
       className="font-medium hover:underline"
     >

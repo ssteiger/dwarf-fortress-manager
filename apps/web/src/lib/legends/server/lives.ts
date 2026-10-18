@@ -1284,7 +1284,7 @@ export interface FortressDweller {
 export interface FortressKin {
   /** The relative, who has a record of their own. */
   figureId: number
-  /** What they are to the dweller: "mother", "grandfather", "spouse", "late spouse". */
+  /** What they are to the dweller: "mother", "grandfather", "spouse", "late spouse", "child", "sibling". */
   relation: string
   dweller: FortressDweller
 }
@@ -1311,7 +1311,7 @@ export interface FortressTie {
 const STORIED_OWN = 4
 const STORIED_BY_KIN = 2
 /** Events a relative needs before they count as famous. */
-const FAMOUS_KIN = 10
+export const FAMOUS_KIN = 10
 
 function sexed(sex: number | null, female: string, male: string, other: string): string {
   return sex === 0 ? female : sex === 1 ? male : other
@@ -1323,11 +1323,69 @@ function kinNote(relation: string, dwellerSex: number | null): string {
     return sexed(dwellerSex, 'Daughter of ', 'Son of ', 'Child of ')
   if (relation.startsWith('grand'))
     return sexed(dwellerSex, 'Granddaughter of ', 'Grandson of ', 'Grandchild of ')
+  if (relation === 'child') return sexed(dwellerSex, 'Mother of ', 'Father of ', 'Parent of ')
+  if (relation === 'sibling') return sexed(dwellerSex, 'Sister of ', 'Brother of ', 'Sibling of ')
   if (relation === 'late spouse') return 'Married to the late '
   return 'Married to '
 }
 
-async function civPast(worldId: number, civId: number): Promise<Prose> {
+export interface Ancestor {
+  id: number
+  /** The descendant this figure is a mother or father of. */
+  child: number
+  relation: 'mother' | 'father'
+  /** 1 for parents, 2 for grandparents, and so on. */
+  generation: number
+}
+
+/**
+ * Every recorded mother and father above these figures, up to `maxGen`
+ * generations, each at the nearest generation it is reached.
+ */
+export async function ancestorsOf(
+  worldId: number,
+  figureIds: number[],
+  maxGen = 8,
+): Promise<Ancestor[]> {
+  const ids = [...new Set(figureIds.filter((id) => Number.isInteger(id) && id >= 0))].slice(0, 200)
+  if (!ids.length) return []
+  const depth = Math.max(1, Math.min(12, Math.floor(maxGen)))
+  const links = (row: SQL) => sql`jsonb_array_elements(case jsonb_typeof(${row}->'hf_link')
+      when 'array' then ${row}->'hf_link'
+      when 'object' then jsonb_build_array(${row}->'hf_link')
+      else '[]'::jsonb end)`
+  const rows = await postgres_db.execute<{
+    id: number
+    child: number
+    relation: string
+    generation: number
+  }>(sql`
+    with recursive anc(id, child, relation, generation) as (
+      select (l->>'hfid')::int, f.id, l->>'link_type', 1
+      from ${R} f, ${links(sql`f.payload`)} l
+      where f.world_id = ${worldId} and f.kind = 'historical_figure'
+        and f.id = any(${intArray(ids)})
+        and l->>'link_type' in ('mother', 'father') and (l->>'hfid')::int >= 0
+      union all
+      select (l->>'hfid')::int, a.id, l->>'link_type', a.generation + 1
+      from anc a
+      join ${R} f on f.world_id = ${worldId} and f.kind = 'historical_figure' and f.id = a.id,
+        ${links(sql`f.payload`)} l
+      where a.generation < ${depth}
+        and l->>'link_type' in ('mother', 'father') and (l->>'hfid')::int >= 0
+    )
+    select distinct on (id) id, child, relation, generation
+    from anc order by id, generation, child`)
+  return [...rows].map((r) => ({
+    id: Number(r.id),
+    child: Number(r.child),
+    relation: r.relation === 'mother' ? 'mother' : 'father',
+    generation: Number(r.generation),
+  }))
+}
+
+/** The civilization's past: its first site, its wars, the sites it lost. */
+export async function civPast(worldId: number, civId: number): Promise<Prose> {
   const W = eq(R.world_id, worldId)
   const events = and(W, eq(R.kind, 'historical_event')) as SQL
   const [civRows, founded, wars, lost] = await Promise.all([
@@ -1493,7 +1551,7 @@ export async function fortressInLegends(
     const dweller = byFigure.get(f.id)
     if (!dweller) continue
     const p = { hf_link: f.links } as LegendsPayload
-    for (const type of ['mother', 'father', 'spouse', 'deceased spouse'])
+    for (const type of ['mother', 'father', 'spouse', 'deceased spouse', 'child'])
       for (const kin of hfLinkIds(p, type))
         direct.push({
           figureId: kin,
@@ -1506,16 +1564,19 @@ export async function fortressInLegends(
     ? await linksOf(inArray(R.id, [...new Set(direct.map((k) => k.figureId))].slice(0, 4000)))
     : []
   const kinById = new Map(kinRows.map((row) => [row.id, row]))
-  const grand: FortressKin[] = []
+  const further: FortressKin[] = []
   for (const parent of parents) {
     const row = kinById.get(parent.figureId)
     if (!row) continue
     const p = { hf_link: row.links } as LegendsPayload
     for (const type of ['mother', 'father'])
       for (const kin of hfLinkIds(p, type))
-        grand.push({ figureId: kin, relation: `grand${type}`, dweller: parent.dweller })
+        further.push({ figureId: kin, relation: `grand${type}`, dweller: parent.dweller })
+    for (const kin of hfLinkIds(p, 'child'))
+      if (kin !== parent.dweller.figureId)
+        further.push({ figureId: kin, relation: 'sibling', dweller: parent.dweller })
   }
-  const grandRows = grand.length
+  const furtherRows = further.length
     ? await postgres_db
         .select({ id: R.id })
         .from(R)
@@ -1523,15 +1584,15 @@ export async function fortressInLegends(
           and(
             W,
             eq(R.kind, 'historical_figure'),
-            inArray(R.id, [...new Set(grand.map((k) => k.figureId))].slice(0, 4000)),
+            inArray(R.id, [...new Set(further.map((k) => k.figureId))].slice(0, 4000)),
           ),
         )
     : []
-  const knownGrand = new Set(grandRows.map((row) => row.id))
+  const knownFurther = new Set(furtherRows.map((row) => row.id))
   const seen = new Set<string>()
   const kin = [
     ...direct.filter((k) => kinById.has(k.figureId)),
-    ...grand.filter((k) => knownGrand.has(k.figureId)),
+    ...further.filter((k) => knownFurther.has(k.figureId)),
   ].filter((k) => {
     const key = `${k.figureId}:${k.dweller.figureId}`
     if (seen.has(key)) return false

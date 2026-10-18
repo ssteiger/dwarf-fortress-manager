@@ -180,6 +180,46 @@ export interface Voiced {
   cached: boolean
 }
 
+/** Two sentences about them for the roster and overview. Fiction, from the facts. */
+export const getUnitSketch = createServerFn({ method: 'GET' })
+  .inputValidator((input: { unitId: number }) => input)
+  .handler(async ({ data }): Promise<Voiced | null> => {
+    const config = readModelConfig()
+    if (!config) return null
+    await requireUser()
+    const fort = await loadFortress()
+    const unit = fort.units.find((u) => u.id === data.unitId)
+    if (!unit) return null
+    const now = gameTimeOf({ world: fort.world })
+    const name = unit.nickname || unit.name.split(/\s+/)[0] || unit.readable
+    const brief = characterBrief(unit, now)
+    const p = pronouns(unit)
+    const user = [
+      `About ${name}:`,
+      ...brief.slice(0, 12).map((l) => `- ${l}`),
+      '',
+      `Write two short sentences in the third person about ${name}. Who ${p.they} ${p.is}, what ${p.they} care about, how ${p.they} seem. Stay true to the facts. Invent no events, people or places. No names of game mechanics.`,
+    ].join('\n')
+    const key = `${config.model}:sketch:${unit.id}:${user}`
+    const hit = cache.get(key)
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return { ...hit.value, cached: true }
+    const text = await complete(config, {
+      system: SYSTEM_PROMPT,
+      user,
+      temperature: 0.8,
+      maxTokens: 180,
+      timeoutMs: 45_000,
+    })
+    const voiced: Voiced = {
+      text: text.trim(),
+      model: config.model,
+      facts: brief.length,
+      cached: false,
+    }
+    remember(key, voiced)
+    return voiced
+  })
+
 export const getVoiceStatus = createServerFn({ method: 'GET' }).handler(
   async (): Promise<VoiceStatus> => {
     const config = readModelConfig()

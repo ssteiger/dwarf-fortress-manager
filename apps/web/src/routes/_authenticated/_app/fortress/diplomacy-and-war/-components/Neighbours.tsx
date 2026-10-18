@@ -169,7 +169,7 @@ const NeighbourRow = ({
     <button
       type="button"
       onClick={() => onOpen(power.id)}
-      className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50 sm:flex-row sm:items-start sm:gap-4"
+      className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-accent sm:flex-row sm:items-start sm:gap-4"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">

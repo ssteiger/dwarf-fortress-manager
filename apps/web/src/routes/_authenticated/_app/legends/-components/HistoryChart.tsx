@@ -8,10 +8,54 @@ export interface YearSpan {
   to: number
 }
 
+const HEIGHT = 200
+const PAD_LEFT = 40
+const PAD_TOP = 8
+const PAD_BOTTOM = 24
+
+const compact = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+
+/** A round step that splits `max` into about `count` gridlines. */
+function niceStep(max: number, count: number): number {
+  const raw = max / count
+  const magnitude = 10 ** Math.floor(Math.log10(raw))
+  const norm = raw / magnitude
+  const factor = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10
+  return factor * magnitude
+}
+
+/** A column with only its top corners rounded. */
+function topRounded(x: number, y: number, w: number, h: number, r: number): string {
+  const radius = Math.min(r, w / 2, h)
+  return [
+    `M${x},${y + h}`,
+    `V${y + radius}`,
+    `Q${x},${y} ${x + radius},${y}`,
+    `H${x + w - radius}`,
+    `Q${x + w},${y} ${x + w},${y + radius}`,
+    `V${y + h}`,
+    'Z',
+  ].join(' ')
+}
+
+function useWidth<T extends HTMLElement>(): [React.RefObject<T | null>, number] {
+  const ref = React.useRef<T>(null)
+  const [width, setWidth] = React.useState(0)
+  React.useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setWidth(el.clientWidth)
+    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, width]
+}
+
 /**
  * Recorded events per span of years, with the share that were battles or
- * deaths. Eras are marked along the top. Click a bar, drag across several,
- * or click an era's name to pick the years the chronicle below should tell.
+ * deaths. Eras run along the top. Click a bar, drag across several, or click
+ * an era to pick the years the chronicle below should tell.
  */
 export const HistoryChart = ({
   bins,
@@ -28,53 +72,60 @@ export const HistoryChart = ({
 }) => {
   const [active, setActive] = React.useState<number | null>(null)
   const [brush, setBrush] = React.useState<{ start: number; end: number } | null>(null)
-  const svgRef = React.useRef<SVGSVGElement>(null)
+  const [wrapRef, width] = useWidth<HTMLDivElement>()
+  const clipId = React.useId().replace(/[^a-zA-Z0-9]/g, '')
   if (!bins.length) return <p className="text-sm text-muted-foreground">No dated events yet.</p>
 
-  const width = 720
-  const height = 180
-  const padLeft = 44
-  const padBottom = 26
-  const padTop = 18
-  const plotW = width - padLeft - 8
-  const plotH = height - padBottom - padTop
-  const maxTotal = Math.max(...bins.map((b) => b.total), 1)
   const first = bins[0].start
   const last = bins[bins.length - 1].start + binYears
   const span = Math.max(last - first, 1)
-  const barW = Math.max(2, (plotW / span) * binYears - 1.5)
-  const xFor = (year: number) => padLeft + ((year - first) / span) * plotW
-  const yFor = (value: number) => padTop + plotH - (value / maxTotal) * plotH
+  const plotW = Math.max(width - PAD_LEFT, 1)
+  const plotH = HEIGHT - PAD_TOP - PAD_BOTTOM
+  const xFor = (year: number) => PAD_LEFT + ((year - first) / span) * plotW
 
-  const labelEvery = Math.max(1, Math.ceil(bins.length / 8))
-  const current = active !== null ? bins[active] : null
+  const maxTotal = Math.max(...bins.map((b) => b.total), 1)
+  const step = niceStep(maxTotal, 4)
+  const top = Math.ceil(maxTotal / step) * step
+  const yFor = (value: number) => PAD_TOP + plotH - (value / top) * plotH
+  const gridlines = Array.from({ length: Math.round(top / step) + 1 }, (_, i) => i * step)
 
-  /** Year under a client x, snapped to the start of its bin. */
-  const yearAt = (clientX: number): number => {
-    const svg = svgRef.current
-    if (!svg) return first
-    const rect = svg.getBoundingClientRect()
-    const x = ((clientX - rect.left) / rect.width) * width
-    const year = first + ((x - padLeft) / plotW) * span
-    const snapped = Math.floor(year / binYears) * binYears
-    return Math.min(Math.max(snapped, first), last - binYears)
+  const yearStep =
+    [10, 25, 50, 100, 200, 250, 500, 1000, 2000].find((s) => (s / span) * plotW >= 72) ?? 5000
+  const yearTicks: number[] = []
+  for (let y = Math.ceil(first / yearStep) * yearStep; y <= last; y += yearStep) yearTicks.push(y)
+
+  const slot = (plotW / span) * binYears
+  const gap = Math.min(4, Math.max(1, slot * 0.18))
+  const barW = Math.max(1, slot - gap)
+
+  const sortedEras = [...eras]
+    .sort((a, b) => a.startYear - b.startYear)
+    .filter((era, i, all) => (all[i + 1]?.startYear ?? last) > first && era.startYear < last)
+  const eraSpan = (index: number): YearSpan => {
+    const start = Math.max(sortedEras[index].startYear, first)
+    const next = sortedEras[index + 1]?.startYear
+    return { from: start, to: Math.min(next ?? last, last) - 1 }
   }
 
-  const eraSpan = (index: number): YearSpan => {
-    const sorted = [...eras].sort((a, b) => a.startYear - b.startYear)
-    const start = Math.max(sorted[index].startYear, first)
-    const next = sorted[index + 1]?.startYear
-    return { from: start, to: (next ?? last) - 1 }
+  /** Index of the bin under a client x. */
+  const binAt = (clientX: number): number => {
+    const rect = wrapRef.current?.getBoundingClientRect()
+    if (!rect) return 0
+    const year = first + ((clientX - rect.left - PAD_LEFT) / plotW) * span
+    const index = Math.floor((year - first) / binYears)
+    return Math.min(Math.max(index, 0), bins.length - 1)
   }
 
   const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
     if (!onSelect) return
-    const year = yearAt(e.clientX)
-    setBrush({ start: year, end: year })
+    const start = bins[binAt(e.clientX)].start
+    setBrush({ start, end: start })
     e.currentTarget.setPointerCapture(e.pointerId)
   }
   const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (brush) setBrush({ ...brush, end: yearAt(e.clientX) })
+    const index = binAt(e.clientX)
+    setActive(index)
+    if (brush) setBrush({ ...brush, end: bins[index].start })
   }
   const onPointerUp = () => {
     if (!brush || !onSelect) return
@@ -90,157 +141,233 @@ export const HistoryChart = ({
         to: Math.max(brush.start, brush.end) + binYears - 1,
       }
     : selection
+  const current = active !== null ? bins[active] : null
+  const currentX = active !== null ? xFor(bins[active].start) + barW / 2 : 0
 
   return (
-    <div className="flex flex-col gap-2">
-      <svg
-        ref={svgRef}
-        viewBox={`0 0 ${width} ${height}`}
-        className={onSelect ? 'h-auto w-full cursor-crosshair select-none' : 'h-auto w-full'}
-        role="img"
-        aria-label="Events recorded per period"
-        style={{ touchAction: 'none' }}
-        onMouseLeave={() => setActive(null)}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => setBrush(null)}
-      >
-        {[0.25, 0.5, 0.75, 1].map((f) => (
-          <g key={f}>
-            <line
-              x1={padLeft}
-              x2={width - 8}
-              y1={yFor(maxTotal * f)}
-              y2={yFor(maxTotal * f)}
-              className="stroke-border"
-              strokeDasharray={f === 1 ? undefined : '2 3'}
-            />
-            <text
-              x={padLeft - 6}
-              y={yFor(maxTotal * f) + 3}
-              textAnchor="end"
-              fontSize={9}
-              className="fill-muted-foreground tabular-nums"
-            >
-              {Math.round(maxTotal * f).toLocaleString()}
-            </text>
-          </g>
-        ))}
-        <line x1={padLeft} x2={width - 8} y1={yFor(0)} y2={yFor(0)} className="stroke-border" />
-        {shown ? (
-          <rect
-            x={xFor(shown.from)}
-            y={padTop - 2}
-            width={Math.max(2, xFor(Math.min(shown.to + 1, last)) - xFor(shown.from))}
-            height={plotH + 4}
-            className="fill-brand/10 stroke-brand/70"
-            rx={3}
-          />
-        ) : null}
-        {bins.map((bin, i) => {
-          const x = xFor(bin.start)
-          const isActive = active === i
-          const inSelection = shown ? bin.start >= shown.from && bin.start <= shown.to : true
-          return (
-            <g
-              key={bin.start}
-              onMouseEnter={() => setActive(i)}
-              opacity={(active === null || isActive ? 1 : 0.65) * (inSelection ? 1 : 0.45)}
-            >
-              <rect x={x} y={padTop} width={barW} height={plotH} fill="transparent" />
-              <rect
-                x={x}
-                y={yFor(bin.total)}
-                width={barW}
-                height={plotH - (yFor(bin.total) - padTop)}
-                className={isActive ? 'fill-foreground/25' : 'fill-foreground/12'}
-                rx={1.5}
-              />
-              <rect
-                x={x}
-                y={yFor(bin.battles + bin.deaths)}
-                width={barW}
-                height={yFor(0) - yFor(bin.battles + bin.deaths)}
-                className="fill-muted-foreground/70"
-                rx={1.5}
-              />
-              <rect
-                x={x}
-                y={yFor(bin.battles)}
-                width={barW}
-                height={yFor(0) - yFor(bin.battles)}
-                className="fill-chart-5"
-                rx={1.5}
-              />
-              {i % labelEvery === 0 ? (
-                <text
-                  x={x}
-                  y={height - 8}
-                  fontSize={9}
-                  className="fill-muted-foreground tabular-nums"
-                >
-                  {bin.start}
-                </text>
-              ) : null}
-            </g>
-          )
-        })}
-        {[...eras]
-          .sort((a, b) => a.startYear - b.startYear)
-          .map((era, index) =>
-            era.startYear >= first - binYears && era.startYear <= last ? (
-              <g
+    <div className="flex flex-col gap-3">
+      {sortedEras.length ? (
+        <div className="relative h-7" style={{ marginLeft: PAD_LEFT }}>
+          {sortedEras.map((era, index) => {
+            const eraYears = eraSpan(index)
+            const left = ((eraYears.from - first) / span) * 100
+            const right = ((eraYears.to + 1 - first) / span) * 100
+            const picked = selection?.from === eraYears.from && selection?.to === eraYears.to
+            const style = { left: `${left}%`, width: `${right - left}%` }
+            const since = era.startYear <= first ? null : era.startYear
+            const base =
+              'absolute inset-y-0 flex min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 text-xs font-medium'
+            return onSelect ? (
+              <button
                 key={`${era.name}-${era.startYear}`}
-                className={onSelect ? 'cursor-pointer' : undefined}
-                onPointerDown={(e) => {
-                  if (!onSelect) return
-                  e.stopPropagation()
-                  onSelect(eraSpan(index))
-                }}
+                type="button"
+                title={`Read ${era.name}`}
+                onClick={() => onSelect(eraYears)}
+                style={style}
+                className={cn(
+                  base,
+                  'text-left transition-colors hover:bg-accent',
+                  picked && 'bg-accent',
+                )}
               >
+                <EraLabel name={era.name} since={since} />
+              </button>
+            ) : (
+              <span key={`${era.name}-${era.startYear}`} style={style} className={base}>
+                <EraLabel name={era.name} since={since} />
+              </span>
+            )
+          })}
+        </div>
+      ) : null}
+
+      <div ref={wrapRef} className="relative" style={{ height: HEIGHT }}>
+        {width > 0 ? (
+          <svg
+            width={width}
+            height={HEIGHT}
+            className={cn('block overflow-visible select-none', onSelect && 'cursor-crosshair')}
+            role="img"
+            aria-label="Events recorded per period"
+            style={{ touchAction: 'none' }}
+            onPointerLeave={() => setActive(null)}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={() => setBrush(null)}
+          >
+            <defs>
+              {bins.map((bin, i) => {
+                const y = yFor(bin.total)
+                return (
+                  <clipPath key={bin.start} id={`${clipId}-${i}`}>
+                    <path d={topRounded(xFor(bin.start), y, barW, yFor(0) - y, 3)} />
+                  </clipPath>
+                )
+              })}
+            </defs>
+
+            {gridlines.map((value) => (
+              <g key={value}>
                 <line
-                  x1={xFor(Math.max(era.startYear, first))}
-                  x2={xFor(Math.max(era.startYear, first))}
-                  y1={4}
-                  y2={height - padBottom}
-                  className="stroke-muted-foreground/60"
-                  strokeDasharray="2 3"
+                  x1={PAD_LEFT}
+                  x2={width}
+                  y1={yFor(value)}
+                  y2={yFor(value)}
+                  className={value === 0 ? 'stroke-border' : 'stroke-border/60'}
+                  shapeRendering="crispEdges"
                 />
                 <text
-                  x={xFor(Math.max(era.startYear, first)) + 4}
-                  y={12}
-                  fontSize={9}
-                  fontWeight={510}
-                  className={cn(
-                    'fill-muted-foreground',
-                    onSelect && 'transition-colors hover:fill-foreground',
-                  )}
+                  x={PAD_LEFT - 10}
+                  y={yFor(value)}
+                  dy="0.32em"
+                  textAnchor="end"
+                  className="fill-muted-foreground text-[11px] tabular-nums"
                 >
-                  {era.name}
+                  {value === 0 ? '0' : compact.format(value)}
                 </text>
               </g>
-            ) : null,
-          )}
-      </svg>
+            ))}
+
+            {sortedEras.slice(1).map((era) => (
+              <line
+                key={`${era.name}-${era.startYear}`}
+                x1={xFor(era.startYear) - gap / 2}
+                x2={xFor(era.startYear) - gap / 2}
+                y1={PAD_TOP}
+                y2={yFor(0)}
+                className="stroke-border"
+                shapeRendering="crispEdges"
+              />
+            ))}
+
+            {shown ? (
+              <rect
+                x={xFor(shown.from) - gap / 2}
+                y={PAD_TOP - 4}
+                width={Math.max(2, xFor(Math.min(shown.to + 1, last)) - xFor(shown.from))}
+                height={plotH + 4}
+                rx={6}
+                className="fill-brand/10 stroke-brand/40"
+              />
+            ) : null}
+
+            {current && !brush ? (
+              <rect
+                x={xFor(current.start) - gap / 2}
+                y={PAD_TOP - 4}
+                width={slot}
+                height={plotH + 4}
+                rx={6}
+                className="fill-accent"
+              />
+            ) : null}
+
+            {bins.map((bin, i) => {
+              const x = xFor(bin.start)
+              const inSelection = shown ? bin.start >= shown.from && bin.start <= shown.to : true
+              const isActive = active === i
+              return (
+                <g
+                  key={bin.start}
+                  clipPath={`url(#${clipId}-${i})`}
+                  className="transition-opacity duration-150"
+                  opacity={inSelection ? 1 : 0.5}
+                >
+                  <rect
+                    x={x}
+                    y={PAD_TOP}
+                    width={barW}
+                    height={plotH}
+                    className={isActive ? 'fill-muted-foreground/45' : 'fill-muted-foreground/25'}
+                  />
+                  <rect
+                    x={x}
+                    y={yFor(bin.battles + bin.deaths)}
+                    width={barW}
+                    height={yFor(0) - yFor(bin.battles + bin.deaths)}
+                    className="fill-muted-foreground/70"
+                  />
+                  <rect
+                    x={x}
+                    y={yFor(bin.battles)}
+                    width={barW}
+                    height={yFor(0) - yFor(bin.battles)}
+                    className="fill-chart-5"
+                  />
+                </g>
+              )
+            })}
+
+            {yearTicks.map((year) => (
+              <text
+                key={year}
+                x={xFor(year)}
+                y={HEIGHT - 6}
+                textAnchor={year === first ? 'start' : 'middle'}
+                className="fill-muted-foreground text-[11px] tabular-nums"
+              >
+                {year}
+              </text>
+            ))}
+          </svg>
+        ) : null}
+
+        {current && !brush ? (
+          <div
+            className="pointer-events-none absolute z-10 w-52 rounded-md border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md"
+            style={{
+              left: Math.min(Math.max(currentX - 104, PAD_LEFT), Math.max(width - 208, PAD_LEFT)),
+              bottom: HEIGHT - yFor(current.total) + 10,
+            }}
+          >
+            <p className="mb-1.5 font-medium tabular-nums">
+              Years {current.start}–{current.start + binYears - 1}
+            </p>
+            <dl className="grid grid-cols-[auto_1fr_auto] items-center gap-x-2 gap-y-1">
+              <TooltipRow swatch="bg-muted-foreground/25" label="Events" value={current.total} />
+              <TooltipRow swatch="bg-muted-foreground/70" label="Deaths" value={current.deaths} />
+              <TooltipRow swatch="bg-chart-5" label="Acts of war" value={current.battles} />
+              <TooltipRow swatch="bg-transparent" label="Art and faith" value={current.culture} />
+            </dl>
+          </div>
+        ) : null}
+      </div>
+
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-foreground/20" /> Everything recorded
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-muted-foreground/70" /> Deaths
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="inline-block size-2 rounded-full bg-chart-5" /> War & battle
-        </span>
-        <span className="ml-auto tabular-nums">
-          {current
-            ? `Years ${current.start}–${current.start + binYears - 1}: ${current.total.toLocaleString()} events, ${current.deaths.toLocaleString()} deaths, ${current.battles.toLocaleString()} acts of war, ${current.culture.toLocaleString()} of art and faith`
-            : onSelect
-              ? `Each bar is ${binYears} year${binYears === 1 ? '' : 's'}. Click or drag to choose the years to read.`
-              : `Each bar is ${binYears} year${binYears === 1 ? '' : 's'}. Hover for numbers.`}
+        <Swatch className="bg-muted-foreground/25">Everything recorded</Swatch>
+        <Swatch className="bg-muted-foreground/70">Deaths</Swatch>
+        <Swatch className="bg-chart-5">War & battle</Swatch>
+        <span className="ml-auto">
+          {onSelect
+            ? `Each bar is ${binYears} year${binYears === 1 ? '' : 's'}. Click or drag to choose the years to read.`
+            : `Each bar is ${binYears} year${binYears === 1 ? '' : 's'}. Hover for numbers.`}
         </span>
       </div>
     </div>
   )
 }
+
+const EraLabel = ({ name, since }: { name: string; since: number | null }) => (
+  <>
+    <span className="truncate">{name}</span>
+    <span className="shrink-0 font-normal text-muted-foreground tabular-nums">
+      {since === null ? 'from the beginning' : `from ${since}`}
+    </span>
+  </>
+)
+
+const Swatch = ({ className, children }: { className: string; children: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-1.5">
+    <span className={cn('inline-block size-2.5 rounded-[3px]', className)} />
+    {children}
+  </span>
+)
+
+const TooltipRow = ({ swatch, label, value }: { swatch: string; label: string; value: number }) => (
+  <>
+    <span className={cn('size-2 rounded-[2px]', swatch)} />
+    <dt className="text-muted-foreground">{label}</dt>
+    <dd className="text-right tabular-nums">{value.toLocaleString()}</dd>
+  </>
+)

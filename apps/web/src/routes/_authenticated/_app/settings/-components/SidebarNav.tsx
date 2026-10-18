@@ -25,7 +25,7 @@ export const SidebarNav = ({ items }: { items: SettingsNavItem[] }) => {
             activeOptions={{ exact: true }}
             className={cn(
               'flex shrink-0 items-start gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-              active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50',
+              active ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-accent',
             )}
           >
             <Icon className={cn('mt-0.5 size-4 shrink-0', active && 'text-primary')} />

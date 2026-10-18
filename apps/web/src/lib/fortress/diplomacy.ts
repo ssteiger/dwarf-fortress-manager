@@ -339,6 +339,24 @@ export function warsOf(d: FortDiplomacy, powerId: number): FortWar[] {
   )
 }
 
+/**
+ * The war of yours an invader fights in: matched by the invading
+ * civilization's id against both sides, never by name. Ongoing wars first,
+ * then the latest begun. Null when no war of yours names them.
+ */
+export function warBehind(d: FortDiplomacy, civId: number): FortWar | null {
+  const power = powerIdOf(d, civId)
+  const fights = (ids: number[]) => ids.some((id) => id === civId || powerIdOf(d, id) === power)
+  const candidates = d.wars.filter(
+    (war) => war.ours && (fights(war.attackers) || fights(war.defenders)),
+  )
+  return (
+    [...candidates].sort(
+      (a, b) => Number(isOngoing(b)) - Number(isOngoing(a)) || b.start_year - a.start_year,
+    )[0] ?? null
+  )
+}
+
 /** "The Noseys of Wiping against The Mythical Fluffleduff". */
 export function warSides(d: FortDiplomacy, war: FortWar): string {
   const side = (ids: number[]) => list(ids.map((id) => entityName(d, id))) || 'someone unknown'

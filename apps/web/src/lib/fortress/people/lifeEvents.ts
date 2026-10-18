@@ -2,9 +2,10 @@ import type { FortLifeEvent, FortUnit, LifeEventKind } from '@fortress/db-drizzl
 import { STRESS_LABELS } from '@fortress/db-drizzle/fortress-types'
 
 import { type TextPart, cleanAnnouncement } from '../chronicle/announcements'
-import { skillRank } from '../format'
+import { formatGameTick, skillRank } from '../format'
+import { type GameTime, TICKS_PER_SEASON, absTicks } from '../time'
 import { skillLabel } from './dossier'
-import { firstName } from './units'
+import { firstName, pronouns } from './units'
 
 /*
  * Life events in words: what two daily snapshots of a citizen differ by,
@@ -60,6 +61,44 @@ const HEADLINE: ReadonlySet<LifeEventKind> = new Set([
 export function isHeadline(event: Pick<FortLifeEvent, 'kind' | 'data'>): boolean {
   if (event.kind === 'bond' && event.data.bond === 'grudge') return true
   return HEADLINE.has(event.kind)
+}
+
+/** One sentence for the top of a dwarf's page, from the newest headline we have. */
+export function latestLifeSentence(
+  event: Pick<FortLifeEvent, 'kind' | 'data' | 'game_year' | 'game_tick'>,
+  unit: FortUnit,
+  now: GameTime | null,
+): string | null {
+  if (!isHeadline(event)) return null
+  const p = pronouns(unit)
+  const They = p.they.charAt(0).toUpperCase() + p.they.slice(1)
+  const recent =
+    now !== null &&
+    absTicks(now) - absTicks({ year: event.game_year, tick: event.game_tick }) <= TICKS_PER_SEASON
+  const when = recent ? 'This season' : formatGameTick(event.game_year, event.game_tick)
+  const d = event.data
+  switch (event.kind) {
+    case 'arrived':
+      return `${when} ${p.they} arrived${typeof d.age === 'number' && d.age > 0 ? `, ${d.age} years old` : ''}.`
+    case 'returned':
+      return `${when} ${p.they} came back to the fortress.`
+    case 'born':
+      return `${when} ${p.they} ${p.is === 'are' ? 'were' : 'was'} born.`
+    case 'office':
+      return d.gained
+        ? `${when} ${p.they} became the fortress’s ${d.position ?? 'an official'}.`
+        : `${when} ${p.they} left the office of ${d.position ?? 'an official'}.`
+    case 'bond':
+      return d.other_name
+        ? `${when} ${p.they} ${d.bond === 'grudge' ? 'took a grudge against' : `became ${d.bond === 'spouse' ? 'spouse to' : 'close to'}`} ${d.other_name}.`
+        : null
+    case 'skill':
+      return typeof d.to === 'number' && d.skill
+        ? `${when} ${p.they} reached ${skillRank(d.to)} in ${skillLabel(d.skill, unit)}.`
+        : null
+    default:
+      return `${They} last changed on ${formatGameTick(event.game_year, event.game_tick)}.`
+  }
 }
 
 const article = (word: string) => (/^[aeiou]/i.test(word) ? `an ${word}` : `a ${word}`)

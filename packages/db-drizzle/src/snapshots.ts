@@ -5,8 +5,10 @@
  */
 
 import {
+	type FortDiplomacy,
 	type FortDumpPayload,
 	type FortUnit,
+	type FortWar,
 	type SheetPerson,
 	decodeTable,
 } from "./fortress-types";
@@ -76,6 +78,47 @@ export interface SnapshotTotals {
 	stocks: Record<string, number>;
 	/** Stress category counts, index 0 = miserable, 6 = ecstatic. */
 	mood: number[];
+	/** Invasions active that day, from dump version 11 on. */
+	invasions?: SnapshotInvasion[];
+}
+
+/** An invasion as the day's dump had it, with the war of yours its civilization fights in. */
+export interface SnapshotInvasion {
+	civ: number;
+	/** The legends war id, matched by civilization id; null when no war of yours names them. */
+	war: number | null;
+	war_name: string | null;
+}
+
+/** The fortress's war with this civilization, by id on either side; ongoing and latest first. */
+function warWith(d: FortDiplomacy, civ: number): FortWar | null {
+	const powerOf = (id: number) =>
+		d.powers.some((p) => p.id === id)
+			? id
+			: (d.entities[String(id)]?.power_id ?? id);
+	const power = powerOf(civ);
+	const fights = (ids: number[]) =>
+		ids.some((id) => id === civ || powerOf(id) === power);
+	return (
+		d.wars
+			.filter((w) => w.ours && (fights(w.attackers) || fights(w.defenders)))
+			.sort(
+				(a, b) =>
+					Number(b.end_year == null) - Number(a.end_year == null) ||
+					b.start_year - a.start_year,
+			)[0] ?? null
+	);
+}
+
+function invasionsOf(
+	d: FortDiplomacy | null | undefined,
+): SnapshotInvasion[] | undefined {
+	const active = d?.invasions.filter((i) => i.flags.includes("active")) ?? [];
+	if (!d || !active.length) return undefined;
+	return active.map((i) => {
+		const war = warWith(d, i.civ_id);
+		return { civ: i.civ_id, war: war?.id ?? null, war_name: war?.name ?? null };
+	});
 }
 
 export interface FortSnapshot {
@@ -212,6 +255,7 @@ export function snapshotOf(payload: FortDumpPayload): FortSnapshot | null {
 			exported: summary.wealth?.exported ?? null,
 			stocks,
 			mood: [...summary.mood],
+			invasions: invasionsOf(payload.diplomacy),
 		},
 		units,
 	};
@@ -371,7 +415,12 @@ export function diffSnapshots(
 				from: was.stress_category,
 				to: now.stress_category,
 			});
-		else if (wasLow && now.low && was.stress_category > 0 && now.stress_category <= 0)
+		else if (
+			wasLow &&
+			now.low &&
+			was.stress_category > 0 &&
+			now.stress_category <= 0
+		)
 			push(id, now, "miserable", {
 				from: was.stress_category,
 				to: now.stress_category,

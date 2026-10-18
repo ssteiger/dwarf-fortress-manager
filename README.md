@@ -37,7 +37,7 @@ flowchart LR
 | Page | What it shows |
 | --- | --- |
 | **Overview** `/fortress` | The story first: what happened since your last look, told in a few sentences from the season's recap, then who is struggling, then what needs your attention. Anything dangerous right now (a siege, a fresh death, no food or drink) goes above all of it. Below: citizens, who is at work, created wealth and dangers on the map, how the fortress feels, the story so far with entries since your last visit marked, stores and trends. |
-| **Dwarves** `/fortress/dwarves` | The citizens: who could use your help, work groups, skill coverage and talents their labors waste, squads, and the bonds between them. Click anyone for a drawer, or open their full page. |
+| **Citizens** `/fortress/citizens` | Who could use your help, work groups, skill coverage and talents their labors waste, squads, and the bonds between them. Click anyone for a drawer, or open their full page. |
 | **Dwarves and creatures** `/fortress/dwarves-and-creatures` | Everyone on the map as cards or a table, split into citizens, residents, visitors, animals and hostiles. |
 | **The dead** `/fortress/dead` | Who died, when and how, by whose hand, where their remains lie, whether a memorial names them and who walks as a ghost; and the citizens who left and never came back. |
 | **Items** `/fortress/items` | What the fortress keeps, what it is running short of and what to do about it, then every item on the map. Each item has its own page. |
@@ -51,7 +51,7 @@ Advice comes with step-by-step guides you can tick off. Where DFHack can do the 
 
 ### A dwarf's page
 
-The drawer and the full page `/fortress/dwarves/$id` share the same tabs; the full page keeps the open tab in the URL (`?tab=mind`).
+The drawer and the full page `/fortress/citizens/$id` share the same tabs; the full page keeps the open tab in the URL (`?tab=mind`).
 
 | Tab | What it shows |
 | --- | --- |
@@ -337,7 +337,7 @@ DFHack's field names come from [df-structures](https://github.com/DFHack/df-stru
 
 1. Add an entry to `DFHACK_ACTIONS` (a fixed console command) or `UNIT_ACTIONS` (an action on one unit) in [packages/db-drizzle/src/fortress-types.ts](packages/db-drizzle/src/fortress-types.ts), with a label, a sentence on what it does, and a `confirm` question for anything not safe to repeat. Unit actions also give the console command a player could paste instead.
 2. For a unit action, implement it in [unit-action.lua](apps/worker/src/dfhack/unit-action.lua), checking the unit before changing anything.
-3. Offer it in the UI through `RunActionButton` ([Guide.tsx](apps/web/src/routes/_authenticated/_app/fortress/-components/Guide.tsx)) or `useUnitCommands` ([ActionsTab.tsx](apps/web/src/routes/_authenticated/_app/fortress/dwarves/-components/ActionsTab.tsx)); both respect the one-click setting.
+3. Offer it in the UI through `RunActionButton` ([Guide.tsx](apps/web/src/routes/_authenticated/_app/fortress/-components/Guide.tsx)) or `useUnitCommands` ([ActionsTab.tsx](apps/web/src/routes/_authenticated/_app/fortress/citizens/-components/ActionsTab.tsx)); both respect the one-click setting.
 
 ### Adding a table
 

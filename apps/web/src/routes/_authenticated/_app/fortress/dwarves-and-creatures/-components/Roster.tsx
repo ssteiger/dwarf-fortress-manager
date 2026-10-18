@@ -29,7 +29,7 @@ import {
   useFigureEventCounts,
   useFortLegendsWorldId,
   useKnownHistFigures,
-} from '../../dwarves/-components/UnitLinks'
+} from '../../citizens/-components/UnitLinks'
 
 export type Group = ReturnType<typeof unitGroup> | 'all'
 
@@ -443,7 +443,7 @@ const Grid = ({
                   type="button"
                   onClick={() => onOpen(unit)}
                   className={cn(
-                    'flex h-full w-full gap-3 p-3 text-left transition-colors hover:bg-accent/40',
+                    'flex h-full w-full gap-3 p-3 text-left transition-colors hover:bg-accent',
                     !living && 'opacity-60',
                   )}
                 >

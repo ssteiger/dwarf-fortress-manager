@@ -5,9 +5,13 @@ import { Link } from '@tanstack/react-router'
 import { BookOpenIcon, ScrollTextIcon } from 'lucide-react'
 import * as React from 'react'
 
+import type { LegendsCurse } from '~/lib/fortress/advice/types'
 import { useFortOverview } from '~/lib/fortress/client/queries'
+import { isLiving } from '~/lib/fortress/format'
+import { isCitizenish } from '~/lib/fortress/people/units'
 import { getChronicleMentionCounts } from '~/lib/fortress/server/events'
 import { matchLegendsWorld } from '~/lib/legends/model'
+import { getFigureCurses } from '~/lib/legends/server/curses'
 import { getFigureEventCounts, getKnownFigures } from '~/lib/legends/server/fortressLinks'
 import { getLegendsOverview } from '~/lib/legends/server/worlds'
 
@@ -47,6 +51,26 @@ export function useKnownHistFigures(worldId: number | null, ids: number[]): Set<
     staleTime: 5 * 60_000,
   })
   return React.useMemo(() => new Set(known.data ?? []), [known.data])
+}
+
+/** Curses the legends export records on your living citizens, for the advice; empty without a matching export. */
+export function useLegendsCurses(units: FortUnit[]): LegendsCurse[] {
+  const worldId = useFortLegendsWorldId()
+  const citizens = React.useMemo(() => units.filter((u) => isLiving(u) && isCitizenish(u)), [units])
+  const ids = stableIds(citizens.map((u) => u.hist_figure_id))
+  const curses = useQuery({
+    queryKey: ['legends', 'curses', worldId, ids.join(',')],
+    queryFn: () => getFigureCurses({ data: { worldId: worldId ?? -1, figureIds: ids } }),
+    enabled: worldId !== null && ids.length > 0,
+    staleTime: 10 * 60_000,
+  })
+  return React.useMemo(() => {
+    const byFigure = new Map(citizens.map((u) => [u.hist_figure_id, u.id]))
+    return (curses.data ?? []).flatMap((c) => {
+      const unitId = byFigure.get(c.figureId)
+      return unitId === undefined ? [] : [{ unitId, kind: c.kind, what: c.what }]
+    })
+  }, [curses.data, citizens])
 }
 
 function stableIds(ids: number[]): number[] {

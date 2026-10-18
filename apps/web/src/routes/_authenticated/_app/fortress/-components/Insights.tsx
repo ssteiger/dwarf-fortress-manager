@@ -90,7 +90,7 @@ export const UnitChip = ({
     )
   return (
     <Link
-      to="/fortress/dwarves/$id"
+      to="/fortress/citizens/$id"
       params={{ id: String(unit.id) }}
       className={classes}
       title={unit.readable}
@@ -169,7 +169,7 @@ export const AnnouncementText = ({
             <Link
               // biome-ignore lint/suspicious/noArrayIndexKey: parts are positional
               key={i}
-              to="/fortress/dwarves/$id"
+              to="/fortress/citizens/$id"
               params={{ id: String(part.unit.id) }}
               className="font-medium text-primary underline-offset-4 hover:underline"
             >
@@ -427,7 +427,7 @@ export const ActivityBoard = ({
               ) : (
                 <Link
                   key={unit.id}
-                  to="/fortress/dwarves/$id"
+                  to="/fortress/citizens/$id"
                   params={{ id: String(unit.id) }}
                   title={`${unit.readable}${unit.job ? ` · ${unit.job}` : ''}`}
                   className="rounded-md border bg-muted/40 p-0.5 transition-colors hover:border-primary/60"

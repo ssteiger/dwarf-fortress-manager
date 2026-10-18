@@ -385,7 +385,7 @@ function commandLabel(c: WorkerCommand, names: Map<number, string>): React.React
   const who =
     c.unitId !== null ? (
       <Link
-        to="/fortress/dwarves/$id"
+        to="/fortress/citizens/$id"
         params={{ id: String(c.unitId) }}
         className="underline underline-offset-4"
       >

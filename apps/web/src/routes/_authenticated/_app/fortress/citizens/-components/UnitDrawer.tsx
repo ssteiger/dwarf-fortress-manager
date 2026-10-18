@@ -104,7 +104,7 @@ export const UnitDrawer = ({ unit, onClose }: { unit: FortUnit | null; onClose: 
             <DrawerFooter className="border-t">
               <Button asChild>
                 <Link
-                  to="/fortress/dwarves/$id"
+                  to="/fortress/citizens/$id"
                   params={{ id: String(unit.id) }}
                   search={tab === 'overview' ? {} : { tab }}
                 >

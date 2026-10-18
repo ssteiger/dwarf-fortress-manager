@@ -6,7 +6,7 @@ import { useFortOverview, useFortUnits } from '~/lib/fortress/client/queries'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { gameTimeOf } from '~/lib/fortress/time'
 import { PageHeader, StatusBand } from '../-components/FortChrome'
-import { UnitDrawer } from '../dwarves/-components/UnitDrawer'
+import { UnitDrawer } from '../citizens/-components/UnitDrawer'
 import { GROUP_LABELS, type Group, Roster } from './-components/Roster'
 
 /** "145 on the map: 65 citizens, 66 animals and 4 hostiles". */

@@ -20,7 +20,7 @@
 --
 -- Nothing in here writes to game state.
 
-local DUMP_VERSION = 12
+local DUMP_VERSION = 13
 
 local args = {...}
 local out_path = args[1] or 'dfhack-config/fortress-dump.json'
@@ -1195,6 +1195,21 @@ local function sheet_syndromes(u)
     return out
 end
 
+-- Every labor the game has switched on for them, by token (MINE, CARPENTER, …).
+local function sheet_labors(u)
+    local out = arr{}
+    local last = df.unit_labor._last_item or 0
+    for i = 0, last do
+        local token = df.unit_labor[i]
+        if type(token) == 'string' and token ~= 'NONE' then
+            if try(function() return u.status.labors[i] end) then
+                out[#out + 1] = token
+            end
+        end
+    end
+    return out
+end
+
 local function sheet_work_details(u)
     local out = arr{}
     for _, wd in ipairs(df.global.plotinfo.labor_info.work_details) do
@@ -1225,6 +1240,7 @@ local function unit_sheet_inner(u, craw)
         wounds = try(sheet_wounds, u) or arr{},
         syndromes = try(sheet_syndromes, u) or arr{},
         work_details = try(sheet_work_details, u) or arr{},
+        labors = try(sheet_labors, u) or arr{},
         birth = (u.birth_year >= 0) and arr{u.birth_year, math.max(u.birth_time, 0)} or nil,
         kills = try(dfhack.units.getKillCount, u),
         pregnant = (try(function() return u.pregnancy_timer end) or 0) > 0 or nil,

@@ -72,7 +72,7 @@ const DwarfPage = () => {
         <FortBreadcrumbs
           items={[
             { label: 'Fortress', to: '/fortress' },
-            { label: 'Dwarves', to: '/fortress/dwarves' },
+            { label: 'Citizens', to: '/fortress/citizens' },
             { label: title },
           ]}
         />
@@ -132,7 +132,7 @@ const DwarfPage = () => {
   )
 }
 
-export const Route = createFileRoute('/_authenticated/_app/fortress/dwarves/$id')({
+export const Route = createFileRoute('/_authenticated/_app/fortress/citizens/$id')({
   validateSearch: (raw: Record<string, unknown>): DwarfSearch =>
     isDwarfTab(raw.tab) ? { tab: raw.tab } : {},
   component: DwarfPage,

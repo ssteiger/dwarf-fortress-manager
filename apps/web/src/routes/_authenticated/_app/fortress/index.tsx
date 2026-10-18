@@ -70,7 +70,8 @@ import {
   StoryFeed,
 } from './-components/Insights'
 import { Trends } from './-components/Trends'
-import { HelpStrip } from './dwarves/-components/PeoplePanels'
+import { HelpStrip } from './citizens/-components/PeoplePanels'
+import { useLegendsCurses } from './citizens/-components/UnitLinks'
 
 const KEY_STOCKS = [
   'drink',
@@ -120,6 +121,7 @@ const OverviewBody = () => {
     () => fortNotices({ summary, units, concerns: concerns.data ?? null, now }),
     [summary, units, concerns.data, now],
   )
+  const legendsCurses = useLegendsCurses(units)
   // The same advice and playbook the work page shows, so every notice has its step-by-step guide.
   const advisorInput = React.useMemo(
     () => ({
@@ -131,8 +133,9 @@ const OverviewBody = () => {
       supplies: supplies.data ?? null,
       events: data?.events ?? [],
       now,
+      legendsCurses,
     }),
-    [summary, units, work.data, concerns.data, supplies.data, data?.events, now],
+    [summary, units, work.data, concerns.data, supplies.data, data?.events, now, legendsCurses],
   )
   const advice = React.useMemo(() => fortAdvice(advisorInput), [advisorInput])
   const playbook = React.useMemo(() => situations(advisorInput), [advisorInput])

@@ -2,6 +2,7 @@ import {
   type FortBuilding,
   type FortItem,
   type FortJob,
+  type FortLifeEvent,
   type FortSquad,
   type FortUnit,
   fortKeyOf,
@@ -9,10 +10,11 @@ import {
   schema,
 } from '@fortress/db-drizzle'
 import { createServerFn } from '@tanstack/react-start'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 
 import { isLiving } from '../format'
 import { relationOf } from '../people/character'
+import { TICKS_PER_SEASON, absTicks } from '../time'
 import { type CachedDump, dumpTable, readDump } from './dump'
 import { currentState } from './fortState'
 
@@ -57,12 +59,23 @@ export interface FortWastedTalent {
   rating: number
 }
 
+export interface FortArrival {
+  unitId: number
+  year: number
+  tick: number
+  age: number | null
+}
+
 export interface FortPeopleResult {
   capturedAt: string | null
   bonds: FortBond[]
   wasted: FortWastedTalent[]
   /** The fortress's squads; empty in dumps older than version 9. */
   squads: FortSquad[]
+  /** Citizens who arrived this season, or the latest wave if none did. */
+  arrivals: FortArrival[]
+  /** Living citizens whose sheet says they are expecting. */
+  expecting: number[]
 }
 
 /** Proficient: the level from which a disabled labor reads as a waste. */
@@ -75,11 +88,21 @@ const NOT_WORK_SKILLS = new Set(['SNEAK', 'TRACKING'])
  * What the dwarf list needs from the sheets without shipping them: the family,
  * friends and foes each citizen has on the map, and the talents they may not use.
  */
+const emptyPeople = (): FortPeopleResult => ({
+  capturedAt: null,
+  bonds: [],
+  wasted: [],
+  squads: [],
+  arrivals: [],
+  expecting: [],
+})
+
 export const getFortPeople = createServerFn({ method: 'GET' }).handler(
   async (): Promise<FortPeopleResult> => {
     const dump = await readDump()
-    if (!dump) return { capturedAt: null, bonds: [], wasted: [], squads: [] }
-    return dump.memo('people', () => readFortPeople(dump))
+    if (!dump) return emptyPeople()
+    const people = dump.memo('people', () => readFortPeople(dump))
+    return { ...people, arrivals: await arrivalsOf() }
   },
 )
 
@@ -88,10 +111,12 @@ function readFortPeople(dump: CachedDump): FortPeopleResult {
   const onMap = new Set(units.filter(isLiving).map((unit) => unit.id))
   const bonds: FortBond[] = []
   const wasted: FortWastedTalent[] = []
+  const expecting: number[] = []
   for (const unit of units) {
     if (!isLiving(unit) || !unit.flags.includes('citizen')) continue
     const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
     if (!sheet) continue
+    if (sheet.pregnant) expecting.push(unit.id)
     for (const [skill, rating, , , skillClass, enabled] of sheet.skills)
       if (
         enabled === false &&
@@ -119,6 +144,58 @@ function readFortPeople(dump: CachedDump): FortPeopleResult {
     bonds,
     wasted,
     squads: dump.table<FortSquad>('squads'),
+    arrivals: [],
+    expecting,
+  }
+}
+
+async function arrivalsOf(): Promise<FortArrival[]> {
+  const world = (await currentState())?.world
+  const fortKey = fortKeyOf(world ?? null)
+  if (!world || !fortKey) return []
+  const L = schema.fort_life_events
+  const rows = await postgres_db
+    .select()
+    .from(L)
+    .where(
+      and(
+        eq(L.fort_key, fortKey),
+        eq(L.kind, 'arrived'),
+        sql`(${L.game_year}, ${L.game_tick}) <= (${world.year}, ${world.tick})`,
+      ),
+    )
+    .orderBy(desc(L.game_year), desc(L.game_tick), desc(L.id))
+    .limit(80)
+  if (!rows.length) return []
+  const now = absTicks({ year: world.year, tick: world.tick })
+  const thisSeason = rows.filter(
+    (row) => now - absTicks({ year: row.game_year, tick: row.game_tick }) <= TICKS_PER_SEASON,
+  )
+  const wave = thisSeason.length ? thisSeason : latestWave(rows)
+  const seen = new Set<number>()
+  const arrivals: FortArrival[] = []
+  for (const row of wave) {
+    if (seen.has(row.unit_id)) continue
+    seen.add(row.unit_id)
+    arrivals.push(fromArrival(row))
+  }
+  return arrivals
+}
+
+function latestWave(rows: FortLifeEvent[]): FortLifeEvent[] {
+  const first = rows[0]
+  return rows.filter(
+    (row) => row.game_year === first.game_year && row.game_tick === first.game_tick,
+  )
+}
+
+function fromArrival(row: FortLifeEvent): FortArrival {
+  const age = row.data.age
+  return {
+    unitId: row.unit_id,
+    year: row.game_year,
+    tick: row.game_tick,
+    age: typeof age === 'number' ? age : null,
   }
 }
 

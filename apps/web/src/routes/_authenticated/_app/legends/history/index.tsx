@@ -5,9 +5,9 @@ import * as React from 'react'
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { yearSpan } from '~/lib/legends/events'
 import { RACE_COLORS, titleCase, words } from '~/lib/legends/model'
-import type { Story } from '~/lib/legends/server/chronicle'
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import { ChroniclePanel } from '../-components/Chronicle'
+import { Yours } from '../-components/FortressTie'
 import { HistoryChart, type YearSpan } from '../-components/HistoryChart'
 import {
   LegendsShell,
@@ -17,7 +17,7 @@ import {
   SectionStack,
   parseWorldParam,
 } from '../-components/LegendsChrome'
-import { StoryCard, useStories } from '../-components/Stories'
+import { StoryCard, featuredNote, featuredStories, useStories } from '../-components/Stories'
 
 interface HistorySearch {
   world?: number
@@ -35,11 +35,13 @@ const HistoryPage = () => {
     })
   return (
     <LegendsShell section="history" world={search.world}>
-      {({ worldId, summary, summaryLoading }) => (
+      {({ worldId, summary, summaryLoading, summaryError, live, matchesLive }) => (
         <HistoryBody
           worldId={worldId}
           summary={summary}
           loading={summaryLoading}
+          failed={summaryError}
+          ourCiv={matchesLive ? (live?.civId ?? null) : null}
           span={
             search.from !== undefined && search.to !== undefined
               ? { from: search.from, to: search.to }
@@ -56,16 +58,28 @@ const HistoryBody = ({
   worldId,
   summary,
   loading,
+  failed,
+  ourCiv,
   span,
   onSpan,
 }: {
   worldId: number
   summary: LegendsWorldSummary | undefined
   loading: boolean
+  failed: boolean
+  ourCiv: number | null
   span: YearSpan | null
   onSpan: (span: YearSpan | null) => void
 }) => {
   const navigate = useNavigate()
+  const isOurs = (id: number | undefined) => ourCiv !== null && id === ourCiv
+  const wars = React.useMemo(() => {
+    const list = summary?.wars ?? []
+    const mine = (id: number | undefined) => ourCiv !== null && id === ourCiv
+    const ours = (w: (typeof list)[number]) => mine(w.aggressor?.id) || mine(w.defender?.id)
+    return [...list.filter(ours), ...list.filter((w) => !ours(w))]
+  }, [summary?.wars, ourCiv])
+  const ourWars = wars.filter((w) => isOurs(w.aggressor?.id) || isOurs(w.defender?.id)).length
   const onSearch = (q: string) =>
     navigate({
       to: '/legends/archive',
@@ -75,7 +89,11 @@ const HistoryBody = ({
   if (!summary) {
     return (
       <p className="p-4 text-sm text-muted-foreground">
-        {loading ? 'Reading the chronicles…' : 'No history yet.'}
+        {loading
+          ? 'Reading the chronicles…'
+          : failed
+            ? 'The history could not be read just now. Reload the page to try again.'
+            : 'No history yet.'}
       </p>
     )
   }
@@ -87,13 +105,10 @@ const HistoryBody = ({
 
   return (
     <SectionStack className="border-b">
-      <StoriesStrip worldId={worldId} />
-
       <SectionGrid className="lg:grid-cols-2">
         <Section
-          collapsed
           title="Names that fill the chronicles"
-          description="The figures mentioned in the most recorded events."
+          description="The figures the most recorded events mention, for good or ill: rulers, heroes, monsters and gods alike."
         >
           <ul className="divide-y">
             {summary.notable.map((figure, i) => (
@@ -168,14 +183,17 @@ const HistoryBody = ({
         </Section>
 
         <Section
-          collapsed
           title="Wars"
           count={summary.wars.length}
-          description="Declared wars between civilizations. Click the years to read them."
+          description={
+            ourWars
+              ? `Declared wars between civilizations. The ${ourWars === 1 ? 'one' : ourWars} your people fought come${ourWars === 1 ? 's' : ''} first. Click the years to read them.`
+              : 'Declared wars between civilizations. Click the years to read them.'
+          }
         >
-          {summary.wars.length ? (
-            <ul className="divide-y">
-              {summary.wars.map((war) => (
+          {wars.length ? (
+            <ul className="max-h-[32rem] divide-y overflow-y-auto">
+              {wars.map((war) => (
                 <li key={war.id} className="py-2">
                   <div className="flex flex-wrap items-baseline gap-x-3">
                     <RecordLink
@@ -184,6 +202,11 @@ const HistoryBody = ({
                       name={war.name}
                       worldId={worldId}
                     />
+                    {isOurs(war.defender?.id) ? (
+                      <Yours>against your people</Yours>
+                    ) : isOurs(war.aggressor?.id) ? (
+                      <Yours>waged by your people</Yours>
+                    ) : null}
                     {war.startYear !== null && war.startYear >= 0 ? (
                       <button
                         type="button"
@@ -317,28 +340,33 @@ const HistoryBody = ({
       </Section>
 
       {years && current ? (
-        <ChroniclePanel worldId={worldId} span={current} years={years} onSpan={onSpan} />
+        <div id="chronicle" className="scroll-mt-4">
+          <ChroniclePanel worldId={worldId} span={current} years={years} onSpan={onSpan} />
+        </div>
       ) : null}
+
+      <StoriesStrip worldId={worldId} ourCiv={ourCiv} />
     </SectionStack>
   )
 }
 
-/** One story from each of the liveliest groups, as a way into the Stories tab. */
-const StoriesStrip = ({ worldId }: { worldId: number }) => {
+/** A few stories, those naming your civilization first, as a way into the Stories tab. */
+const StoriesStrip = ({ worldId, ourCiv }: { worldId: number; ourCiv: number | null }) => {
   const stories = useStories(worldId)
-  const picks = React.useMemo(() => {
-    const groups = stories.data?.groups ?? []
-    const order = ['battles', 'slayers', 'lives', 'cursed', 'contested', 'hearts']
-    return order
-      .map((key) => groups.find((g) => g.key === key)?.stories[0])
-      .filter((s): s is Story => Boolean(s))
-      .slice(0, 4)
-  }, [stories.data])
+  const featured = React.useMemo(
+    () => featuredStories(stories.data, ourCiv),
+    [stories.data, ourCiv],
+  )
+  const picks = featured.slice(0, 4)
   if (!stories.data || !picks.length) return null
   return (
     <Section
       title="Stories worth reading"
-      description="Threads the records keep returning to."
+      description={
+        featuredNote(featured, ourCiv)
+          ? 'Threads the records keep returning to. Those that name your civilization come first.'
+          : 'Threads the records keep returning to.'
+      }
       action={
         <Button asChild variant="outline" size="sm">
           <Link to="/legends/stories" search={{ world: worldId }}>

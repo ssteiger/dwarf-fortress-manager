@@ -14,6 +14,8 @@ function eventsOf(worldId: number): SQL {
 }
 
 const memo = new Map<string, { version: string; value: Promise<unknown> }>()
+/** Per-record entries come and go; the per-world aggregates are few and re-read often. */
+const MEMO_LIMIT = 4000
 
 async function worldVersion(worldId: number): Promise<string> {
   const [world, imports] = await Promise.all([
@@ -38,12 +40,22 @@ export async function remember<T>(
   const version = await worldVersion(worldId)
   const cacheKey = `${worldId}:${key}`
   const hit = memo.get(cacheKey)
-  if (hit && hit.version === version) return hit.value as Promise<T>
+  if (hit && hit.version === version) {
+    memo.delete(cacheKey)
+    memo.set(cacheKey, hit)
+    return hit.value as Promise<T>
+  }
   const value = compute().catch((error) => {
     memo.delete(cacheKey)
     throw error
   })
+  memo.delete(cacheKey)
   memo.set(cacheKey, { version, value })
+  while (memo.size > MEMO_LIMIT) {
+    const oldest = memo.keys().next().value
+    if (oldest === undefined) break
+    memo.delete(oldest)
+  }
   return value
 }
 

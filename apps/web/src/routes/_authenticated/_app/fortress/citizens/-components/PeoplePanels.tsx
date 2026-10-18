@@ -2,7 +2,10 @@ import type { FortSquad, FortUnit } from '@fortress/db-drizzle'
 import { Badge, Button, Skeleton, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import {
+  BabyIcon,
   BriefcaseIcon,
+  EyeIcon,
+  FootprintsIcon,
   GraduationCapIcon,
   HandHelpingIcon,
   HeartHandshakeIcon,
@@ -10,14 +13,31 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { useQuery } from '@tanstack/react-query'
 import { CreatureSprite } from '~/lib/df-assets/components'
-import { skillRank, unitDisplayName } from '~/lib/fortress/format'
+import { formatGameTick, skillRank, stressLabel, unitDisplayName } from '~/lib/fortress/format'
 import { skillLabel } from '~/lib/fortress/people/dossier'
 import type { Concern } from '~/lib/fortress/people/troubles'
 import { firstName, isGrownCitizen } from '~/lib/fortress/people/units'
-import type { FortBond, FortWastedTalent } from '~/lib/fortress/server/units'
+import { getUnitSketch } from '~/lib/fortress/server/roleplay'
+import type { FortArrival, FortBond, FortWastedTalent } from '~/lib/fortress/server/units'
 import { Section } from '../../-components/FortChrome'
 import { ConcernBadges, type OpenUnit, UnitChip } from '../../-components/Insights'
+import { LaborButton } from './LaborButton'
+
+export const CitizenFilter = React.createContext('')
+
+function matches(unit: FortUnit, query: string): boolean {
+  if (!query) return true
+  const q = query.toLowerCase()
+  return [unit.name, unit.nickname, unit.readable, unit.profession, unit.name_english].some((s) =>
+    s?.toLowerCase().includes(q),
+  )
+}
+
+function chipClass(unit: FortUnit, query: string, extra?: string): string | undefined {
+  return cn(extra, query && !matches(unit, query) && 'opacity-40')
+}
 
 const SEVERITY_ORDER: Record<Concern['severity'], number> = { danger: 0, warning: 1, info: 2 }
 
@@ -57,6 +77,7 @@ function firstSentence(text: string): string {
 
 /** Citizens with a need, a wound, a dark mood or nothing to do, the worst first. */
 export const HelpList = ({ entries, onOpen }: { entries: HelpEntry[]; onOpen: OpenUnit }) => {
+  const query = React.useContext(CitizenFilter)
   const [all, setAll] = React.useState(false)
   const shown = capped(entries, HELP_SHOWN, all)
   return (
@@ -91,7 +112,10 @@ export const HelpList = ({ entries, onOpen }: { entries: HelpEntry[]; onOpen: Op
                   <button
                     type="button"
                     onClick={() => onOpen(unit)}
-                    className="-mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
+                    className={cn(
+                      '-mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent',
+                      query && !matches(unit, query) && 'opacity-40',
+                    )}
                   >
                     <CreatureSprite unit={unit} size={28} className="mt-0.5 shrink-0" />
                     <span className="flex min-w-0 flex-1 flex-col gap-1">
@@ -139,12 +163,12 @@ export const HelpStrip = ({ entries, className }: { entries: HelpEntry[]; classN
       }
       action={
         <Link
-          to="/fortress/dwarves"
+          to="/fortress/citizens"
           className="text-sm text-primary underline-offset-4 hover:underline"
         >
           {entries.length > shown.length
-            ? `All ${entries.length} on the Dwarves page`
-            : 'More on the Dwarves page'}
+            ? `All ${entries.length} on the Citizens page`
+            : 'More on the Citizens page'}
         </Link>
       }
     >
@@ -156,7 +180,7 @@ export const HelpStrip = ({ entries, className }: { entries: HelpEntry[]; classN
           return (
             <li key={unit.id} className="min-w-0">
               <Link
-                to="/fortress/dwarves/$id"
+                to="/fortress/citizens/$id"
                 params={{ id: String(unit.id) }}
                 className="-mx-2 flex h-full flex-col gap-1.5 rounded-md px-2 py-2 transition-colors hover:bg-accent"
               >
@@ -172,6 +196,228 @@ export const HelpStrip = ({ entries, className }: { entries: HelpEntry[]; classN
                 ) : null}
               </Link>
             </li>
+          )
+        })}
+      </ul>
+    </Section>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Watch, arrivals, the young
+
+const SketchLine = ({ unitId }: { unitId: number }) => {
+  const sketch = useQuery({
+    queryKey: ['fort', 'sketch', unitId],
+    queryFn: () => getUnitSketch({ data: { unitId } }),
+    staleTime: 30 * 60_000,
+  })
+  if (!sketch.data?.text) return null
+  return (
+    <span className="text-sm text-muted-foreground">
+      {sketch.data.text} <span className="italic">A reading, not a fact from the game.</span>
+    </span>
+  )
+}
+
+const PersonRow = ({
+  unit,
+  onOpen,
+  detail,
+}: {
+  unit: FortUnit
+  onOpen: OpenUnit
+  detail: React.ReactNode
+}) => {
+  const query = React.useContext(CitizenFilter)
+  return (
+    <li className={cn('min-w-0', query && !matches(unit, query) && 'opacity-40')}>
+      <button
+        type="button"
+        onClick={() => onOpen(unit)}
+        className="-mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
+      >
+        <CreatureSprite unit={unit} size={28} className="mt-0.5 shrink-0" />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-baseline gap-2">
+            <span className="truncate font-medium">{unitDisplayName(unit)}</span>
+            <span className="shrink-0 text-sm text-muted-foreground">{unit.profession}</span>
+          </span>
+          {detail}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+/** Citizens you pinned with Watch. */
+export const Watching = ({
+  units,
+  concerns,
+  onOpen,
+}: {
+  units: FortUnit[]
+  concerns: Map<number, Concern[]>
+  onOpen: OpenUnit
+}) => {
+  return (
+    <Section
+      icon={<EyeIcon className="size-4 text-primary" />}
+      title={
+        <>
+          You are watching
+          {units.length ? (
+            <span className="text-sm font-normal text-muted-foreground tabular-nums">
+              {units.length}
+            </span>
+          ) : null}
+        </>
+      }
+      description={
+        units.length
+          ? 'The dwarves you pinned. They come first in the chronicle and the glance window.'
+          : 'Pin someone with Watch on their page and they will sit here.'
+      }
+    >
+      {units.length ? (
+        <ul className="grid gap-x-6 gap-y-0.5 lg:grid-cols-2">
+          {units.map((unit) => {
+            const list = concerns.get(unit.id) ?? []
+            return (
+              <PersonRow
+                key={unit.id}
+                unit={unit}
+                onOpen={onOpen}
+                detail={
+                  <>
+                    <span className="text-sm text-muted-foreground">
+                      {stressLabel(unit.stress_category)}
+                      {unit.job ? ` · ${unit.job}` : ''}
+                    </span>
+                    {list.length ? <ConcernBadges concerns={list} /> : null}
+                    <SketchLine unitId={unit.id} />
+                  </>
+                }
+              />
+            )
+          })}
+        </ul>
+      ) : null}
+    </Section>
+  )
+}
+
+/** Who joined the fortress this season, or the last wave the worker saw. */
+export const JustArrived = ({
+  arrivals,
+  units,
+  onOpen,
+}: {
+  arrivals: FortArrival[]
+  units: FortUnit[]
+  onOpen: OpenUnit
+}) => {
+  const byId = React.useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
+  const rows = arrivals.flatMap((a) => {
+    const unit = byId.get(a.unitId)
+    return unit ? [{ unit, arrival: a }] : []
+  })
+  if (!rows.length) return null
+  return (
+    <Section
+      icon={<FootprintsIcon className="size-4 text-primary" />}
+      title={
+        <>
+          Just arrived
+          <span className="text-sm font-normal text-muted-foreground tabular-nums">
+            {rows.length}
+          </span>
+        </>
+      }
+      description="Who the worker saw join. Earlier waves from before it started are not here."
+    >
+      <ul className="grid gap-x-6 gap-y-0.5 lg:grid-cols-2">
+        {rows.map(({ unit, arrival }) => (
+          <PersonRow
+            key={unit.id}
+            unit={unit}
+            onOpen={onOpen}
+            detail={
+              <span className="text-sm text-muted-foreground">
+                Arrived {formatGameTick(arrival.year, arrival.tick)}
+                {arrival.age !== null ? `, ${arrival.age} years old` : ''}
+              </span>
+            }
+          />
+        ))}
+      </ul>
+    </Section>
+  )
+}
+
+/** Babies, children, and who is expecting. */
+export const TheYoung = ({
+  citizens,
+  expecting,
+  bonds,
+  onOpen,
+}: {
+  citizens: FortUnit[]
+  expecting: number[]
+  bonds: FortBond[]
+  onOpen: OpenUnit
+}) => {
+  const byId = React.useMemo(() => new Map(citizens.map((unit) => [unit.id, unit])), [citizens])
+  const children = citizens.filter(
+    (unit) => unit.flags.includes('child') || unit.flags.includes('baby'),
+  )
+  const mothers = expecting.flatMap((id) => {
+    const unit = byId.get(id)
+    return unit ? [unit] : []
+  })
+  if (!children.length && !mothers.length) return null
+  const parentOf = (child: FortUnit): FortUnit | undefined => {
+    const bond = bonds.find(
+      (b) => b.to === child.id && /mother|father|parent/i.test(b.label) && byId.has(b.from),
+    )
+    return bond ? byId.get(bond.from) : undefined
+  }
+  return (
+    <Section
+      icon={<BabyIcon className="size-4 text-primary" />}
+      title={
+        <>
+          The young
+          <span className="text-sm font-normal text-muted-foreground tabular-nums">
+            {children.length + mothers.length}
+          </span>
+        </>
+      }
+      description="Babies, children, and who is expecting."
+    >
+      <ul className="grid gap-x-6 gap-y-0.5 lg:grid-cols-2">
+        {mothers.map((unit) => (
+          <PersonRow
+            key={`e${unit.id}`}
+            unit={unit}
+            onOpen={onOpen}
+            detail={<span className="text-sm text-muted-foreground">Expecting a child</span>}
+          />
+        ))}
+        {children.map((unit) => {
+          const parent = parentOf(unit)
+          return (
+            <PersonRow
+              key={unit.id}
+              unit={unit}
+              onOpen={onOpen}
+              detail={
+                <span className="text-sm text-muted-foreground">
+                  {unit.flags.includes('baby') ? 'Baby' : `${Math.floor(unit.age)} years`}
+                  {parent ? ` · child of ${firstName(parent)}` : ''}
+                </span>
+              }
+            />
           )
         })}
       </ul>
@@ -242,15 +488,11 @@ function workGroups(citizens: FortUnit[]): WorkGroup[] {
   for (const [squad, members] of [...squads].sort((a, b) => a[0].localeCompare(b[0])))
     groups.push({ key: `squad-${squad}`, label: squad, units: members.sort(byName) })
 
-  const young = citizens.filter(
-    (unit) => !placed.has(unit.id) && (unit.flags.includes('child') || unit.flags.includes('baby')),
-  )
-  for (const unit of young) placed.add(unit.id)
-
   const trades = new Map<string, FortUnit[]>()
   const other: FortUnit[] = []
   for (const unit of citizens) {
     if (placed.has(unit.id)) continue
+    if (unit.flags.includes('child') || unit.flags.includes('baby')) continue
     const trade = TRADES.find(([, test]) => test.test(unit.profession))?.[0]
     if (trade) trades.set(trade, [...(trades.get(trade) ?? []), unit])
     else other.push(unit)
@@ -260,11 +502,11 @@ function workGroups(citizens: FortUnit[]): WorkGroup[] {
     if (members?.length) groups.push({ key: label, label, units: members.sort(byName) })
   }
   if (other.length) groups.push({ key: 'other', label: 'Other work', units: other.sort(byName) })
-  if (young.length) groups.push({ key: 'young', label: 'Children', units: young.sort(byName) })
   return groups
 }
 
 export const WorkGroups = ({ citizens, onOpen }: { citizens: FortUnit[]; onOpen: OpenUnit }) => {
+  const query = React.useContext(CitizenFilter)
   const groups = React.useMemo(() => workGroups(citizens), [citizens])
   const idle = citizens.filter(isIdle).length
   return (
@@ -301,7 +543,7 @@ export const WorkGroups = ({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
               {group.units.map((unit) =>
                 group.offices ? (
                   <span key={unit.id} className="inline-flex items-center gap-1.5 pr-2">
-                    <UnitChip unit={unit} onOpen={onOpen} />
+                    <UnitChip unit={unit} onOpen={onOpen} className={chipClass(unit, query)} />
                     <span className="text-sm text-muted-foreground">
                       {(group.offices.get(unit.id) ?? []).map(capitalize).join(', ')}
                     </span>
@@ -311,7 +553,11 @@ export const WorkGroups = ({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
                     key={unit.id}
                     unit={unit}
                     onOpen={onOpen}
-                    className={cn(isIdle(unit) && 'border-amber-500/70')}
+                    className={chipClass(
+                      unit,
+                      query,
+                      isIdle(unit) ? 'border-amber-500/70' : undefined,
+                    )}
                   />
                 ),
               )}
@@ -336,6 +582,7 @@ export const Squads = ({
   units: FortUnit[]
   onOpen: OpenUnit
 }) => {
+  const query = React.useContext(CitizenFilter)
   const byId = React.useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
   if (!squads.length) return null
   return (
@@ -401,7 +648,11 @@ export const Squads = ({
                       key={member.position}
                       unit={unit}
                       onOpen={onOpen}
-                      className={cn(member.assigned_items === 0 && 'border-amber-500/70')}
+                      className={chipClass(
+                        unit,
+                        query,
+                        member.assigned_items === 0 ? 'border-amber-500/70' : undefined,
+                      )}
                     />
                   ) : (
                     <span
@@ -487,6 +738,7 @@ export const SkillCoverage = ({
   loading: boolean
   onOpen: OpenUnit
 }) => {
+  const query = React.useContext(CitizenFilter)
   const [allWasted, setAllWasted] = React.useState(false)
   const adults = React.useMemo(() => citizens.filter(isGrownCitizen), [citizens])
   const byId = React.useMemo(() => new Map(citizens.map((unit) => [unit.id, unit])), [citizens])
@@ -523,14 +775,21 @@ export const SkillCoverage = ({
                     <dd className="flex min-w-0 flex-wrap items-center gap-2">
                       {best ? (
                         <>
-                          <UnitChip unit={best.unit} onOpen={onOpen} />
+                          <UnitChip
+                            unit={best.unit}
+                            onOpen={onOpen}
+                            className={chipClass(best.unit, query)}
+                          />
                           <span className="text-sm text-muted-foreground">
                             {skillRank(best.rating)}
                           </span>
                           {wastedKeys.has(`${best.unit.id}:${token}`) ? (
-                            <span className="text-xs text-amber-700 dark:text-amber-400">
-                              labor off
-                            </span>
+                            <>
+                              <span className="text-xs text-amber-700 dark:text-amber-400">
+                                labor off
+                              </span>
+                              <LaborButton unit={best.unit} skill={token} on />
+                            </>
                           ) : null}
                         </>
                       ) : (
@@ -559,7 +818,7 @@ export const SkillCoverage = ({
           <section className="flex flex-col border-t pt-4">
             <h3 className="text-sm font-medium">Good at it, but not allowed to</h3>
             <p className="text-sm text-muted-foreground">
-              Enable the labor, or add them to a work detail that allows it.
+              Allow the work here, or add them to a work detail in the game.
             </p>
             <ul className="mt-2 flex flex-col gap-1.5">
               {shownWasted.map((talent) => {
@@ -570,10 +829,11 @@ export const SkillCoverage = ({
                     key={`${talent.unitId}:${talent.skill}`}
                     className="flex flex-wrap items-center gap-2 text-sm"
                   >
-                    <UnitChip unit={unit} onOpen={onOpen} />
+                    <UnitChip unit={unit} onOpen={onOpen} className={chipClass(unit, query)} />
                     <span>
                       {skillRank(talent.rating)} at {skillLabel(talent.skill, unit)}
                     </span>
+                    <LaborButton unit={unit} skill={talent.skill} on />
                   </li>
                 )
               })}
@@ -720,6 +980,31 @@ const BondColumn = ({
   )
 }
 
+function familyLine(members: FortUnit[], bonds: FortBond[]): string {
+  const children = members.filter(
+    (unit) => unit.flags.includes('child') || unit.flags.includes('baby'),
+  )
+  const grown = members.filter((unit) => !children.includes(unit))
+  const ids = new Set(members.map((unit) => unit.id))
+  const spouse = bonds.find(
+    (bond) =>
+      ids.has(bond.from) && ids.has(bond.to) && /wife|husband|spouse|lover/i.test(bond.label),
+  )
+  if (spouse) {
+    const a = members.find((unit) => unit.id === spouse.from)
+    const b = members.find((unit) => unit.id === spouse.to)
+    if (a && b) {
+      const kids = children.length
+        ? `, and their ${children.length === 1 ? 'child' : `${children.length} children`}`
+        : ''
+      return `${firstName(a)}, ${spouse.label.toLowerCase()} of ${firstName(b)}${kids}`
+    }
+  }
+  if (grown.length && children.length)
+    return `${grown.map(firstName).join(' and ')}, with ${children.length === 1 ? 'a child' : `${children.length} children`}`
+  return members.map(firstName).join(', ')
+}
+
 export const Bonds = ({
   citizens,
   bonds,
@@ -731,6 +1016,7 @@ export const Bonds = ({
   loading: boolean
   onOpen: OpenUnit
 }) => {
+  const query = React.useContext(CitizenFilter)
   const [open, setOpen] = React.useState({ family: false, friends: false, foes: false })
   const byId = React.useMemo(() => new Map(citizens.map((unit) => [unit.id, unit])), [citizens])
   const families = React.useMemo(() => households(bonds, byId), [bonds, byId])
@@ -762,10 +1048,18 @@ export const Bonds = ({
             onShowAll={() => setOpen((o) => ({ ...o, family: true }))}
           >
             {cap(families, open.family).map((members) => (
-              <li key={members[0].id} className="flex flex-wrap gap-1.5 py-2 first:pt-0">
-                {members.map((unit) => (
-                  <UnitChip key={unit.id} unit={unit} onOpen={onOpen} />
-                ))}
+              <li key={members[0].id} className="flex flex-col gap-1.5 py-2 first:pt-0">
+                <span className="text-sm text-muted-foreground">{familyLine(members, bonds)}</span>
+                <span className="flex flex-wrap gap-1.5">
+                  {members.map((unit) => (
+                    <UnitChip
+                      key={unit.id}
+                      unit={unit}
+                      onOpen={onOpen}
+                      className={chipClass(unit, query)}
+                    />
+                  ))}
+                </span>
               </li>
             ))}
           </BondColumn>
@@ -785,8 +1079,8 @@ export const Bonds = ({
               <li key={row.key} className="flex flex-col gap-1 py-2 first:pt-0">
                 <span className="text-xs text-muted-foreground">{row.words}</span>
                 <span className="flex flex-wrap gap-1.5">
-                  <UnitChip unit={row.a} onOpen={onOpen} />
-                  <UnitChip unit={row.b} onOpen={onOpen} />
+                  <UnitChip unit={row.a} onOpen={onOpen} className={chipClass(row.a, query)} />
+                  <UnitChip unit={row.b} onOpen={onOpen} className={chipClass(row.b, query)} />
                 </span>
               </li>
             ))}
@@ -803,9 +1097,9 @@ export const Bonds = ({
                 key={row.key}
                 className="flex flex-wrap items-center gap-1.5 py-2 text-sm first:pt-0"
               >
-                <UnitChip unit={row.a} onOpen={onOpen} />
+                <UnitChip unit={row.a} onOpen={onOpen} className={chipClass(row.a, query)} />
                 <span className="text-muted-foreground">{row.words}</span>
-                <UnitChip unit={row.b} onOpen={onOpen} />
+                <UnitChip unit={row.b} onOpen={onOpen} className={chipClass(row.b, query)} />
                 {row.both ? <span className="text-muted-foreground">and back</span> : null}
               </li>
             ))}

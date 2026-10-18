@@ -55,8 +55,22 @@ export function featuredStories(stories: Stories | undefined, civId?: number | n
   for (let round = 0; queues.some((q) => q.length > round); round++)
     for (const queue of queues) if (queue[round]) out.push(queue[round])
   if (civId === null || civId === undefined) return out
-  const ours = (s: Story) => s.refs.some((r) => r.kind === 'entity' && r.id === civId)
+  const ours = (s: Story) => namesCiv(s, civId)
   return [...out.filter(ours), ...out.filter((s) => !ours(s))]
+}
+
+export function namesCiv(story: Story, civId: number | null | undefined): boolean {
+  return civId !== null && civId !== undefined
+    ? story.refs.some((r) => r.kind === 'entity' && r.id === civId)
+    : false
+}
+
+/** Why the featured story leads, when your civilization decided it. */
+export function featuredNote(candidates: Story[], civId: number | null | undefined) {
+  const count = candidates.filter((s) => namesCiv(s, civId)).length
+  return count
+    ? `Stories that name your civilization come first: ${count} of them. "Another" walks through those before the rest.`
+    : undefined
 }
 
 /** Characters below which the opening paragraph runs on into the next. */
@@ -69,6 +83,7 @@ export const FeaturedStory = ({
   title = 'A story from the record',
   start = 'first',
   action,
+  description,
 }: {
   worldId: number
   candidates: Story[]
@@ -76,6 +91,8 @@ export const FeaturedStory = ({
   /** Open on the first candidate, or on one picked at random once they load. */
   start?: 'first' | 'random'
   action?: React.ReactNode
+  /** Why these stories, e.g. that those naming your civilization come first. */
+  description?: string
 }) => {
   const [at, setAt] = React.useState<number | null>(start === 'first' ? 0 : null)
   React.useEffect(() => {
@@ -93,6 +110,7 @@ export const FeaturedStory = ({
   return (
     <Section
       title={title}
+      description={description}
       action={
         <div className="flex items-center gap-2">
           {candidates.length > 1 ? (

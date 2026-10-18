@@ -165,7 +165,7 @@ export const PersonName = ({
       {unit ? <CreatureSprite unit={unit} size={24} className="-my-1 shrink-0" /> : null}
       {unit ? (
         <Link
-          to="/fortress/dwarves/$id"
+          to="/fortress/citizens/$id"
           params={{ id: String(unit.id) }}
           className="truncate font-medium hover:underline"
           title={person.name_english ?? undefined}

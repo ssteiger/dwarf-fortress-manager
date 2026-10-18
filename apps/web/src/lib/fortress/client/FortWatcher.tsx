@@ -6,12 +6,18 @@ import type { FortEvent } from '@fortress/db-drizzle'
 
 import { type AlertKind, usePreferences } from '~/lib/preferences'
 
+import { titleCase } from '~/lib/legends/model'
+
+import { type CursedDwarf, cursedDwarves } from '../advice/curses'
 import { creatureCounts } from '../advice/notices'
+import type { LegendsCurse } from '../advice/types'
 import { alertLevel, cleanAnnouncement, storyKind } from '../chronicle/announcements'
+import { warBehind, warSpan } from '../diplomacy'
 import { formatGameTick, isLiving, unitGroup } from '../format'
+import { firstName } from '../people/units'
 import { type WatchAlert, type WatchMark, watchAlerts, watchMark } from '../people/watchChanges'
 import { desktopAlertsAllowed, useAlertMode } from './alerts'
-import { useFortDumpWatch, useFortOverview, useFortUnits } from './queries'
+import { useFortDiplomacy, useFortDumpWatch, useFortOverview, useFortUnits } from './queries'
 import { useWatchList } from './watch'
 
 /*
@@ -22,7 +28,31 @@ import { useWatchList } from './watch'
 /** At most this many toasts per poll, so a siege does not bury the screen. */
 const MAX_PER_POLL = 4
 
-type Target = { to: '/fortress' } | { to: '/fortress/dwarves/$id'; params: { id: string } }
+type Target = { to: '/fortress' } | { to: '/fortress/citizens/$id'; params: { id: string } }
+
+/** Cursed dwarves already told of, kept per browser so each is told once. */
+const TOLD_CURSES_KEY = 'dfm.told-curses'
+
+function curseMark(fortName: string, c: CursedDwarf): string {
+  return `${fortName}:${c.unit.id}:${c.kind}`
+}
+
+function toldCurses(): Set<string> {
+  try {
+    const stored = JSON.parse(localStorage.getItem(TOLD_CURSES_KEY) ?? '[]')
+    return new Set(Array.isArray(stored) ? stored.map(String) : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function keepToldCurses(told: Set<string>) {
+  try {
+    localStorage.setItem(TOLD_CURSES_KEY, JSON.stringify([...told].slice(-500)))
+  } catch {
+    // Private windows: told again next time the page opens.
+  }
+}
 
 /** Which Settings → Alerts switch an announcement answers to. */
 function alertKindOf(event: Pick<FortEvent, 'type' | 'text'>): AlertKind | null {
@@ -51,13 +81,25 @@ function alertKindOf(event: Pick<FortEvent, 'type' | 'text'>): AlertKind | null 
  * deaths, dangers, moods, births and arrivals, and danger coming into sight.
  * Renders nothing. What was already there when the app opened stays quiet.
  */
-export function FortWatcher() {
+export function FortWatcher({ legendsCurses }: { legendsCurses?: LegendsCurse[] } = {}) {
   useFortDumpWatch()
   const navigate = useNavigate()
   const mode = useAlertMode()
   const { alertKinds } = usePreferences()
   const overview = useFortOverview()
   const units = useFortUnits()
+  const diplomacy = useFortDiplomacy()
+  const d = diplomacy.data?.diplomacy ?? null
+  const warNote = React.useMemo(() => {
+    if (!d) return null
+    const war = d.invasions
+      .filter((invasion) => invasion.flags.includes('active'))
+      .map((invasion) => warBehind(d, invasion.civ_id))
+      .find((w) => w !== null)
+    if (!war) return null
+    const span = warSpan(war, d.year)
+    return `The war behind it: ${war.name ? titleCase(war.name) : 'an unnamed war'}, ${span.charAt(0).toLowerCase()}${span.slice(1)}.`
+  }, [d])
   const seenEvent = React.useRef<number | null>(null)
   const seenDanger = React.useRef<Set<number> | null>(null)
   const seenWatched = React.useRef<Map<number, WatchMark>>(new Map())
@@ -97,6 +139,7 @@ export function FortWatcher() {
   )
 
   const events = overview.data?.events
+  // biome-ignore lint/correctness/useExhaustiveDependencies: warNote only adds words; a change alone must not re-announce
   React.useEffect(() => {
     if (!events) return
     const newest = events.reduce((max, e) => Math.max(max, e.id), 0)
@@ -114,9 +157,14 @@ export function FortWatcher() {
       })
       .sort((a, b) => a.id - b.id)
     for (const event of fresh.slice(-MAX_PER_POLL)) {
+      const when = formatGameTick(event.game_year, event.game_tick)
+      const detail =
+        alertKindOf(event) === 'threat' && warNote
+          ? [when, warNote].filter(Boolean).join(' · ')
+          : when
       tell(
         cleanAnnouncement(event.text),
-        formatGameTick(event.game_year, event.game_tick) || undefined,
+        detail || undefined,
         alertLevel(event) === 'urgent',
         `fort-event-${event.id}`,
       )
@@ -128,6 +176,7 @@ export function FortWatcher() {
   }, [events, mode, alertKinds, tell, navigate])
 
   const all = units.data?.units
+  // biome-ignore lint/correctness/useExhaustiveDependencies: warNote only adds words; a change alone must not re-announce
   React.useEffect(() => {
     if (!all) return
     const inSight = all.filter(
@@ -141,11 +190,33 @@ export function FortWatcher() {
     if (!arrived.length) return
     tell(
       `Danger in sight: ${creatureCounts(arrived)}`,
-      'Hostile creatures have been spotted on the map.',
+      `Hostile creatures have been spotted on the map.${warNote ? ` ${warNote}` : ''}`,
       true,
       'fort-danger',
     )
   }, [all, mode, alertKinds.sighting, tell])
+
+  const loadedFort = overview.data?.state?.fort_name ?? null
+  React.useEffect(() => {
+    if (!all || !loadedFort || mode === 'off' || !alertKinds.threat) return
+    const told = toldCurses()
+    const fresh = cursedDwarves(all, legendsCurses).filter(
+      (c) => !told.has(curseMark(loadedFort, c)),
+    )
+    if (!fresh.length) return
+    for (const c of fresh) told.add(curseMark(loadedFort, c))
+    keepToldCurses(told)
+    for (const c of fresh.slice(0, MAX_PER_POLL))
+      tell(
+        `${firstName(c.unit)} is ${c.kind === 'undead' ? 'undead' : `a ${c.what}`}`,
+        c.source === 'dump'
+          ? 'The game shows the curse on them.'
+          : 'The world’s history records the curse on them.',
+        false,
+        `fort-cursed-${c.unit.id}`,
+        { to: '/fortress/citizens/$id', params: { id: String(c.unit.id) } },
+      )
+  }, [all, legendsCurses, loadedFort, mode, alertKinds.threat, tell])
 
   const { ids: watched } = useWatchList()
   React.useEffect(() => {
@@ -162,7 +233,7 @@ export function FortWatcher() {
     }
     for (const { alert, unitId } of told.slice(0, MAX_PER_POLL))
       tell(alert.title, alert.detail, alert.urgent, `fort-watch-${unitId}`, {
-        to: '/fortress/dwarves/$id',
+        to: '/fortress/citizens/$id',
         params: { id: String(unitId) },
       })
   }, [all, watched, mode, alertKinds.watched, tell])

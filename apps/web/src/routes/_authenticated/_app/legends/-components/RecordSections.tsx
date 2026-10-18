@@ -1,9 +1,10 @@
 import type { JsonObject, LegendsPayload, LegendsRecord } from '@fortress/db-drizzle'
 import { Badge, Button, cn } from '@fortress/ui'
-import { useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import * as React from 'react'
 
 import {
+  describeEvent,
   legendsDate,
   num,
   numList,
@@ -27,9 +28,13 @@ import {
 import type { LegendsMapData } from '~/lib/legends/server/map'
 import type { RelatedRecords } from '~/lib/legends/server/record'
 import type { HeldPosition, LegendsHit, NameIndex } from '~/lib/legends/types'
+import { FamilyTree } from './FamilyTree'
+import { Yours, useFortressContext } from './FortressTie'
+import { PrayedToHere } from './Gods'
 import {
   EventLine,
   Facts,
+  Fragments,
   HitRows,
   NamedRef,
   RecordLink,
@@ -407,7 +412,26 @@ function groupLinks(links: JsonObject[], idKey: string, typeKey: string, order: 
   return groups
 }
 
+/** The figure page's in-page links, for the bands this record fills. */
+export function figureJumps(
+  p: LegendsPayload,
+  related: RelatedRecords,
+  positions: HeldPosition[],
+): { anchor: string; label: string }[] {
+  const links = objList(p.hf_link)
+  const out: { anchor: string; label: string }[] = []
+  if (related.family || links.some((l) => FAMILY_LINKS.includes(str(l.link_type) ?? '')))
+    out.push({ anchor: 'family', label: 'Family' })
+  if (positions.length) out.push({ anchor: 'offices', label: 'Offices' })
+  if (objList(p.site_link).length) out.push({ anchor: 'places', label: 'Places' })
+  if (related.kills?.rows.length || related.artifacts?.length || related.writings?.length)
+    out.push({ anchor: 'deeds', label: 'Deeds' })
+  out.push({ anchor: 'record', label: 'The record' })
+  return out
+}
+
 export const FigureSections = ({
+  record,
   payload: p,
   plus,
   names,
@@ -466,27 +490,11 @@ export const FigureSections = ({
           <Facts
             items={[
               {
-                label: 'Race',
-                value: race ? (
-                  <span className="inline-flex items-center gap-2">
-                    <span
-                      className="inline-block size-2.5 rounded-full"
-                      style={{ backgroundColor: raceColor(race) }}
-                    />
-                    {titleCase(words(race))}
-                  </span>
-                ) : null,
-              },
-              {
                 label: 'Caste',
                 value:
                   str(p.caste) && !['MALE', 'FEMALE', 'DEFAULT'].includes(str(p.caste) ?? '')
                     ? words(str(p.caste))
                     : null,
-              },
-              {
-                label: 'Sex',
-                value: num(plus.sex) === 0 ? 'female' : num(plus.sex) === 1 ? 'male' : null,
               },
               {
                 label: 'Born',
@@ -521,8 +529,10 @@ export const FigureSections = ({
           />
         </Section>
 
+        {p.deity === true ? <PrayedToHere worldId={worldId} godId={record.id} /> : null}
+
         {positions.length ? (
-          <Section title="Offices held" count={positions.length}>
+          <Section anchor="offices" title="Offices held" count={positions.length}>
             <ul className="flex flex-col gap-2">
               {positions.map((pos, i) => (
                 <li key={`${pos.entity.id}-${pos.title}-${i}`} className="leading-relaxed">
@@ -552,26 +562,17 @@ export const FigureSections = ({
           </Section>
         ) : null}
 
-        {family.size || otherLinks.size ? (
-          <Section title="Family & companions">
-            <div className="flex flex-col gap-3">
-              {family.size ? (
-                <LinkGroups
-                  groups={family}
-                  kind="historical_figure"
-                  names={names}
-                  worldId={worldId}
-                />
-              ) : null}
-              {otherLinks.size ? (
-                <LinkGroups
-                  groups={otherLinks}
-                  kind="historical_figure"
-                  names={names}
-                  worldId={worldId}
-                />
-              ) : null}
-            </div>
+        {otherLinks.size ? (
+          <Section
+            title="Companions"
+            description="Masters, apprentices, friends and foes the record links to them."
+          >
+            <LinkGroups
+              groups={otherLinks}
+              kind="historical_figure"
+              names={names}
+              worldId={worldId}
+            />
           </Section>
         ) : null}
 
@@ -582,13 +583,39 @@ export const FigureSections = ({
         ) : null}
 
         {siteLinks.size ? (
-          <Section title="Places">
+          <Section anchor="places" title="Places">
             <LinkGroups groups={siteLinks} kind="site" names={names} worldId={worldId} />
           </Section>
         ) : null}
       </div>
 
       <div className="flex flex-col divide-y lg:col-span-2">
+        {related.family ? (
+          <Section
+            anchor="family"
+            title="Family"
+            description="As the record links them: parents, partners, siblings and children."
+          >
+            <FamilyTree
+              family={related.family}
+              self={{
+                id: record.id,
+                name: record.name,
+                race: race || null,
+                sex: num(plus.sex),
+                birth: p.deity === true || p.force === true ? null : birth,
+                death: death !== null && death >= 0 ? death : null,
+                deity: p.deity === true,
+              }}
+              worldId={worldId}
+            />
+          </Section>
+        ) : family.size ? (
+          <Section anchor="family" title="Family">
+            <LinkGroups groups={family} kind="historical_figure" names={names} worldId={worldId} />
+          </Section>
+        ) : null}
+
         {skills.length ? (
           <Section title="Skills" count={skills.length}>
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
@@ -623,6 +650,7 @@ export const FigureSections = ({
 
         {related.kills?.rows.length ? (
           <Section
+            anchor="deeds"
             title="Slain by their hand"
             count={related.kills.total}
             description="Those whose deaths are laid at this figure's feet."
@@ -638,6 +666,7 @@ export const FigureSections = ({
 
         {related.artifacts?.length ? (
           <Section
+            anchor={related.kills?.rows.length ? undefined : 'deeds'}
             title="Artifacts"
             count={related.artifacts.length}
             description="Held now, or claimed."
@@ -647,7 +676,11 @@ export const FigureSections = ({
         ) : null}
 
         {related.writings?.length ? (
-          <Section title="Works" count={related.writings.length}>
+          <Section
+            anchor={related.kills?.rows.length || related.artifacts?.length ? undefined : 'deeds'}
+            title="Works"
+            count={related.writings.length}
+          >
             <HitRows hits={related.writings} worldId={worldId} years />
           </Section>
         ) : null}
@@ -753,7 +786,11 @@ export const FigureSections = ({
             </div>
           </Section>
         ) : null}
-        {timeline}
+        {timeline ? (
+          <div id="record" className="scroll-mt-4">
+            {timeline}
+          </div>
+        ) : null}
       </div>
     </>
   )
@@ -823,6 +860,7 @@ export const SiteSections = ({
   map,
   timeline,
 }: SectionProps) => {
+  const fort = useFortressContext(worldId)
   const at = parseCoord(p.coords)
   const region = regionAt(map, at)
   const structures = mergeStructures(p, plus)
@@ -856,12 +894,15 @@ export const SiteSections = ({
                     label: 'Held by',
                     value:
                       num(plus.civ_id) !== null && (num(plus.civ_id) ?? -1) >= 0 ? (
-                        <NamedRef
-                          kind="entity"
-                          id={num(plus.civ_id)}
-                          names={names}
-                          worldId={worldId}
-                        />
+                        <span className="inline-flex flex-wrap items-center gap-x-2">
+                          <NamedRef
+                            kind="entity"
+                            id={num(plus.civ_id)}
+                            names={names}
+                            worldId={worldId}
+                          />
+                          {fort.isOurCiv(num(plus.civ_id)) ? <Yours>yours</Yours> : null}
+                        </span>
                       ) : (
                         'no one'
                       ),
@@ -1587,9 +1628,13 @@ export const CollectionSections = ({
   const battles = children.filter((c) => c.type === 'battle')
   const conquests = children.filter((c) => c.type === 'site conquered')
   const otherChildren = children.filter((c) => c.type !== 'battle' && c.type !== 'site conquered')
+  const fort = useFortressContext(worldId)
   const side = (id: number | null) =>
     id !== null && id >= 0 ? (
-      <NamedRef kind="entity" id={id} names={names} worldId={worldId} />
+      <span className="inline-flex flex-wrap items-center gap-x-2">
+        <NamedRef kind="entity" id={id} names={names} worldId={worldId} />
+        {fort.isOurCiv(id) || fort.isOurGroup(id) ? <Yours>your people</Yours> : null}
+      </span>
     ) : null
 
   return (
@@ -1854,6 +1899,40 @@ export const PlaceSections = ({ payload: p, plus, map, worldId, timeline }: Sect
       </div>
       <TimelineRow timeline={timeline} />
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// One event
+
+export const EventSections = ({ record, names, worldId }: SectionProps) => {
+  const described = describeEvent(record, names)
+  const year = record.year
+  const seconds = num((record.payload as LegendsPayload).seconds72)
+  return (
+    <div className="lg:col-span-3">
+      <Section title="What happened">
+        <p className="max-w-[70ch] text-base leading-relaxed">
+          {year !== null && year >= 0 ? (
+            <span className="text-muted-foreground">{titleCase(legendsDate(year, seconds))}: </span>
+          ) : null}
+          <Fragments fragments={described.fragments} worldId={worldId} />
+        </p>
+        {year !== null && year >= 0 ? (
+          <div>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                to="/legends/history"
+                search={{ world: worldId, from: Math.max(0, year - 2), to: year + 2 }}
+                hash="chronicle"
+              >
+                Read the years around it
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+      </Section>
+    </div>
   )
 }
 

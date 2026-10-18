@@ -37,7 +37,7 @@ import {
 } from '~/lib/fortress/diplomacy'
 import { humanize } from '~/lib/fortress/format'
 import { type OpenUnit, UnitChips } from '../../-components/Insights'
-import { useKnownHistFigures } from '../../dwarves/-components/UnitLinks'
+import { useKnownHistFigures } from '../../citizens/-components/UnitLinks'
 import { noticeText, siegeText } from './Forecast'
 import { caravanText } from './RightNow'
 import {

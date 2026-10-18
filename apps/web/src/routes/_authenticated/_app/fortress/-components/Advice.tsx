@@ -99,11 +99,11 @@ export const AdviceCard = ({ advice }: { advice: Advice }) => {
   const style = STATUS_STYLE[advice.status]
   const AreaIcon = AREA_ICON[advice.area]
   return (
-    <li className="py-3 first:pt-0 last:pb-0">
+    <li className="py-1 first:pt-0 last:pb-0">
       <button
         type="button"
         onClick={() => open(adviceGuide(advice))}
-        className="group flex w-full items-start gap-3 text-left"
+        className="group -mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
       >
         <span
           className={cn(
@@ -115,12 +115,7 @@ export const AdviceCard = ({ advice }: { advice: Advice }) => {
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span
-              className={cn(
-                'underline-offset-4 group-hover:underline',
-                advice.status === 'problem' ? 'font-semibold' : 'font-medium',
-              )}
-            >
+            <span className={cn(advice.status === 'problem' ? 'font-semibold' : 'font-medium')}>
               {advice.title}
             </span>
             <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
@@ -257,7 +252,7 @@ const SituationRow = ({ situation }: { situation: Situation }) => {
         type="button"
         onClick={() => open(situationGuide(situation))}
         className={cn(
-          'group flex w-full items-start gap-3 text-left hover:bg-accent/30',
+          'group -mx-2 flex w-[calc(100%+1rem)] items-start gap-3 rounded-md px-2 text-left transition-colors hover:bg-accent',
           active ? 'py-3' : 'py-2',
         )}
       >
@@ -354,7 +349,7 @@ export const JobQueueList = ({ groups, advice }: { groups: JobGroup[]; advice: A
                   {group.working.slice(0, QUEUE_WORKERS_SHOWN).map((unit) => (
                     <Link
                       key={unit.id}
-                      to="/fortress/dwarves/$id"
+                      to="/fortress/citizens/$id"
                       params={{ id: String(unit.id) }}
                       title={unit.readable}
                       className="rounded-md p-0.5 hover:bg-accent"
@@ -411,20 +406,15 @@ export const WorkshopList = ({
             row.info.skills.length > 0 &&
             row.skilled.length === 0
           return (
-            <li key={row.key} className="py-2.5">
+            <li key={row.key} className="py-0.5">
               <button
                 type="button"
                 onClick={() => open(workshopGuide(row, idle))}
-                className="group flex w-full flex-wrap items-start gap-x-4 gap-y-1 rounded-sm text-left hover:bg-accent/30"
+                className="-mx-2 flex w-[calc(100%+1rem)] flex-wrap items-start gap-x-4 gap-y-1 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
               >
                 <span className="min-w-[12rem] flex-1">
                   <span className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'font-medium group-hover:underline',
-                        missing && 'text-muted-foreground',
-                      )}
-                    >
+                    <span className={cn('font-medium', missing && 'text-muted-foreground')}>
                       {row.info.label}
                     </span>
                     {row.count > 1 ? (

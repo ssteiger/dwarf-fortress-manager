@@ -73,7 +73,7 @@ const unitName = (unit: DwarfHit['unit']) => unit.nickname || unit.name || unit.
 const PAGE_ICON: Record<AppPath, LucideIcon> = {
   '/fortress': MountainIcon,
   '/fortress/dwarves-and-creatures': PawPrintIcon,
-  '/fortress/dwarves': UsersIcon,
+  '/fortress/citizens': UsersIcon,
   '/fortress/dead': SkullIcon,
   '/fortress/items': PackageIcon,
   '/fortress/work': HammerIcon,
@@ -192,7 +192,7 @@ export function GlobalSearch() {
   }
   const goDwarf = (hit: DwarfHit) => {
     close()
-    navigate({ to: '/fortress/dwarves/$id', params: { id: String(hit.unit.id) } })
+    navigate({ to: '/fortress/citizens/$id', params: { id: String(hit.unit.id) } })
   }
   const goItem = (hit: ItemHit) => {
     close()

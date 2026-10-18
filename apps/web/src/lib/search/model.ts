@@ -12,7 +12,7 @@ import type { LegendsHit } from '~/lib/legends/types'
 export type AppPath =
   | '/fortress'
   | '/fortress/dwarves-and-creatures'
-  | '/fortress/dwarves'
+  | '/fortress/citizens'
   | '/fortress/dead'
   | '/fortress/items'
   | '/fortress/work'
@@ -50,10 +50,10 @@ export const PAGES: PageEntry[] = [
     keywords: 'home dashboard summary population mood alerts stocks wealth news',
   },
   {
-    to: '/fortress/dwarves',
-    title: 'Dwarves',
+    to: '/fortress/citizens',
+    title: 'Citizens',
     detail: 'Who needs help, who does what, squads and friendships',
-    keywords: 'people citizens skills stress squad military nobles bonds families',
+    keywords: 'dwarves people citizens skills stress squad military nobles bonds families',
   },
   {
     to: '/fortress/dwarves-and-creatures',

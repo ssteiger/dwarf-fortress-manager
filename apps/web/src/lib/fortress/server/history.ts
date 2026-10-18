@@ -3,6 +3,7 @@ import {
   type FortHistoryRow,
   type FortLifeEvent,
   type FortUnit,
+  type SnapshotInvasion,
   type SnapshotTotals,
   fortKeyOf,
   gameDay,
@@ -253,6 +254,31 @@ async function seasonDays(
   return out
 }
 
+/** The invasions any kept day of each season in the span had, once per civilization, by season index. */
+async function seasonInvasions(
+  p: Present,
+  from: GameTime,
+  to: GameTime,
+): Promise<Map<number, SnapshotInvasion[]>> {
+  const rows = await postgres_db.execute<{ idx: number; invasion: SnapshotInvasion }>(sql`
+    select distinct on (idx, invasion->>'civ') idx, invasion from (
+      select game_year * 4 + least(3, game_tick / ${TICKS_PER_SEASON}) as idx, day, invasion
+      from ${S}, jsonb_array_elements(coalesce(${S.totals}->'invasions', '[]'::jsonb)) as invasion
+      where ${S.fort_key} = ${p.fortKey}
+        and ${S.day} >= ${gameDay(from.year, from.tick)}
+        and ${S.day} < ${gameDay(to.year, to.tick)}
+        and ${S.day} <= ${gameDay(p.year, p.tick)}
+    ) s
+    order by idx, invasion->>'civ', day desc
+  `)
+  const out = new Map<number, SnapshotInvasion[]>()
+  for (const r of rows) {
+    const idx = Number(r.idx)
+    out.set(idx, [...(out.get(idx) ?? []), r.invasion])
+  }
+  return out
+}
+
 export interface FortRecapSource extends RecapSource {
   /** The loaded fortress's present, which no span reaches past. */
   present: GameTime | null
@@ -372,7 +398,11 @@ export const getFortSeasons = createServerFn({ method: 'GET' })
 
     const from = seasonSpan(seasonFromIndex(page[page.length - 1])).from
     const to = seasonSpan(seasonFromIndex(page[0])).to
-    const [events, days] = await Promise.all([recapEvents(p, from, to), seasonDays(p, from, to)])
+    const [events, days, invasions] = await Promise.all([
+      recapEvents(p, from, to),
+      seasonDays(p, from, to),
+      seasonInvasions(p, from, to),
+    ])
     const seasonOf = (year: number, tick: number) =>
       seasonIndex({ year, season: Math.min(3, Math.floor(tick / TICKS_PER_SEASON)) })
     const seasons = page.map((i): FortSeason => {
@@ -394,6 +424,7 @@ export const getFortSeasons = createServerFn({ method: 'GET' })
           history: inSeason(events.history),
           first: kept?.first ?? null,
           last: kept?.last ?? null,
+          invasions: invasions.get(i) ?? [],
         },
       }
     })

@@ -12,6 +12,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import * as React from 'react'
 
+import { HouseIcon } from 'lucide-react'
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { EVENT_CATEGORIES, yearSpan } from '~/lib/legends/events'
 import { BROWSE_TABS, kindLabel, racePlural, titleCase, words } from '~/lib/legends/model'
@@ -23,6 +24,7 @@ import {
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import type { LegendsHit } from '~/lib/legends/types'
 import { EventsArchive, YearInput } from '../-components/EventsArchive'
+import { useFortressContext } from '../-components/FortressTie'
 import { LegendsShell, RecordLink, parseWorldParam, recordName } from '../-components/LegendsChrome'
 import { FilterChip } from '../-components/Timeline'
 
@@ -47,6 +49,8 @@ interface ArchiveSearch {
   artifact?: number
   order?: 'asc' | 'desc'
   page?: number
+  /** Figures: only the people of your fortress. */
+  ours?: 'people'
 }
 
 const EVENTS_TAB = { key: 'events', label: 'Events' } as const
@@ -152,85 +156,191 @@ const ArchivePage = () => {
     <LegendsShell section="archive" world={search.world}>
       {({ worldId, counts, summary }) => (
         <>
-          <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
-            <p className="text-sm text-muted-foreground">
-              Every record in the export, and every recorded event. Search by name or race, narrow
-              by what matters, sort by any column.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {[...BROWSE_TABS.slice(0, -1), EVENTS_TAB, BROWSE_TABS[BROWSE_TABS.length - 1]].map(
-                (t) => {
-                  const kinds = 'kinds' in t ? t.kinds : ['historical_event']
-                  const n = kinds.length
-                    ? kinds.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0)
-                    : null
-                  const showCount = n && !('types' in t && t.types)
-                  return (
-                    <FilterChip
-                      key={t.key}
-                      active={t.key === (search.archive ?? 'figures')}
-                      onClick={() =>
-                        navigate({
-                          search: { world: worldId, archive: t.key },
-                        })
-                      }
-                      count={showCount ? n : undefined}
-                    >
-                      {t.label}
-                    </FilterChip>
-                  )
-                },
-              )}
-            </div>
-          </div>
-          {search.archive === EVENTS_TAB.key ? (
-            <EventsArchive
-              worldId={worldId}
-              years={summary?.years ?? null}
-              filters={{
-                from: search.from,
-                to: search.to,
-                categories: parseList(search.cat),
-                hf: search.hf,
-                civ: search.civ,
-                site: search.site,
-                artifact: search.artifact,
-                order: search.order ?? 'asc',
-                page: search.page ?? 0,
-              }}
-              onChange={(patch) => {
-                const { categories, page, ...rest } = patch
-                setSearch({
-                  ...rest,
-                  ...(categories !== undefined
-                    ? { cat: categories.length ? categories.join(',') : undefined }
-                    : {}),
-                  ...(page !== undefined ? { page: page || undefined } : {}),
-                })
-              }}
-            />
-          ) : (
-            <RecordsArchive
-              worldId={worldId}
-              summary={summary}
-              archive={search.archive ?? 'figures'}
-              q={search.q ?? ''}
-              type={parseList(search.type)}
-              facets={{
-                alive: search.alive,
-                nature: search.nature,
-                civ: search.civ,
-                from: search.from,
-                to: search.to,
-              }}
-              onQuery={(q) => setSearch({ q: q || undefined }, true)}
-              onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
-              onFacets={(patch) => setSearch(patch)}
-            />
-          )}
+          <ArchiveBody
+            worldId={worldId}
+            counts={counts}
+            summary={summary}
+            search={search}
+            setSearch={setSearch}
+          />
         </>
       )}
     </LegendsShell>
+  )
+}
+
+const ArchiveBody = ({
+  worldId,
+  counts,
+  summary,
+  search,
+  setSearch,
+}: {
+  worldId: number
+  counts: Record<string, number>
+  summary: LegendsWorldSummary | undefined
+  search: ArchiveSearch
+  setSearch: (patch: Partial<ArchiveSearch>, replace?: boolean) => void
+}) => {
+  const navigate = useNavigate({ from: Route.fullPath })
+  const fort = useFortressContext(worldId)
+  const archive = search.archive ?? 'figures'
+  const peopleIds = React.useMemo(
+    () => (fort.tie.data?.living ?? []).map((d) => d.figureId),
+    [fort.tie.data],
+  )
+  // Search and civilization mean the same on every tab; the rest belong to one.
+  const switchTab = (key: string) =>
+    navigate({
+      search: {
+        world: worldId,
+        archive: key,
+        q: key === EVENTS_TAB.key ? undefined : search.q,
+        civ: search.civ,
+        ours: key === 'figures' ? search.ours : undefined,
+      },
+    })
+  const shortcuts: { label: string; active: boolean; apply: () => void }[] = []
+  if (fort.matchesLive) {
+    if (archive === 'figures') {
+      if (peopleIds.length)
+        shortcuts.push({
+          label: `Your people (${peopleIds.length})`,
+          active: search.ours === 'people',
+          apply: () =>
+            setSearch({ ours: search.ours === 'people' ? undefined : 'people', civ: undefined }),
+        })
+      if (fort.civId !== null)
+        shortcuts.push({
+          label: "Your civilization's people",
+          active: search.civ === fort.civId && search.ours === undefined,
+          apply: () =>
+            setSearch({
+              civ: search.civ === fort.civId ? undefined : (fort.civId ?? undefined),
+              ours: undefined,
+            }),
+        })
+    } else if (archive === 'sites' && fort.civId !== null) {
+      shortcuts.push({
+        label: 'Held by your civilization',
+        active: search.civ === fort.civId,
+        apply: () =>
+          setSearch({ civ: search.civ === fort.civId ? undefined : (fort.civId ?? undefined) }),
+      })
+    } else if (archive === EVENTS_TAB.key) {
+      if (fort.civId !== null)
+        shortcuts.push({
+          label: 'Involving your civilization',
+          active: search.civ === fort.civId,
+          apply: () =>
+            setSearch({
+              civ: search.civ === fort.civId ? undefined : (fort.civId ?? undefined),
+              page: undefined,
+            }),
+        })
+      if (fort.siteId !== null)
+        shortcuts.push({
+          label: 'At your fortress',
+          active: search.site === fort.siteId,
+          apply: () =>
+            setSearch({
+              site: search.site === fort.siteId ? undefined : (fort.siteId ?? undefined),
+              page: undefined,
+            }),
+        })
+    }
+  }
+
+  return (
+    <>
+      <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
+        <p className="text-sm text-muted-foreground">
+          Every record in the export, and every recorded event. Search by name or race, narrow by
+          what matters, sort by any column.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {[...BROWSE_TABS.slice(0, -1), EVENTS_TAB, BROWSE_TABS[BROWSE_TABS.length - 1]].map(
+            (t) => {
+              const kinds = 'kinds' in t ? t.kinds : ['historical_event']
+              const n = kinds.length
+                ? kinds.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0)
+                : null
+              const showCount = n && !('types' in t && t.types)
+              return (
+                <FilterChip
+                  key={t.key}
+                  active={t.key === archive}
+                  onClick={() => switchTab(t.key)}
+                  count={showCount ? n : undefined}
+                >
+                  {t.label}
+                </FilterChip>
+              )
+            },
+          )}
+        </div>
+        {shortcuts.length ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 text-sm text-muted-foreground">
+              <HouseIcon className="size-3.5 text-primary" />
+              Yours:
+            </span>
+            {shortcuts.map((s) => (
+              <FilterChip key={s.label} active={s.active} onClick={s.apply}>
+                {s.label}
+              </FilterChip>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {search.archive === EVENTS_TAB.key ? (
+        <EventsArchive
+          worldId={worldId}
+          years={summary?.years ?? null}
+          filters={{
+            from: search.from,
+            to: search.to,
+            categories: parseList(search.cat),
+            hf: search.hf,
+            civ: search.civ,
+            site: search.site,
+            artifact: search.artifact,
+            order: search.order ?? 'asc',
+            page: search.page ?? 0,
+          }}
+          onChange={(patch) => {
+            const { categories, page, ...rest } = patch
+            setSearch({
+              ...rest,
+              ...(categories !== undefined
+                ? { cat: categories.length ? categories.join(',') : undefined }
+                : {}),
+              ...(page !== undefined ? { page: page || undefined } : {}),
+            })
+          }}
+        />
+      ) : (
+        <RecordsArchive
+          worldId={worldId}
+          summary={summary}
+          archive={search.archive ?? 'figures'}
+          q={search.q ?? ''}
+          type={parseList(search.type)}
+          facets={{
+            alive: search.alive,
+            nature: search.nature,
+            civ: search.civ,
+            from: search.from,
+            to: search.to,
+          }}
+          ids={search.ours === 'people' ? peopleIds : undefined}
+          ourCiv={fort.civId}
+          onQuery={(q) => setSearch({ q: q || undefined }, true)}
+          onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
+          onFacets={(patch) => setSearch(patch)}
+        />
+      )}
+    </>
   )
 }
 
@@ -249,6 +359,8 @@ const RecordsArchive = ({
   q,
   type,
   facets,
+  ids,
+  ourCiv,
   onQuery,
   onType,
   onFacets,
@@ -259,6 +371,9 @@ const RecordsArchive = ({
   q: string
   type: string[]
   facets: Facets
+  /** Only these figures, e.g. your fortress's people. */
+  ids?: number[]
+  ourCiv: number | null
   onQuery: (q: string) => void
   onType: (type: string[]) => void
   onFacets: (patch: Partial<Facets>) => void
@@ -313,6 +428,7 @@ const RecordsArchive = ({
       ? { alive: facets.alive, nature: facets.nature, bornFrom: facets.from, bornTo: facets.to }
       : {}),
     ...(isFigures || isSites ? { entityId: facets.civ } : {}),
+    ...(isFigures && ids ? { ids } : {}),
   }
   const results = useQuery({
     queryKey: ['legends', 'browse', browseQuery],
@@ -331,8 +447,12 @@ const RecordsArchive = ({
     [results.data?.types],
   )
   const civilizations = React.useMemo(
-    () => [...(summary?.civilizations ?? [])].sort((a, b) => b.sites - a.sites || a.id - b.id),
-    [summary?.civilizations],
+    () =>
+      [...(summary?.civilizations ?? [])].sort(
+        (a, b) =>
+          Number(b.id === ourCiv) - Number(a.id === ourCiv) || b.sites - a.sites || a.id - b.id,
+      ),
+    [summary?.civilizations, ourCiv],
   )
   const setFacet = (patch: Partial<Facets>) => {
     setPage(0)
@@ -398,6 +518,7 @@ const RecordsArchive = ({
               {civilizations.map((civ) => (
                 <SelectItem key={civ.id} value={String(civ.id)}>
                   {civ.name ? titleCase(civ.name) : `Civilization #${civ.id}`}
+                  {civ.id === ourCiv ? ' (yours)' : ''}
                   {civ.race ? ` · ${racePlural(civ.race)}` : ''}
                   {civ.sites ? ` · ${civ.sites} sites` : ''}
                 </SelectItem>
@@ -449,13 +570,23 @@ const RecordsArchive = ({
           }}
           rowCount={results.data?.total ?? 0}
           getRowId={(hit) => `${hit.kind}-${hit.id}`}
-          emptyState={{
-            title: 'Nothing found',
-            subtitle:
-              debounced || type.length || Object.values(facets).some((v) => v !== undefined)
-                ? 'Try another spelling, a race, a different type, or loosen a filter.'
-                : 'This part of the archive is empty.',
-          }}
+          emptyState={
+            results.isError
+              ? {
+                  title: 'The archive could not be read',
+                  subtitle: 'The database did not answer. Change a filter or reload to try again.',
+                }
+              : {
+                  title: 'Nothing found',
+                  subtitle:
+                    debounced ||
+                    type.length ||
+                    ids ||
+                    Object.values(facets).some((v) => v !== undefined)
+                      ? 'Try another spelling, a race, a different type, or loosen a filter.'
+                      : 'This part of the archive is empty.',
+                }
+          }
           toolbar={
             typeOptions.length > 1 ? (
               <MultiSelect
@@ -503,6 +634,7 @@ export const Route = createFileRoute('/_authenticated/_app/legends/archive/')({
     const cat = parseList(raw.cat).filter((c) => CATEGORY_KEYS.has(c))
     if (cat.length) out.cat = cat.join(',')
     if (raw.order === 'asc' || raw.order === 'desc') out.order = raw.order
+    if (raw.ours === 'people') out.ours = 'people'
     return out
   },
   component: ArchivePage,

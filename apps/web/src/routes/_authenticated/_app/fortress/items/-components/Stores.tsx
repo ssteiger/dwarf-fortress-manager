@@ -42,7 +42,7 @@ export const StoreTiles = ({ tiles, advice }: { tiles: StoreTile[]; advice: Advi
             onClick={() => match && open(adviceGuide(match))}
             title={match ? `${match.title}: ${match.why}` : undefined}
             className={cn(
-              'flex flex-col gap-1 p-4 text-left transition-colors enabled:hover:bg-accent/40',
+              'flex flex-col gap-1 p-4 text-left transition-colors enabled:hover:bg-accent',
               match && TILE_TONE[match.status],
             )}
           >
@@ -89,14 +89,14 @@ export const ProductionPlan = ({ rows, max = 8 }: { rows: PlanRow[]; max?: numbe
             <button
               type="button"
               onClick={() => open(planGuide(row))}
-              className="group flex w-full items-center gap-3 rounded-sm py-2 text-left hover:bg-accent/30"
+              className="group -mx-2 flex w-[calc(100%+1rem)] items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-md border bg-muted/40">
                 <ItemSprite item={row.sprite} size={32} />
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-1">
                 <span className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="flex items-center gap-2 font-medium group-hover:underline">
+                  <span className="flex items-center gap-2 font-medium">
                     {row.label}
                     <OneClickMark actions={row.actions} />
                   </span>

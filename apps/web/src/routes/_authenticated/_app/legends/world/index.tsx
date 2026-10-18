@@ -15,17 +15,19 @@ import {
   titleCase,
   words,
 } from '~/lib/legends/model'
-import { summarizeSpan } from '~/lib/legends/prose'
+import { tellSpan } from '~/lib/legends/prose'
 import { getSiteHistory, getSpanDigest } from '~/lib/legends/server/chronicle'
 import { getLegendsMap } from '~/lib/legends/server/map'
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import { changesBySite, holdingsAt, siteStatesAt } from '~/lib/legends/timeline'
 import { siteSpriteNameFor } from '~/lib/legends/worldTiles'
+import { Yours } from '../-components/FortressTie'
 import {
   EventLine,
   LegendsShell,
   RecordLink,
   Section,
+  Telling,
   parseWorldParam,
 } from '../-components/LegendsChrome'
 import { type PlaybackSpeed, TimeSlider } from '../-components/TimeSlider'
@@ -34,7 +36,7 @@ import { WorldMap } from '../-components/WorldMap'
 interface WorldSearch {
   world?: number
   year?: number
-  /** Civilization whose sites are lit on the map. */
+  /** Civilization whose sites are lit on the map; -1 for none, missing for your own. */
   civ?: number
 }
 
@@ -45,19 +47,39 @@ const WorldPage = () => {
   const navigate = useNavigate({ from: Route.fullPath })
   return (
     <LegendsShell section="world" world={search.world}>
-      {({ worldId, summary, counts }) => (
-        <WorldBody
-          worldId={worldId}
-          summary={summary}
-          counts={counts}
-          year={search.year}
-          onYear={(year) => navigate({ search: (prev) => ({ ...prev, year }), replace: true })}
-          civ={search.civ ?? null}
-          onCiv={(civ) =>
-            navigate({ search: (prev) => ({ ...prev, civ: civ ?? undefined }), replace: true })
-          }
-        />
-      )}
+      {({ worldId, summary, counts, live, matchesLive }) => {
+        const ourCiv = matchesLive ? (live?.civId ?? null) : null
+        // No ?civ lights your own civilization; ?civ=-1 lights none.
+        const civ = search.civ === undefined ? ourCiv : search.civ < 0 ? null : (search.civ ?? null)
+        return (
+          <WorldBody
+            worldId={worldId}
+            summary={summary}
+            counts={counts}
+            year={search.year}
+            onYear={(year) => navigate({ search: (prev) => ({ ...prev, year }), replace: true })}
+            civ={civ}
+            ourCiv={ourCiv}
+            homeSite={matchesLive ? (live?.siteId ?? null) : null}
+            onCiv={(next) =>
+              navigate({
+                search: (prev) => ({
+                  ...prev,
+                  civ:
+                    next === ourCiv
+                      ? undefined
+                      : next === null
+                        ? ourCiv !== null
+                          ? -1
+                          : undefined
+                        : next,
+                }),
+                replace: true,
+              })
+            }
+          />
+        )
+      }}
     </LegendsShell>
   )
 }
@@ -69,6 +91,8 @@ const WorldBody = ({
   year: requestedYear,
   onYear,
   civ,
+  ourCiv,
+  homeSite,
   onCiv,
 }: {
   worldId: number
@@ -77,6 +101,9 @@ const WorldBody = ({
   year: number | undefined
   onYear: (year: number | undefined) => void
   civ: number | null
+  /** The civilization the fortress belongs to, when this is its world. */
+  ourCiv: number | null
+  homeSite: number | null
   onCiv: (civ: number | null) => void
 }) => {
   const navigate = useNavigate()
@@ -186,6 +213,8 @@ const WorldBody = ({
     staleTime: 10 * 60_000,
   })
 
+  const told = React.useMemo(() => (digest.data ? tellSpan(digest.data) : []), [digest.data])
+
   const openRecord = (kind: string, id: number) =>
     navigate({
       to: '/legends/$kind/$id',
@@ -258,6 +287,7 @@ const WorldBody = ({
               />
               <span className="text-muted-foreground">Lighting the sites of</span>
               <RecordLink kind="entity" id={civ} name={lit?.name ?? null} worldId={worldId} />
+              {civ === ourCiv ? <Yours>your civilization</Yours> : null}
               <span className="text-muted-foreground tabular-nums">
                 {lit ? `${lit.held} site${lit.held === 1 ? '' : 's'}` : ''}
                 {lit && inThePast ? ` in ${year}` : ''}
@@ -270,6 +300,17 @@ const WorldBody = ({
                 Clear
               </button>
             </div>
+          ) : ourCiv !== null ? (
+            <div className="mx-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-muted/40 px-3 py-1.5 text-sm">
+              <span className="text-muted-foreground">Every civilization is shown alike.</span>
+              <button
+                type="button"
+                className="ml-auto font-medium text-primary underline-offset-4 hover:underline"
+                onClick={() => onCiv(ourCiv)}
+              >
+                Light your civilization
+              </button>
+            </div>
           ) : null}
           {map.data ? (
             <WorldMap
@@ -277,6 +318,8 @@ const WorldBody = ({
               highlightSites={highlight}
               year={history.data ? year : null}
               history={history.data ?? null}
+              homeSite={homeSite}
+              pins={!playing && digest.data && !digest.isPlaceholderData ? digest.data.pins : null}
               onSelectSite={(site) => openRecord('site', site.id)}
               onSelectRegion={(region) => openRecord('region', region.id)}
             />
@@ -312,10 +355,14 @@ const WorldBody = ({
                 title={inThePast ? `The year ${year}` : `The present, ${present}`}
                 description={
                   playing
-                    ? 'Pause to read the year.'
-                    : digest.data
-                      ? 'What the records say about this year.'
-                      : 'Reading the records…'
+                    ? digest.data
+                      ? `Rolling forward at ${speed} years a second. Below is the year ${digest.data.from}, the last one read; pause to read this one.`
+                      : `Rolling forward at ${speed} years a second. Pause to read the year.`
+                    : digest.isError
+                      ? 'The records for this year could not be read. Move the slider to try again.'
+                      : digest.data
+                        ? 'What the records say about this year. The places it names are pinned on the map.'
+                        : 'Reading the records…'
                 }
                 action={
                   <Link
@@ -327,11 +374,14 @@ const WorldBody = ({
                   </Link>
                 }
               />
-              {digest.data && !playing ? (
+              {digest.data ? (
                 <div
-                  className={cn('flex flex-col gap-3', digest.isPlaceholderData && 'opacity-60')}
+                  className={cn(
+                    'flex flex-col gap-3',
+                    (digest.isPlaceholderData || playing) && 'opacity-60',
+                  )}
                 >
-                  <p className="text-sm">{summarizeSpan(digest.data)}</p>
+                  <Telling paragraphs={told} worldId={worldId} className="text-sm" />
                   {digest.data.moments.length ? (
                     <ol className="divide-y text-sm">
                       {digest.data.moments.slice(0, 8).map((event) => (
@@ -346,7 +396,7 @@ const WorldBody = ({
                     </ol>
                   ) : null}
                 </div>
-              ) : (
+              ) : digest.isError ? null : (
                 <p className="text-sm text-muted-foreground">
                   {playing ? `Rolling forward at ${speed} years a second.` : 'Reading the records…'}
                 </p>
@@ -394,6 +444,7 @@ const WorldBody = ({
                               className="block truncate"
                             />
                             <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              {c.id === ourCiv ? <Yours className="mr-1">yours</Yours> : null}
                               {c.race ? racePlural(c.race) : 'unknown race'} · {c.held} site
                               {c.held === 1 ? '' : 's'}
                               {inThePast && delta !== 0 ? (
@@ -547,7 +598,7 @@ export const Route = createFileRoute('/_authenticated/_app/legends/world/')({
           : Number.NaN
     if (Number.isFinite(year) && year >= 0) out.year = year
     const civ = parseWorldParam(raw.civ)
-    if (civ !== undefined && civ >= 0) out.civ = civ
+    if (civ !== undefined && civ >= -1) out.civ = civ
     return out
   },
   component: WorldPage,

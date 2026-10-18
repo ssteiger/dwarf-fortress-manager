@@ -6,6 +6,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
   cn,
 } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
@@ -18,6 +19,7 @@ import {
   HourglassIcon,
   LibraryIcon,
   NotebookPenIcon,
+  RadarIcon,
   SparklesIcon,
 } from 'lucide-react'
 import type * as React from 'react'
@@ -61,10 +63,18 @@ export function parseWorldSearch(raw: Record<string, unknown>): { world?: number
   return world !== undefined ? { world } : {}
 }
 
-export type LegendsSection = 'overview' | 'world' | 'history' | 'stories' | 'archive' | 'journal'
+export type LegendsSection =
+  | 'overview'
+  | 'around'
+  | 'world'
+  | 'history'
+  | 'stories'
+  | 'archive'
+  | 'journal'
 
 const SECTION_LINKS = [
   { key: 'overview' as const, label: 'Overview', to: '/legends', icon: CompassIcon },
+  { key: 'around' as const, label: 'Around you', to: '/legends/around', icon: RadarIcon },
   { key: 'world' as const, label: 'The world', to: '/legends/world', icon: GlobeIcon },
   { key: 'history' as const, label: 'History', to: '/legends/history', icon: HourglassIcon },
   { key: 'stories' as const, label: 'Stories', to: '/legends/stories', icon: SparklesIcon },
@@ -155,6 +165,7 @@ export const LegendsShell = ({
     counts: Record<string, number>
     summary: LegendsWorldSummary | undefined
     summaryLoading: boolean
+    summaryError: boolean
     live: LiveFortress | null
     matchesLive: boolean
   }) => React.ReactNode
@@ -225,7 +236,20 @@ export const LegendsShell = ({
       />
 
       {!selectedWorld || worldId === null ? (
-        legends.isLoading ? null : (
+        legends.isLoading ? (
+          <div className="flex flex-col gap-4 p-4" aria-busy="true" aria-label="Loading legends">
+            <Skeleton className="h-10 w-full max-w-xl" />
+            <div className="grid gap-4 lg:grid-cols-3">
+              <Skeleton className="h-48 lg:col-span-2" />
+              <Skeleton className="h-48" />
+            </div>
+            <Skeleton className="h-64" />
+          </div>
+        ) : legends.isError ? (
+          <EmptyState title="The legends could not be read" className="m-4">
+            The database did not answer. Reload the page to try again.
+          </EmptyState>
+        ) : (
           <EmptyState title="No legends imported yet" className="m-4">
             Export legends from the game (Legends mode, or DFHack's <code>exportlegends</code>) into
             the Dwarf Fortress folder. The worker picks up <code>*-legends.xml</code> and{' '}
@@ -234,42 +258,58 @@ export const LegendsShell = ({
         )
       ) : (
         <>
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
-            <nav
-              aria-label="Legends sections"
-              className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"
-            >
-              {SECTION_LINKS.map((item) => {
-                const Icon = item.icon
-                const active = item.key === section
-                return (
-                  <Link
-                    key={item.key}
-                    to={item.to}
-                    search={{ world: worldId }}
-                    className={cn(
-                      "inline-flex h-[calc(100%-1px)] items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium whitespace-nowrap text-foreground transition-[color,box-shadow] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
-                      active && 'bg-background shadow-sm dark:border-input dark:bg-input/30',
-                    )}
-                  >
-                    <Icon /> {item.label}
-                  </Link>
-                )
-              })}
-            </nav>
-            <QuickSearch worldId={worldId} />
-          </div>
+          <LegendsNav section={section} worldId={worldId} />
           {children({
             worldId,
             selectedWorld,
             counts,
             summary: summary.data,
             summaryLoading: summary.isLoading,
+            summaryError: summary.isError,
             live,
             matchesLive,
           })}
         </>
       )}
+    </div>
+  )
+}
+
+/** The Legends section tabs and the quick search, on every Legends page and record. */
+export const LegendsNav = ({
+  section,
+  worldId,
+}: {
+  /** The tab to mark as current; none on record pages. */
+  section: LegendsSection | null
+  worldId: number
+}) => {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
+      <nav
+        aria-label="Legends sections"
+        className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"
+      >
+        {SECTION_LINKS.map((item) => {
+          const Icon = item.icon
+          const active = item.key === section
+          return (
+            <Link
+              key={item.key}
+              to={item.to}
+              search={{ world: worldId }}
+              aria-current={active ? 'page' : undefined}
+              className={cn(
+                "inline-flex h-[calc(100%-1px)] items-center justify-center gap-2 rounded-md border border-transparent px-4 text-sm font-medium whitespace-nowrap text-foreground transition-[color,box-shadow] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+                active && 'bg-background shadow-sm dark:border-input dark:bg-input/30',
+              )}
+            >
+              <Icon /> {item.label}
+            </Link>
+          )
+        })}
+      </nav>
+      <QuickSearch worldId={worldId} />
     </div>
   )
 }
@@ -425,30 +465,30 @@ export const HitRows = ({
   return (
     <ul className="divide-y">
       {hits.map((hit) => (
-        <li
-          key={`${hit.kind}-${hit.id}`}
-          className="flex flex-wrap items-center gap-x-3 gap-y-0.5 py-2"
-        >
-          <LegendsSprite subject={hit} size={24} className="-my-1" />
-          <RecordLink
-            kind={hit.kind}
-            id={hit.id}
-            name={hit.name}
-            type={hit.type}
-            worldId={worldId}
-          />
-          {showKind ? <Badge variant="outline">{kindLabel(hit.kind)}</Badge> : null}
-          {hit.type && hit.kind !== 'historical_figure' ? (
-            <span className="text-sm text-muted-foreground">{words(hit.type)}</span>
-          ) : null}
-          {years && hit.year !== null && hit.year >= 0 ? (
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {hit.endYear !== null && hit.endYear !== undefined && hit.endYear !== hit.year
-                ? `${hit.year}–${hit.endYear}`
-                : hit.year}
-            </span>
-          ) : null}
-          {hit.detail ? <span className="text-sm text-muted-foreground">{hit.detail}</span> : null}
+        <li key={`${hit.kind}-${hit.id}`} className="py-0.5">
+          <Link
+            to="/legends/$kind/$id"
+            params={{ kind: hit.kind, id: String(hit.id) }}
+            search={{ world: worldId ?? undefined }}
+            className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-md px-2 py-1.5 transition-colors hover:bg-accent"
+          >
+            <LegendsSprite subject={hit} size={24} className="-my-1" />
+            <span className="font-medium text-primary">{recordName(hit)}</span>
+            {showKind ? <Badge variant="outline">{kindLabel(hit.kind)}</Badge> : null}
+            {hit.type && hit.kind !== 'historical_figure' ? (
+              <span className="text-sm text-muted-foreground">{words(hit.type)}</span>
+            ) : null}
+            {years && hit.year !== null && hit.year >= 0 ? (
+              <span className="text-sm text-muted-foreground tabular-nums">
+                {hit.endYear !== null && hit.endYear !== undefined && hit.endYear !== hit.year
+                  ? `${hit.year}–${hit.endYear}`
+                  : hit.year}
+              </span>
+            ) : null}
+            {hit.detail ? (
+              <span className="text-sm text-muted-foreground">{hit.detail}</span>
+            ) : null}
+          </Link>
         </li>
       ))}
       {typeof total === 'number' && total > hits.length ? (

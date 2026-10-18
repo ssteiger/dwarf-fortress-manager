@@ -15,6 +15,17 @@ import type { AdvisorInput, Shortcut } from './types'
  * it. Client-safe.
  */
 
+/** What to do about the cursed and the dead they raise, shared with the `cursed` check. */
+export const CURSE_STEPS = {
+  culprit: 'Read the cause of each death and who was nearby: a pattern points to the culprit.',
+  vampire:
+    'Lock a suspected vampire in a room or wall them in; they cannot be cured but need no food.',
+  werebeast:
+    'Lock a werebeast away before the full moon, or send them off. Anyone they bite may catch the curse.',
+  corpses:
+    'Deal with corpses before they rise: burn them, drop them into magma, or seal them in a pit.',
+}
+
 // ---------------------------------------------------------------------------
 // The season ahead
 
@@ -259,7 +270,7 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
         '"The dead walk", zombies or skeletons at the gates, a necromancer nearby, or evil weather.',
       steps: [
         'Close the gates: the undead never tire and never flee.',
-        'Deal with corpses before they rise: burn them, drop them into magma, or seal them in a pit.',
+        CURSE_STEPS.corpses,
         'Blunt weapons break skeletons; axes and swords cut zombies apart.',
         'Keep civilians inside while evil clouds or rain pass over.',
       ],
@@ -270,11 +281,7 @@ export function situations({ units, summary, concerns, events, now }: AdvisorInp
       title: 'Vampires and werebeasts',
       signs:
         'Dwarves found dead and drained of blood, a dwarf who never eats, drinks or sleeps; or a citizen who turns into a beast.',
-      steps: [
-        'Read the cause of each death and who was nearby: a pattern points to the culprit.',
-        'Lock a suspected vampire in a room or wall them in; they cannot be cured but need no food.',
-        'Lock a werebeast away before the full moon, or send them off. Anyone they bite may catch the curse.',
-      ],
+      steps: [CURSE_STEPS.culprit, CURSE_STEPS.vampire, CURSE_STEPS.werebeast],
     },
     {
       key: 'water',

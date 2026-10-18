@@ -79,11 +79,21 @@ export interface Advice {
   dfhack?: Shortcut[]
   units?: FortUnit[]
   link?: {
-    to: '/fortress/dwarves' | '/fortress/items' | '/fortress/map' | '/fortress/chronicle'
+    to: '/fortress/citizens' | '/fortress/items' | '/fortress/map' | '/fortress/chronicle'
     label: string
     /** Which view of the item list to open, for links to the items page. */
     view?: ItemView
   }
+}
+
+export type CurseKind = 'vampire' | 'necromancer' | 'werebeast' | 'undead'
+
+/** A curse the legends export records on a living citizen's historical figure. */
+export interface LegendsCurse {
+  unitId: number
+  kind: CurseKind
+  /** "vampire", "weremoose". */
+  what: string
 }
 
 export interface AdvisorInput {
@@ -95,4 +105,6 @@ export interface AdvisorInput {
   supplies: FortSupplies | null
   events: FortEvent[]
   now: GameTime | null
+  /** Curses on your citizens that only the legends export knows of; absent without a matching export. */
+  legendsCurses?: LegendsCurse[]
 }

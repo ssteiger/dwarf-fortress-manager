@@ -1,3 +1,4 @@
+import type { FortUnit } from '@fortress/db-drizzle'
 import { AppLayout, type NavUserUser } from '@fortress/ui'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Outlet, createFileRoute, useLocation } from '@tanstack/react-router'
@@ -27,9 +28,11 @@ import { type EdgeDwarf, EdgeDwarves } from '~/lib/components/EdgeDwarves'
 import { GlobalSearch } from '~/lib/components/GlobalSearch'
 import { FortWatcher } from '~/lib/fortress/client/FortWatcher'
 import { ReadGameButton } from '~/lib/fortress/client/ReadGameButton'
+import { useFortUnits } from '~/lib/fortress/client/queries'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { getFortUnits } from '~/lib/fortress/server/units'
 import { usePreferences, usePreferencesSync } from '~/lib/preferences'
+import { useLegendsCurses } from './_app/fortress/citizens/-components/UnitLinks'
 
 const EDGE_DWARF_COUNT = 12
 
@@ -59,10 +62,19 @@ const FortressEdgeDwarves = () => {
   return <EdgeDwarves dwarves={dwarves} />
 }
 
+/** The watcher, with the curses the legends export knows of your citizens. */
+const FortressWatcher = () => {
+  const units = useFortUnits().data?.units
+  const legendsCurses = useLegendsCurses(units ?? NO_UNITS)
+  return <FortWatcher legendsCurses={legendsCurses} />
+}
+
+const NO_UNITS: FortUnit[] = []
+
 const NAV = [
   { title: 'Overview', url: '/fortress', icon: MountainIcon },
   { title: 'Dwarves and creatures', url: '/fortress/dwarves-and-creatures', icon: PawPrintIcon },
-  { title: 'Dwarves', url: '/fortress/dwarves', icon: UsersIcon, matchPrefix: true },
+  { title: 'Citizens', url: '/fortress/citizens', icon: UsersIcon, matchPrefix: true },
   { title: 'The dead', url: '/fortress/dead', icon: SkullIcon },
   { title: 'Items', url: '/fortress/items', icon: PackageIcon },
   { title: 'Work', url: '/fortress/work', icon: HammerIcon },
@@ -145,7 +157,7 @@ const Layout = () => {
       >
         <Outlet />
         {edgeDwarves && <FortressEdgeDwarves />}
-        <FortWatcher />
+        <FortressWatcher />
       </AppLayout>
     </AssistantProvider>
   )

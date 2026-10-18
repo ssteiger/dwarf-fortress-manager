@@ -34,7 +34,7 @@ export interface Guide {
   units?: FortUnit[]
   link?: {
     to:
-      | '/fortress/dwarves'
+      | '/fortress/citizens'
       | '/fortress/items'
       | '/fortress/map'
       | '/fortress/chronicle'

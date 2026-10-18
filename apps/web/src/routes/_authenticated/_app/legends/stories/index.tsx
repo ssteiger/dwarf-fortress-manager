@@ -10,7 +10,13 @@ import {
   SectionStack,
   parseWorldSearch,
 } from '../-components/LegendsChrome'
-import { FeaturedStory, StoryCard, featuredStories, useStories } from '../-components/Stories'
+import {
+  FeaturedStory,
+  StoryCard,
+  featuredNote,
+  featuredStories,
+  useStories,
+} from '../-components/Stories'
 
 const StoriesPage = () => {
   const { world } = Route.useSearch()
@@ -30,14 +36,22 @@ const StoriesBody = ({ worldId, civId }: { worldId: number; civId: number | null
   if (!stories.data) {
     return (
       <p className="p-4 text-sm text-muted-foreground">
-        {stories.isLoading ? 'Sifting the chronicles for stories…' : 'No stories yet.'}
+        {stories.isLoading
+          ? 'Sifting the chronicles for stories…'
+          : stories.isError
+            ? 'The stories could not be read just now. Reload the page to try again.'
+            : 'No stories yet.'}
       </p>
     )
   }
 
   return (
     <SectionStack className="border-b">
-      <FeaturedStory worldId={worldId} candidates={featured} />
+      <FeaturedStory
+        worldId={worldId}
+        candidates={featured}
+        description={featuredNote(featured, civId)}
+      />
 
       <nav aria-label="Story groups" className="flex flex-wrap gap-2 px-4 py-3">
         {stories.data.groups.map((group) => (

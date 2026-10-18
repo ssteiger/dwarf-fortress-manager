@@ -10,7 +10,10 @@ import { type SQL, and, asc, eq, inArray, or, sql } from 'drizzle-orm'
 
 import { num, numList, objList, plusOf, str } from '../events'
 import { words } from '../model'
+import type { Prose } from '../prose'
 import type { HeldPosition, LegendsHit, NameIndex } from '../types'
+import { type FamilyTree, familyOf } from './family'
+import { openingFor } from './openings'
 import {
   type Decorate,
   type RecordRow,
@@ -68,6 +71,8 @@ export interface RelatedRecords {
   /** The earliest event on record for this thing. */
   firstEvent?: LegendsRecord | null
   eventsTotal?: number
+  /** A figure's parents, grandparents, partners, siblings and children. */
+  family?: FamilyTree | null
 }
 
 export interface LegendsRecordDetail {
@@ -76,6 +81,8 @@ export interface LegendsRecordDetail {
   names: NameIndex
   positions: HeldPosition[]
   related: RelatedRecords
+  /** The paragraph a site, civilization or war page opens with; empty for other kinds. */
+  opening?: Prose
 }
 
 const ROW_COLUMNS = {
@@ -255,6 +262,9 @@ export const getLegendsRecord = createServerFn({ method: 'GET' })
           }),
           hitsByIds(data.worldId, 'identity', numList(payload.used_identity_id)).then((ids) => {
             related.identities = ids
+          }),
+          familyOf(data.worldId, data.id, payload).then((family) => {
+            related.family = family
           }),
         )
         break
@@ -469,7 +479,13 @@ export const getLegendsRecord = createServerFn({ method: 'GET' })
       }
     }
 
+    let opening: Prose = []
+    jobs.push(
+      openingFor(data.worldId, data.kind, data.id, payload).then((p) => {
+        opening = p
+      }),
+    )
     await Promise.all(jobs)
     const names = await lookupNames(data.worldId, refs)
-    return { record, names, positions, related }
+    return { record, names, positions, related, opening }
   })
