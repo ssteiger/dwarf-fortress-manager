@@ -392,7 +392,7 @@ function RouteComponent() {
 
       <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
         {ideasQuery.data ? (
-          <div className="xl:sticky xl:top-6 xl:order-last xl:h-[calc(100svh-3rem)]">
+          <div className="xl:sticky xl:top-6 xl:order-last xl:h-[calc(100svh-6rem)]">
             <NameList
               className="h-full"
               list={list}

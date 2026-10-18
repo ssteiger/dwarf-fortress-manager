@@ -111,6 +111,8 @@ const Layout = () => {
     <AssistantProvider>
       <AppLayout
         headerProps={{
+          brand: '☺ Dwarf Fortress Manager',
+          brandHref: '/fortress',
           title: headerTitle(location.pathname),
           center: (
             <div className="flex gap-2">
@@ -123,8 +125,6 @@ const Layout = () => {
           end: <ReadGameButton />,
         }}
         sidebarProps={{
-          brand: '☺ Dwarf Fortress Manager',
-          brandHref: '/fortress',
           user: sidebarUser,
           onLogout: () => logOutMutation.mutate(undefined),
           navMain: NAV,

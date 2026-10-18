@@ -97,6 +97,12 @@ export interface DataTableProps<TData> {
   showToolbar?: boolean
   /** Page controls under the table. */
   paginate?: boolean
+  /**
+   * Fill the remaining height of a flex-column parent: rows scroll under a
+   * sticky header while the search bar and page controls stay put. The parent
+   * needs a bounded height (`min-h-0 flex-1` down from the app shell).
+   */
+  fill?: boolean
   enableSortingRemoval?: boolean
   getRowId?: (row: TData) => string
   rowClassName?: (row: TData) => string | undefined
@@ -130,6 +136,7 @@ export function DataTable<TData>({
   showActionsColumn = true,
   showToolbar = true,
   paginate = true,
+  fill = false,
   enableSortingRemoval = true,
   getRowId,
   rowClassName,
@@ -305,8 +312,10 @@ export function DataTable<TData>({
   const [selectedRow, setSelectedRow] = React.useState<TData | null>(null)
 
   return (
-    <div className="w-full">
-      <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+    <div className={cn('w-full', fill && 'flex min-h-0 flex-1 flex-col')}>
+      <div
+        className={cn('flex flex-wrap items-center gap-2 px-4 py-3', fill && 'shrink-0 border-b')}
+      >
         <div className="relative w-full max-w-sm">
           <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -357,9 +366,10 @@ export function DataTable<TData>({
           </div>
         ) : null}
       </div>
-      <div className="overflow-hidden">
-        <Table>
-          <TableHeader className="sticky top-0 z-10 bg-card">
+      <div className={cn(fill ? 'flex min-h-0 flex-1 flex-col' : 'overflow-hidden')}>
+        <Table containerClassName={fill ? 'min-h-0 flex-1 overflow-auto' : undefined}>
+          {/* Collapsed table borders stay behind when a sticky row moves, so the header draws its rule as a shadow. */}
+          <TableHeader className="sticky top-0 z-10 [&_th]:bg-muted [&_th]:shadow-[inset_0_-1px_0_var(--color-border)] [&_tr]:border-b-0">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
@@ -488,7 +498,7 @@ export function DataTable<TData>({
         </Table>
       </div>
       {paginate ? (
-        <div className="flex items-center justify-between gap-2 border-t px-4 py-2 text-sm text-muted-foreground">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t px-4 py-2 text-sm text-muted-foreground">
           <div className="flex-1 tabular-nums">
             {showSelectColumn
               ? `${table.getFilteredSelectedRowModel().rows.length} of ${table.getFilteredRowModel().rows.length} row(s) selected.`

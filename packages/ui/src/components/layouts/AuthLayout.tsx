@@ -91,9 +91,7 @@ export function AuthLayout({
           <div className="m-auto w-full max-w-sm">{children}</div>
 
           {footer ? (
-            <div className="text-muted-foreground mt-auto text-center text-sm">
-              {footer}
-            </div>
+            <div className="text-muted-foreground mt-auto text-center text-sm">{footer}</div>
           ) : null}
         </section>
       </div>

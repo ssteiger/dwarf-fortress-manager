@@ -1,3 +1,4 @@
+import { APP_SCROLL_ID } from '@fortress/ui'
 import { QueryClient } from '@tanstack/react-query'
 import { createRouter as createTanStackRouter } from '@tanstack/react-router'
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query'
@@ -26,6 +27,7 @@ export function getRouter() {
     defaultPendingComponent: DefaultPending,
     defaultNotFoundComponent: NotFound,
     scrollRestoration: true,
+    scrollToTopSelectors: [`#${APP_SCROLL_ID}`],
     defaultStructuralSharing: true,
   })
 

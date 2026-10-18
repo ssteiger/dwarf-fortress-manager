@@ -1,4 +1,4 @@
-export { AppLayout, type AppLayoutProps } from './AppLayout'
+export { APP_SCROLL_ID, AppLayout, type AppLayoutProps } from './AppLayout'
 export { AuthLayout, type AuthLayoutProps, type AuthLayoutQuote } from './AuthLayout'
 export {
   AppSidebar,

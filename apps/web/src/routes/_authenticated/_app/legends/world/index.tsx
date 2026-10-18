@@ -283,7 +283,7 @@ function WorldBody({
         </div>
       </Section>
 
-      <Card className="gap-0 overflow-hidden py-0 xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)]">
+      <Card className="gap-0 overflow-hidden py-0 xl:sticky xl:top-4 xl:max-h-[calc(100svh-5rem)]">
         <Tabs
           value={panel}
           onValueChange={(value) => setPanel(value as Panel)}
