@@ -234,7 +234,7 @@ export function LegendsShell({
         )
       ) : (
         <>
-          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
             <nav
               aria-label="Legends sections"
               className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"

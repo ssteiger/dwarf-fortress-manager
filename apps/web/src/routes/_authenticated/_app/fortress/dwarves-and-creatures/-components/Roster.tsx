@@ -304,10 +304,7 @@ export function Roster({
   )
 
   return (
-    <div
-      data-fill={view === 'table' && rows.length > 0 ? '' : undefined}
-      className="flex flex-col data-fill:min-h-0 data-fill:flex-1"
-    >
+    <div className="flex flex-col">
       <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <Tabs value={group} onValueChange={(v) => setGroup(v as Group)}>
           <TabsList className="flex-wrap">
@@ -350,19 +347,22 @@ export function Roster({
       ) : view === 'grid' ? (
         <Grid units={rows} now={now} onOpen={onOpen} />
       ) : (
-        <DataTable
-          fill
-          data={rows}
-          columns={columns}
-          showSelectColumn={false}
-          showActionsColumn={false}
-          showToolbar={false}
-          enableSortingRemoval={false}
-          defaultSort={[{ id: 'mood', desc: false }]}
-          getRowId={(unit) => String(unit.id)}
-          rowClassName={(unit) => (isLiving(unit) ? undefined : 'opacity-50')}
-          onRowClick={onOpen}
-        />
+        // As tall as the window below the app header; the page scrolls past the filters to it.
+        <div className="flex h-[calc(100svh-3rem)] shrink-0 flex-col">
+          <DataTable
+            fill
+            data={rows}
+            columns={columns}
+            showSelectColumn={false}
+            showActionsColumn={false}
+            showToolbar={false}
+            enableSortingRemoval={false}
+            defaultSort={[{ id: 'mood', desc: false }]}
+            getRowId={(unit) => String(unit.id)}
+            rowClassName={(unit) => (isLiving(unit) ? undefined : 'opacity-50')}
+            onRowClick={onOpen}
+          />
+        </div>
       )}
     </div>
   )

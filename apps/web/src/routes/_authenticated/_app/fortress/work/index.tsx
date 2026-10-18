@@ -412,7 +412,7 @@ function WorkPage() {
             }}
             className="gap-0"
           >
-            <div className="border-b px-4 py-3">
+            <div className="sticky top-0 z-20 border-b bg-background px-4 py-3">
               <TabsList className="h-auto flex-wrap">
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <TabsTrigger key={key} value={key} className="gap-1.5">

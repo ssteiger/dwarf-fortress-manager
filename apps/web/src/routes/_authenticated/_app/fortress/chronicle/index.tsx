@@ -221,7 +221,7 @@ function EveryEntry() {
   }, [data, history.data, everyone.data, filter])
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex flex-1 flex-col">
       <PageHeader
         className="shrink-0 border-b p-4"
         title="Chronicle"
@@ -236,49 +236,56 @@ function EveryEntry() {
       <StatusBand state={overview.data?.state} />
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-3">
         <ViewSwitch current="entries" />
-        {(Object.keys(FILTERS) as Filter[]).map((key) => (
-          <button
-            type="button"
-            key={key}
-            onClick={() => setFilter(key)}
-            className={cn(
-              'rounded-full border px-3 py-1.5 text-sm transition-colors hover:bg-accent',
-              filter === key &&
-                'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
-            )}
-          >
-            {FILTERS[key]}
-          </button>
-        ))}
-        <span className="self-center text-sm text-muted-foreground">
-          {rows.length.toLocaleString()} entries
-        </span>
       </div>
 
-      <DataTable
-        fill
-        data={rows}
-        columns={columns}
-        showSelectColumn={false}
-        showActionsColumn={false}
-        showToolbar={false}
-        enableSortingRemoval={false}
-        defaultSort={[{ id: 'when', desc: true }]}
-        search={search}
-        onSearch={setSearch}
-        getRowId={(row) => row.key}
-        rowClassName={(row) =>
-          row.filters.includes('cancellations') ? 'text-muted-foreground' : undefined
-        }
-        emptyState={{
-          title: filter === 'history' ? 'No history recorded yet' : 'The chronicle is empty',
-          subtitle: q
-            ? 'Nothing matches this search.'
-            : filter === 'history'
-              ? 'The worker reads the world’s history with each dump: masterpieces, artifacts, marriages, deaths and offices. Restart the worker so the game runs the new dump script.'
-              : 'Announcements are recorded each time the worker dumps the game. Play a little and come back.',
-        }}
-      />
+      {/* As tall as the window below the app header; the page scrolls past the header to it. */}
+      <div className="flex h-[calc(100svh-3rem)] shrink-0 flex-col">
+        <DataTable
+          fill
+          data={rows}
+          columns={columns}
+          showSelectColumn={false}
+          showActionsColumn={false}
+          showToolbar={false}
+          enableSortingRemoval={false}
+          defaultSort={[{ id: 'when', desc: true }]}
+          search={search}
+          onSearch={setSearch}
+          toolbar={
+            <>
+              {(Object.keys(FILTERS) as Filter[]).map((key) => (
+                <button
+                  type="button"
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-sm transition-colors hover:bg-accent',
+                    filter === key &&
+                      'border-primary bg-primary text-primary-foreground hover:bg-primary/90',
+                  )}
+                >
+                  {FILTERS[key]}
+                </button>
+              ))}
+              <span className="self-center text-sm text-muted-foreground">
+                {rows.length.toLocaleString()} entries
+              </span>
+            </>
+          }
+          getRowId={(row) => row.key}
+          rowClassName={(row) =>
+            row.filters.includes('cancellations') ? 'text-muted-foreground' : undefined
+          }
+          emptyState={{
+            title: filter === 'history' ? 'No history recorded yet' : 'The chronicle is empty',
+            subtitle: q
+              ? 'Nothing matches this search.'
+              : filter === 'history'
+                ? 'The worker reads the world’s history with each dump: masterpieces, artifacts, marriages, deaths and offices. Restart the worker so the game runs the new dump script.'
+                : 'Announcements are recorded each time the worker dumps the game. Play a little and come back.',
+          }}
+        />
+      </div>
     </div>
   )
 }

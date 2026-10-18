@@ -149,7 +149,7 @@ function ArchivePage() {
     navigate({ search: (prev) => ({ ...prev, ...patch }), replace })
 
   return (
-    <LegendsShell section="archive" world={search.world} fill={search.archive !== EVENTS_TAB.key}>
+    <LegendsShell section="archive" world={search.world}>
       {({ worldId, counts, summary }) => (
         <>
           <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
@@ -424,56 +424,59 @@ function RecordsArchive({
           ) : null}
         </div>
       ) : null}
-      <DataTable
-        fill
-        data={results.data?.rows ?? []}
-        columns={columns}
-        isLoading={results.isLoading}
-        showSelectColumn={false}
-        showActionsColumn={false}
-        showToolbar={false}
-        enableSortingRemoval={false}
-        sorting={sorting}
-        onSortingChange={(next) => {
-          setSorting(next.length ? next : defaultSorting(tab.key))
-          setPage(0)
-        }}
-        search={search}
-        onSearch={onSearchInput}
-        pagination={{ pageIndex: page, pageSize }}
-        onPaginationChange={(next) => {
-          setPage(next.pageIndex)
-          setPageSize(next.pageSize)
-        }}
-        rowCount={results.data?.total ?? 0}
-        getRowId={(hit) => `${hit.kind}-${hit.id}`}
-        emptyState={{
-          title: 'Nothing found',
-          subtitle:
-            debounced || type.length || Object.values(facets).some((v) => v !== undefined)
-              ? 'Try another spelling, a race, a different type, or loosen a filter.'
-              : 'This part of the archive is empty.',
-        }}
-        toolbar={
-          typeOptions.length > 1 ? (
-            <MultiSelect
-              options={typeOptions}
-              value={type}
-              defaultValue={type}
-              onValueChange={(next) => {
-                const all = typeOptions.length > 0 && next.length === typeOptions.length
-                onType(all ? [] : next)
-                setPage(0)
-              }}
-              placeholder="All types"
-              variant="secondary"
-              maxCount={2}
-              className="min-h-9 w-[min(100%,20rem)] border-input bg-background text-sm dark:bg-background"
-              aria-label="Filter by type"
-            />
-          ) : null
-        }
-      />
+      {/* As tall as the window below the app header and the sticky section nav (4rem + border). */}
+      <div className="flex h-[calc(100svh-7rem-1px)] shrink-0 flex-col">
+        <DataTable
+          fill
+          data={results.data?.rows ?? []}
+          columns={columns}
+          isLoading={results.isLoading}
+          showSelectColumn={false}
+          showActionsColumn={false}
+          showToolbar={false}
+          enableSortingRemoval={false}
+          sorting={sorting}
+          onSortingChange={(next) => {
+            setSorting(next.length ? next : defaultSorting(tab.key))
+            setPage(0)
+          }}
+          search={search}
+          onSearch={onSearchInput}
+          pagination={{ pageIndex: page, pageSize }}
+          onPaginationChange={(next) => {
+            setPage(next.pageIndex)
+            setPageSize(next.pageSize)
+          }}
+          rowCount={results.data?.total ?? 0}
+          getRowId={(hit) => `${hit.kind}-${hit.id}`}
+          emptyState={{
+            title: 'Nothing found',
+            subtitle:
+              debounced || type.length || Object.values(facets).some((v) => v !== undefined)
+                ? 'Try another spelling, a race, a different type, or loosen a filter.'
+                : 'This part of the archive is empty.',
+          }}
+          toolbar={
+            typeOptions.length > 1 ? (
+              <MultiSelect
+                options={typeOptions}
+                value={type}
+                defaultValue={type}
+                onValueChange={(next) => {
+                  const all = typeOptions.length > 0 && next.length === typeOptions.length
+                  onType(all ? [] : next)
+                  setPage(0)
+                }}
+                placeholder="All types"
+                variant="secondary"
+                maxCount={2}
+                className="min-h-9 w-[min(100%,20rem)] border-input bg-background text-sm dark:bg-background"
+                aria-label="Filter by type"
+              />
+            ) : null
+          }
+        />
+      </div>
     </>
   )
 }

@@ -28,7 +28,7 @@ function DwarvesAndCreaturesPage() {
   const [selected, setSelected] = React.useState<FortUnit | null>(null)
   const units = data?.units ?? []
   return (
-    <div className="flex flex-1 flex-col has-[[data-fill]]:min-h-0">
+    <div className="flex flex-1 flex-col">
       <PageHeader
         className="border-b p-4"
         title="Dwarves and creatures"
