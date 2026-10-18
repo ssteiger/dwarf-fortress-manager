@@ -22,7 +22,7 @@ function count(n: number, one: string, many = `${one}s`): string {
   return `${n.toLocaleString()} ${n === 1 ? one : many}`
 }
 
-function DwarvesPage() {
+const DwarvesPage = () => {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortUnits()
   const [selected, setSelected] = React.useState<FortUnit | null>(null)

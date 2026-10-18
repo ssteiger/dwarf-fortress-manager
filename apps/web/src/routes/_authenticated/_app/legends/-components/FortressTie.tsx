@@ -28,7 +28,7 @@ const RELATION: Record<string, string> = {
 const linkClass = 'font-medium text-primary underline-offset-4 hover:underline'
 
 /** The figure's tie to the running fortress: living there now, or kin to someone who does. */
-export function FortressTieLine({ worldId, figureId }: { worldId: number; figureId: number }) {
+export const FortressTieLine = ({ worldId, figureId }: { worldId: number; figureId: number }) => {
   const { matchesLive } = useSelectedWorld(worldId)
   const tie = useFortressInLegends(worldId, matchesLive)
   const data = tie.data

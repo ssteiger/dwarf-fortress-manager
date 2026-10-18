@@ -25,7 +25,7 @@ interface HistorySearch {
   to?: number
 }
 
-function HistoryPage() {
+const HistoryPage = () => {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const setSpan = (span: YearSpan | null) =>
@@ -52,7 +52,7 @@ function HistoryPage() {
   )
 }
 
-function HistoryBody({
+const HistoryBody = ({
   worldId,
   summary,
   loading,
@@ -64,7 +64,7 @@ function HistoryBody({
   loading: boolean
   span: YearSpan | null
   onSpan: (span: YearSpan | null) => void
-}) {
+}) => {
   const navigate = useNavigate()
   const onSearch = (q: string) =>
     navigate({
@@ -324,7 +324,7 @@ function HistoryBody({
 }
 
 /** One story from each of the liveliest groups, as a way into the Stories tab. */
-function StoriesStrip({ worldId }: { worldId: number }) {
+const StoriesStrip = ({ worldId }: { worldId: number }) => {
   const stories = useStories(worldId)
   const picks = React.useMemo(() => {
     const groups = stories.data?.groups ?? []

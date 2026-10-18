@@ -8,7 +8,7 @@ import { type TrendPoint, getFortTrends } from '~/lib/fortress/server/history'
 import { Section, SectionBoundary } from './FortChrome'
 
 /** A small line over evenly spaced readings; `min` and `max` fix the scale when given. */
-export function Sparkline({
+export const Sparkline = ({
   values,
   label,
   min,
@@ -22,7 +22,7 @@ export function Sparkline({
   max?: number
   className?: string
   strokeClassName?: string
-}) {
+}) => {
   const width = 120
   const height = 32
   if (values.length < 2) return null
@@ -129,7 +129,7 @@ function changeText(
 }
 
 /** Population, wealth, drink, food and unhappiness from the worker's daily snapshots. */
-export function Trends() {
+export const Trends = () => {
   const trends = useQuery({
     queryKey: ['fort', 'trends'],
     queryFn: () => getFortTrends(),
@@ -154,7 +154,7 @@ export function Trends() {
   )
 }
 
-function TrendRows({ points }: { points: TrendPoint[] }) {
+const TrendRows = ({ points }: { points: TrendPoint[] }) => {
   return (
     <dl className="flex flex-col divide-y">
       {MEASURES.map((measure) => {

@@ -47,7 +47,7 @@ function changeOf(unit: FortUnit, draft: string): Change {
   return current ? 'rename' : 'new'
 }
 
-export function Citizens({
+export const Citizens = ({
   rows,
   total,
   withoutNickname,
@@ -86,7 +86,7 @@ export function Citizens({
   onBrowse: ((unitId: number) => void) | null
   onQueue: (unit: FortUnit) => void
   onAsk: (unit: FortUnit) => void
-}) {
+}) => {
   const query = search.trim()
   const canAsk = Boolean(writer?.enabled)
   const waiting = rows.filter((row) => changeOf(row.unit, row.draft) !== 'none').length
@@ -203,14 +203,14 @@ const SOURCE_LABEL: Record<NicknameIdea['source'], string> = {
   list: 'From your names',
 }
 
-function SourceIcon({ source }: { source: NicknameIdea['source'] }) {
+const SourceIcon = ({ source }: { source: NicknameIdea['source'] }) => {
   if (source === 'model') return <SparklesIcon className="size-3" aria-hidden />
   if (source === 'list') return <BookmarkIcon className="size-3" aria-hidden />
   return null
 }
 
 /** What queueing the box would do, said next to it. */
-function Preview({
+const Preview = ({
   change,
   draft,
   current,
@@ -220,7 +220,7 @@ function Preview({
   draft: string
   current: string
   name: DwarfName | null
-}) {
+}) => {
   if (change === 'none') return null
   if (change === 'clear') {
     const plain = [name?.given, name?.surname].filter(Boolean).join(' ')
@@ -254,7 +254,7 @@ function Preview({
 const LINK =
   'inline-flex items-center gap-1 text-sm text-primary underline-offset-4 hover:underline disabled:pointer-events-none disabled:opacity-50'
 
-function NicknameRow({
+const NicknameRow = ({
   unit,
   draft,
   ideas,
@@ -280,7 +280,7 @@ function NicknameRow({
   onBrowse: (() => void) | null
   onQueue: () => void
   onAsk: () => void
-}) {
+}) => {
   const [open, setOpen] = React.useState(false)
   const current = unit.nickname?.trim() ?? ''
   const change = changeOf(unit, draft)

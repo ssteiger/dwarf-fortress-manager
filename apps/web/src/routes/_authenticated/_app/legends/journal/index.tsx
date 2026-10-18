@@ -61,7 +61,7 @@ function exportText(notes: LegendsNote[], worldName: string): string {
   return lines.join('\n')
 }
 
-function JournalPage() {
+const JournalPage = () => {
   const { world } = Route.useSearch()
   return (
     <LegendsShell section="journal" world={world}>
@@ -75,7 +75,7 @@ function JournalPage() {
   )
 }
 
-function JournalBody({ worldId, worldName }: { worldId: number; worldName: string }) {
+const JournalBody = ({ worldId, worldName }: { worldId: number; worldName: string }) => {
   const journal = useJournal(worldId)
   const [tag, setTag] = React.useState<string | null>(null)
   const notes = journal.data ?? []
@@ -143,7 +143,7 @@ function JournalBody({ worldId, worldName }: { worldId: number; worldName: strin
   )
 }
 
-function NoteRow({
+const NoteRow = ({
   note,
   worldId,
   onTag,
@@ -151,7 +151,7 @@ function NoteRow({
   note: LegendsNote
   worldId: number
   onTag: (tag: string) => void
-}) {
+}) => {
   const { save, remove } = useJournalMutations(worldId)
   const [editing, setEditing] = React.useState(false)
   const link = targetLink(note, worldId)

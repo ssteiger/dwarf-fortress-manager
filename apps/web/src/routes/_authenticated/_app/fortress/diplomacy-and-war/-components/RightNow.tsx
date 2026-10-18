@@ -58,7 +58,7 @@ interface Line {
 }
 
 /** Invaders, envoys, caravans and armies: what is happening between the fortress and the world now. */
-export function RightNow({
+export const RightNow = ({
   d,
   presence,
   caravans,
@@ -70,7 +70,7 @@ export function RightNow({
   caravans: FortCaravan[]
   onOpenPower: OpenPower
   onOpenUnit: OpenUnit
-}) {
+}) => {
   const name = (id: number) => <EntityName d={d} id={id} onOpen={onOpenPower} />
   const lines: Line[] = []
 

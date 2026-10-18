@@ -63,7 +63,7 @@ export function featuredStories(stories: Stories | undefined, civId?: number | n
 const OPENING_MIN = 160
 
 /** The opening of one told story, with the way into the rest. */
-export function FeaturedStory({
+export const FeaturedStory = ({
   worldId,
   candidates,
   title = 'A story from the record',
@@ -76,7 +76,7 @@ export function FeaturedStory({
   /** Open on the first candidate, or on one picked at random once they load. */
   start?: 'first' | 'random'
   action?: React.ReactNode
-}) {
+}) => {
   const [at, setAt] = React.useState<number | null>(start === 'first' ? 0 : null)
   React.useEffect(() => {
     if (at === null && candidates.length) setAt(Math.floor(Math.random() * candidates.length))
@@ -165,7 +165,7 @@ export function storyLink(story: Pick<Story, 'key'>, worldId: number) {
   }
 }
 
-export function StoryCard({
+export const StoryCard = ({
   story,
   names,
   worldId,
@@ -177,7 +177,7 @@ export function StoryCard({
   worldId: number
   featured?: boolean
   actions?: React.ReactNode
-}) {
+}) => {
   const lead = leadRef(story)
   const refs = story.refs
     .filter((ref) => !ref.name || titleCase(ref.name) !== story.title)

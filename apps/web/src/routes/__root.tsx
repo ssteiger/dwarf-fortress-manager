@@ -11,6 +11,32 @@ import { type CurrentUser, getCurrentUser } from '~/lib/auth/server'
 import { BOOT_SCRIPT } from '~/lib/preferences'
 import appCss from '~/lib/styles/app.css?url'
 
+const RootComponent = () => {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
+  )
+}
+
+const RootDocument = ({ children }: { readonly children: React.ReactNode }) => {
+  return (
+    // suppress since we're updating the "dark" class in a custom script below
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <ScriptOnce>{BOOT_SCRIPT}</ScriptOnce>
+
+        {children}
+
+        <Scripts />
+      </body>
+    </html>
+  )
+}
+
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient
   user: CurrentUser | null
@@ -43,29 +69,3 @@ export const Route = createRootRouteWithContext<{
   }),
   component: RootComponent,
 })
-
-function RootComponent() {
-  return (
-    <RootDocument>
-      <Outlet />
-    </RootDocument>
-  )
-}
-
-function RootDocument({ children }: { readonly children: React.ReactNode }) {
-  return (
-    // suppress since we're updating the "dark" class in a custom script below
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <ScriptOnce>{BOOT_SCRIPT}</ScriptOnce>
-
-        {children}
-
-        <Scripts />
-      </body>
-    </html>
-  )
-}

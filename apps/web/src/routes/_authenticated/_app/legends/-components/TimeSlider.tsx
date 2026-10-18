@@ -9,7 +9,7 @@ export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number]
  * Scrub through the years. Eras are ticked along the track; play rolls the
  * years forward at a chosen pace until the end of the record.
  */
-export function TimeSlider({
+export const TimeSlider = ({
   min,
   max,
   year,
@@ -31,7 +31,7 @@ export function TimeSlider({
   onPlaying: (playing: boolean) => void
   onSpeed: (speed: PlaybackSpeed) => void
   className?: string
-}) {
+}) => {
   const span = Math.max(1, max - min)
   const pct = ((year - min) / span) * 100
   const inputRef = React.useRef<HTMLInputElement>(null)

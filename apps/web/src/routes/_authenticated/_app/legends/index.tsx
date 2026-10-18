@@ -38,7 +38,7 @@ interface LegacySearch {
   q?: string
 }
 
-function OverviewPage() {
+const OverviewPage = () => {
   const { world } = Route.useSearch()
   return (
     <LegendsShell section="overview" world={world}>
@@ -56,7 +56,7 @@ function OverviewPage() {
   )
 }
 
-function OverviewBody({
+const OverviewBody = ({
   worldId,
   worldName,
   counts,
@@ -70,7 +70,7 @@ function OverviewBody({
   summary: LegendsWorldSummary | undefined
   live: LiveFortress | null
   matchesLive: boolean
-}) {
+}) => {
   const navigate = useNavigate()
   const years = summary?.years ?? null
   const stories = useStories(worldId)
@@ -160,7 +160,7 @@ function OverviewBody({
 }
 
 /** The size of the world, each figure a way into the archive. */
-function AtAGlance({
+const AtAGlance = ({
   worldId,
   counts,
   summary,
@@ -168,7 +168,7 @@ function AtAGlance({
   worldId: number
   counts: Record<string, number>
   summary: LegendsWorldSummary | undefined
-}) {
+}) => {
   const tabCount = (key: string) => {
     const tab = BROWSE_TABS.find((t) => t.key === key)
     return tab ? tab.kinds.reduce((sum, kind) => sum + (counts[kind] ?? 0), 0) : 0
@@ -261,7 +261,7 @@ const WAYS_IN = [
   },
 ]
 
-function WaysIn({ worldId }: { worldId: number }) {
+const WaysIn = ({ worldId }: { worldId: number }) => {
   return (
     <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-2 xl:grid-cols-5">
       {WAYS_IN.map((way) => {
@@ -286,7 +286,7 @@ function WaysIn({ worldId }: { worldId: number }) {
 }
 
 /** Where the running fortress stands in these legends, or why it does not. */
-function YourFortress({
+const YourFortress = ({
   worldId,
   worldName,
   live,
@@ -298,7 +298,7 @@ function YourFortress({
   live: LiveFortress
   matchesLive: boolean
   summary: LegendsWorldSummary | undefined
-}) {
+}) => {
   const refs = {
     entity: [live.civId, live.groupId].filter((id): id is number => id !== null),
     site: live.siteId !== null ? [live.siteId] : [],
@@ -454,7 +454,7 @@ function YourFortress({
 }
 
 /** The trail and the latest journal pins, for a returning reader. */
-function PickUp({ worldId }: { worldId: number }) {
+const PickUp = ({ worldId }: { worldId: number }) => {
   const journal = useJournal(worldId)
   const notes = (journal.data ?? []).slice(0, 3)
   return (

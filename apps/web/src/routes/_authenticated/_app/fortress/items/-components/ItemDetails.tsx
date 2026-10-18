@@ -79,13 +79,13 @@ export function itemSubtitle(item: FortItem): string {
     .join(' · ')
 }
 
-export function ItemStatusBadges({
+export const ItemStatusBadges = ({
   flags,
   className,
 }: {
   flags: string[]
   className?: string
-}) {
+}) => {
   return (
     <>
       {flags.includes('artifact') ? <Badge className={className}>Artifact</Badge> : null}
@@ -129,7 +129,7 @@ export function ItemStatusBadges({
 }
 
 /** A unit on the map links to their page; anyone else is named, with their race and fate. */
-function PersonLink({ person }: { person: ItemPerson | null }) {
+const PersonLink = ({ person }: { person: ItemPerson | null }) => {
   if (!person) return null
   if (person.unit)
     return (
@@ -160,7 +160,7 @@ function buildingLabel(building: FortBuilding): string {
   return splitPascal(building.type)
 }
 
-export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boolean }) {
+export const ItemDetails = ({ itemId, compact }: { itemId: number; compact?: boolean }) => {
   const { data, isLoading } = useFortItem(itemId)
 
   if (isLoading) {
@@ -420,7 +420,7 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
 }
 
 /** What is wrong with the item and what it is good for. */
-function ItemHints({ hints }: { hints: ItemHint[] }) {
+const ItemHints = ({ hints }: { hints: ItemHint[] }) => {
   const trouble = hints.some((h) => h.problem)
   return (
     <div className={cn('p-4', trouble ? 'bg-amber-500/5' : 'bg-muted/30')}>
@@ -447,7 +447,7 @@ function ItemHints({ hints }: { hints: ItemHint[] }) {
   )
 }
 
-function Facts({ items }: { items: { label: string; value: ReactNode }[] }) {
+const Facts = ({ items }: { items: { label: string; value: ReactNode }[] }) => {
   const shown = items.filter(
     (item) => item.value !== null && item.value !== undefined && item.value !== '',
   )

@@ -29,7 +29,7 @@ interface LocalCounts {
   watched: number
 }
 
-function AccountSettingsPage() {
+const AccountSettingsPage = () => {
   const { user } = Route.useRouteContext()
   const client = useQueryClient()
   const [counts, setCounts] = React.useState<LocalCounts | null>(null)
@@ -171,7 +171,7 @@ function AccountSettingsPage() {
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024
 
 /** The player's own writing, saved to a file and read back, since `db:reset` wipes it. */
-function BackupSection() {
+const BackupSection = () => {
   const client = useQueryClient()
   const fileRef = React.useRef<HTMLInputElement>(null)
   const counts = useQuery({ queryKey: ['backup-counts'], queryFn: () => getBackupCounts() })

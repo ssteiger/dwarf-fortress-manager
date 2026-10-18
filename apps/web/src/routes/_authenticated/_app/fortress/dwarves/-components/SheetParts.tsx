@@ -9,7 +9,7 @@ import { CreatureSprite } from '~/lib/df-assets/components'
 import type { Standing, Tone } from '~/lib/fortress/people/character'
 
 /** A titled band of the sheet; `count` shows as a badge next to the title when above zero. */
-export function Section({
+export const Section = ({
   title,
   count,
   action,
@@ -27,7 +27,7 @@ export function Section({
   contentClassName?: string
   bleed?: boolean
   children: React.ReactNode
-}) {
+}) => {
   return (
     <FlatSection
       bleed={bleed}
@@ -42,12 +42,15 @@ export function Section({
   )
 }
 
-export function Muted({ children, className }: { children: React.ReactNode; className?: string }) {
+export const Muted = ({
+  children,
+  className,
+}: { children: React.ReactNode; className?: string }) => {
   return <p className={cn('text-sm text-muted-foreground', className)}>{children}</p>
 }
 
 /** Shown where the dump predates the sheet the updated worker collects. */
-export function SheetMissing({ what }: { what: string }) {
+export const SheetMissing = ({ what }: { what: string }) => {
   return (
     <p className="flex gap-2 bg-muted/30 p-4 text-sm text-muted-foreground">
       <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -81,7 +84,7 @@ export const TONE_TEXT: Record<Tone, string> = {
 }
 
 /** A thin bar; `marker` draws a tick, e.g. where a typical dwarf sits. */
-export function Meter({
+export const Meter = ({
   pct,
   barClassName,
   marker,
@@ -93,7 +96,7 @@ export function Meter({
   marker?: number
   className?: string
   label?: string
-}) {
+}) => {
   const clamped = Math.max(0, Math.min(100, pct))
   return (
     <div
@@ -118,7 +121,7 @@ export function Meter({
   )
 }
 
-export function Facts({ items }: { items: { label: string; value: React.ReactNode }[] }) {
+export const Facts = ({ items }: { items: { label: string; value: React.ReactNode }[] }) => {
   const shown = items.filter(
     (item) => item.value !== null && item.value !== undefined && item.value !== '',
   )
@@ -136,7 +139,7 @@ export function Facts({ items }: { items: { label: string; value: React.ReactNod
 }
 
 /** A label then a few words, the way a character sheet reads. */
-export function SheetLine({ label, children }: { label: string; children: React.ReactNode }) {
+export const SheetLine = ({ label, children }: { label: string; children: React.ReactNode }) => {
   return (
     <div className="grid gap-0.5 sm:grid-cols-[8rem_1fr] sm:gap-3">
       <dt className="text-sm font-medium text-muted-foreground">{label}</dt>
@@ -146,7 +149,7 @@ export function SheetLine({ label, children }: { label: string; children: React.
 }
 
 /** Someone from the sheet: their sprite and a link to their page when they are in the dump. */
-export function PersonName({
+export const PersonName = ({
   person,
   units,
   className,
@@ -154,7 +157,7 @@ export function PersonName({
   person: SheetPerson
   units: Map<number, FortUnit>
   className?: string
-}) {
+}) => {
   const unit = person.unit !== null ? units.get(person.unit) : undefined
   const name = person.name ?? person.name_english ?? 'Someone unnamed'
   return (

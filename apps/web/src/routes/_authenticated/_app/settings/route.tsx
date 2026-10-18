@@ -37,7 +37,7 @@ const SECTIONS: SettingsNavItem[] = [
   },
 ]
 
-function SettingsLayout() {
+const SettingsLayout = () => {
   return (
     <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
       <PageHeader

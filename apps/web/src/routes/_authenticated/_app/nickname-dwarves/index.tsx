@@ -24,10 +24,6 @@ import {
 } from './-server'
 import { livingCitizens } from './-utils'
 
-export const Route = createFileRoute('/_authenticated/_app/nickname-dwarves/')({
-  component: RouteComponent,
-})
-
 const MAX_IDEAS = 6
 const MAX_QUEUE = 250
 const PARALLEL_WRITES = 3
@@ -58,7 +54,7 @@ function prefersReducedMotion(): boolean {
   )
 }
 
-function RouteComponent() {
+const RouteComponent = () => {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useQuery({
     queryKey: ['fort', 'units'],
@@ -450,3 +446,7 @@ function RouteComponent() {
     </div>
   )
 }
+
+export const Route = createFileRoute('/_authenticated/_app/nickname-dwarves/')({
+  component: RouteComponent,
+})

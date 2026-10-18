@@ -46,7 +46,7 @@ const PAGE_SIZE = 500
 const REFRESH_INTERVAL_MS = 10_000
 
 /** Backticks in a hint mark a command or a setting. */
-function WithCode({ text }: { text: string }) {
+const WithCode = ({ text }: { text: string }) => {
   return (
     <>
       {text.split('`').map((part, i) =>
@@ -94,7 +94,7 @@ async function copyEntry(entry: LogEntry) {
   }
 }
 
-function EntryRow({ entry }: { entry: LogEntry }) {
+const EntryRow = ({ entry }: { entry: LogEntry }) => {
   const { Icon, label, className } = entryIcon(entry)
   const problem = isProblem(entry)
   const over = overLabel(entry)
@@ -182,7 +182,7 @@ function byDay(entries: LogEntry[]): { key: string; label: string; entries: LogE
 }
 
 /** The newest problem, while nothing good has been heard since. */
-function OpenProblem({ entry }: { entry: LogEntry }) {
+const OpenProblem = ({ entry }: { entry: LogEntry }) => {
   return (
     <Alert variant={entry.level === 'error' ? 'destructive' : 'default'}>
       {entry.level === 'error' ? (
@@ -203,13 +203,13 @@ function OpenProblem({ entry }: { entry: LogEntry }) {
   )
 }
 
-function FilterChips({
+const FilterChips = ({
   current,
   counts,
 }: {
   current: LogFilter
   counts: Record<LogFilter, number>
-}) {
+}) => {
   const shown = (Object.keys(LOG_FILTERS) as LogFilter[]).filter(
     (key) => key === 'all' || key === 'problems' || key === current || counts[key] > 0,
   )
@@ -243,7 +243,7 @@ function FilterChips({
   )
 }
 
-function WorkerLogsPage() {
+const WorkerLogsPage = () => {
   const { show = 'all' } = Route.useSearch()
   const [limit, setLimit] = React.useState(PAGE_SIZE)
   const [search, setSearch] = React.useState('')

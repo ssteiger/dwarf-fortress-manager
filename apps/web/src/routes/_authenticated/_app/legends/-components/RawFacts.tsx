@@ -26,12 +26,12 @@ function kindForKey(key: string): string | null {
   return null
 }
 
-function FactValue({
+const FactValue = ({
   keyName,
   value,
   names,
   worldId,
-}: { keyName: string; value: unknown; names: NameIndex; worldId: number | null }) {
+}: { keyName: string; value: unknown; names: NameIndex; worldId: number | null }) => {
   if (value === true) return <span>yes</span>
   if (value === false) return <span>no</span>
   if (value === null || value === undefined || value === '')
@@ -104,7 +104,7 @@ function FactValue({
 }
 
 /** Every field of the export, for when the summaries above are not enough. */
-export function RawFacts({
+export const RawFacts = ({
   payload,
   names,
   worldId,
@@ -112,7 +112,7 @@ export function RawFacts({
   payload: JsonObject
   names: NameIndex
   worldId: number | null
-}) {
+}) => {
   const entries = Object.entries(payload).filter(([k]) => !HIDDEN_KEYS.has(k))
   if (entries.length === 0)
     return <p className="text-sm text-muted-foreground">Nothing more is recorded.</p>

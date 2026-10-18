@@ -164,7 +164,7 @@ export function powerCommands(
 }
 
 /** One power in full: where it lives, who leads it, its wars and how to deal with it. */
-export function PowerDrawer({
+export const PowerDrawer = ({
   d,
   power,
   stance,
@@ -186,7 +186,7 @@ export function PowerDrawer({
   onClose: () => void
   onOpenPower: OpenPower
   onOpenUnit: OpenUnit
-}) {
+}) => {
   return (
     <Drawer
       direction="right"
@@ -214,7 +214,7 @@ export function PowerDrawer({
   )
 }
 
-function PowerDetails({
+const PowerDetails = ({
   d,
   power,
   stance,
@@ -234,7 +234,7 @@ function PowerDetails({
   worldId: number | null
   onOpenPower: OpenPower
   onOpenUnit: OpenUnit
-}) {
+}) => {
   const knownLeaders = useKnownHistFigures(
     worldId,
     power.leaders.map((l) => l.hf),

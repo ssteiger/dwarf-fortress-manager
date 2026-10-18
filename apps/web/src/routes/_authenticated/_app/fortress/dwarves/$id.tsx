@@ -33,7 +33,7 @@ interface DwarfSearch {
   tab?: DwarfTab
 }
 
-function DwarfPage() {
+const DwarfPage = () => {
   const { id } = Route.useParams()
   const { tab } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })

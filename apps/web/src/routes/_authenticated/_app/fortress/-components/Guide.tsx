@@ -95,7 +95,7 @@ function useActionRuns() {
   return runs
 }
 
-function RunStatus({ run }: { run: ActionRun }) {
+const RunStatus = ({ run }: { run: ActionRun }) => {
   const [showOutput, setShowOutput] = React.useState(false)
   const age = Date.now() - new Date(run.createdAt).getTime()
   if (run.status === 'pending' || run.status === 'processing')
@@ -154,7 +154,7 @@ function RunStatus({ run }: { run: ActionRun }) {
  * Run a whitelisted DFHack action in the game through the worker, and show how
  * it went. With one-click commands turned off in Settings, offers it to copy.
  */
-export function RunActionButton({ action }: { action: DfhackAction }) {
+export const RunActionButton = ({ action }: { action: DfhackAction }) => {
   const { oneClickActions } = usePreferences()
   const spec: DfhackActionSpec = DFHACK_ACTIONS[action]
   const command = [spec.command, ...spec.args].join(' ')
@@ -182,11 +182,11 @@ export function useActionsToOffer(actions: readonly DfhackAction[] | undefined):
 }
 
 /** Marks what DFHack can fix in one click, unless every fix is on already. */
-export function OneClickMark({ actions }: { actions?: readonly DfhackAction[] }) {
+export const OneClickMark = ({ actions }: { actions?: readonly DfhackAction[] }) => {
   return useActionsToOffer(actions).length ? <ZapIcon className="size-3.5 text-primary" /> : null
 }
 
-function AlreadyOn({ plugin }: { plugin: string }) {
+const AlreadyOn = ({ plugin }: { plugin: string }) => {
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
       <CircleCheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -205,7 +205,7 @@ function AlreadyOn({ plugin }: { plugin: string }) {
   )
 }
 
-function RunAction({ action }: { action: DfhackAction }) {
+const RunAction = ({ action }: { action: DfhackAction }) => {
   const spec: DfhackActionSpec = DFHACK_ACTIONS[action]
   const client = useQueryClient()
   const runs = useActionRuns()
@@ -269,13 +269,13 @@ function RunAction({ action }: { action: DfhackAction }) {
   )
 }
 
-export function CopyCommand({ shortcut }: { shortcut: Shortcut }) {
+export const CopyCommand = ({ shortcut }: { shortcut: Shortcut }) => {
   const running = useRunningPlugin(shortcut.command)
   if (running) return <AlreadyOn plugin={running} />
   return <CopyShortcut shortcut={shortcut} />
 }
 
-function CopyShortcut({ shortcut }: { shortcut: Shortcut }) {
+const CopyShortcut = ({ shortcut }: { shortcut: Shortcut }) => {
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(shortcut.command)
@@ -310,17 +310,17 @@ const STATUS_ICON: Record<AdviceStatus, { Icon: typeof CircleAlertIcon; classNam
   good: { Icon: CircleCheckIcon, className: 'text-emerald-600 dark:text-emerald-400' },
 }
 
-export function GuideStatusIcon({
+export const GuideStatusIcon = ({
   status,
   className,
-}: { status?: AdviceStatus; className?: string }) {
+}: { status?: AdviceStatus; className?: string }) => {
   if (!status) return null
   const { Icon, className: tone } = STATUS_ICON[status]
   return <Icon className={cn('size-4 shrink-0', tone, className)} />
 }
 
 /** The steps as a checklist the player can tick off while doing them in the game. */
-function StepChecklist({ guideKey, steps }: { guideKey: string; steps: string[] }) {
+const StepChecklist = ({ guideKey, steps }: { guideKey: string; steps: string[] }) => {
   const { done, toggle, reset } = useStepProgress(guideKey)
   const count = steps.filter((_, i) => done.includes(i)).length
   return (
@@ -375,7 +375,7 @@ function StepChecklist({ guideKey, steps }: { guideKey: string; steps: string[] 
 }
 
 /** Everything a guide says: why, how to tell, the steps, and what DFHack can do for you. */
-export function GuideBody({
+export const GuideBody = ({
   guide,
   compact = false,
   onNavigate,
@@ -384,7 +384,7 @@ export function GuideBody({
   compact?: boolean
   /** Called when the guide's link is followed, e.g. to close the drawer it sits in. */
   onNavigate?: () => void
-}) {
+}) => {
   const { oneClickActions } = usePreferences()
   return (
     <div className={cn('flex flex-col', compact ? 'gap-3' : 'gap-5')}>
@@ -468,7 +468,7 @@ export function useOpenGuide() {
   return open
 }
 
-export function GuideProvider({ children }: { children: React.ReactNode }) {
+export const GuideProvider = ({ children }: { children: React.ReactNode }) => {
   const [guide, setGuide] = React.useState<Guide | null>(null)
   return (
     <GuideContext.Provider value={setGuide}>
@@ -518,7 +518,7 @@ export function GuideProvider({ children }: { children: React.ReactNode }) {
 }
 
 /** A small "How to fix" link that opens the guide. */
-export function GuideButton({
+export const GuideButton = ({
   guide,
   label = 'How to fix it',
   className,
@@ -526,7 +526,7 @@ export function GuideButton({
   guide: Guide
   label?: string
   className?: string
-}) {
+}) => {
   const open = useOpenGuide()
   return (
     <button

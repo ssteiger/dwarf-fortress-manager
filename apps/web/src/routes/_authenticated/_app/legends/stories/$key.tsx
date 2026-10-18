@@ -20,7 +20,7 @@ import { NarrateButton } from '../-components/Narrator'
 import { useStories, useToldStory } from '../-components/Stories'
 import { EmptyState } from '../../fortress/-components/FortChrome'
 
-function StoryPage() {
+const StoryPage = () => {
   const { key } = Route.useParams()
   const { world } = Route.useSearch()
   return (
@@ -33,7 +33,7 @@ function StoryPage() {
 /** Events shown before "Show all". */
 const RECORD_PREVIEW = 20
 
-function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string }) {
+const StoryBody = ({ worldId, storyKey }: { worldId: number; storyKey: string }) => {
   const story = useToldStory(worldId, storyKey)
   const stories = useStories(worldId)
   const [allEvents, setAllEvents] = React.useState(false)
@@ -169,7 +169,7 @@ function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string })
   )
 }
 
-function CastList({ cast, worldId }: { cast: StoryRef[]; worldId: number }) {
+const CastList = ({ cast, worldId }: { cast: StoryRef[]; worldId: number }) => {
   return (
     <ul className="divide-y">
       {cast.map((ref) => (

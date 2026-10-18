@@ -58,7 +58,7 @@ function groupHits(hits: LegendsHit[]) {
   return [...groups.entries()]
 }
 
-function HitRow({ hit }: { hit: LegendsHit }) {
+const HitRow = ({ hit }: { hit: LegendsHit }) => {
   return (
     <>
       <LegendsSprite subject={hit} size={24} className="shrink-0" />
@@ -79,7 +79,7 @@ function HitRow({ hit }: { hit: LegendsHit }) {
  * Jump to any named record from anywhere in the legends pages. Opens with
  * ⌘K / Ctrl+K; typing two letters searches names across every kind.
  */
-export function QuickSearch({ worldId }: { worldId: number }) {
+export const QuickSearch = ({ worldId }: { worldId: number }) => {
   const navigate = useNavigate()
   const [open, setOpen] = React.useState(false)
   const [q, setQ] = React.useState('')
@@ -203,7 +203,7 @@ export interface PickedRecord {
  * Pick one record of the given kinds by name, for "involving…" filters.
  * Shows the current pick with a clear button.
  */
-export function RecordPicker({
+export const RecordPicker = ({
   worldId,
   kinds,
   value,
@@ -217,7 +217,7 @@ export function RecordPicker({
   onChange: (next: PickedRecord | null) => void
   placeholder: string
   className?: string
-}) {
+}) => {
   const [open, setOpen] = React.useState(false)
   const [q, setQ] = React.useState('')
   const results = useQuickResults(worldId, q, kinds)

@@ -61,7 +61,7 @@ function usePowers(
   }, [d, units, caravans])
 }
 
-function DiplomacyAndWarPage() {
+const DiplomacyAndWarPage = () => {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortDiplomacy()
   const units = useFortUnits()

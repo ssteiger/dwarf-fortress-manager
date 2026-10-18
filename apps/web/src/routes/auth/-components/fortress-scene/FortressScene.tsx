@@ -31,7 +31,7 @@ import {
   workSpots,
 } from './map'
 
-function SceneStyles() {
+const SceneStyles = () => {
   return <link rel="stylesheet" href={sceneCss} precedence="default" />
 }
 
@@ -325,7 +325,7 @@ function useExpedition({
 // ---------------------------------------------------------------------------
 // Pieces
 
-function AnimatedTile({
+const AnimatedTile = ({
   index,
   sheets,
   frames,
@@ -341,7 +341,7 @@ function AnimatedTile({
   interval?: number
   className?: string
   style?: React.CSSProperties
-}) {
+}) => {
   const ref = React.useRef<HTMLCanvasElement>(null)
   React.useEffect(() => {
     const canvas = ref.current
@@ -386,7 +386,7 @@ const DUST = Array.from({ length: 22 }, (_, i) => ({
  * where an expedition goes about its business. Without extracted sprites
  * only the cave light and dust play over a plain backdrop.
  */
-export function FortressScene() {
+export const FortressScene = () => {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const chipLayer = React.useRef<HTMLDivElement>(null)
@@ -627,12 +627,12 @@ const EXPEDITION_AT_THE_EDGE: EdgeDwarf[] = SCENE_DWARVES.map((d) => ({
 }))
 
 /** The expedition wandering along the bottom of the window, unnamed like the artwork. */
-export function ExpeditionEdgeDwarves() {
+export const ExpeditionEdgeDwarves = () => {
   return <EdgeDwarves dwarves={EXPEDITION_AT_THE_EDGE} showNames={false} />
 }
 
 /** The expedition in a row, for small screens where the artwork is hidden. */
-export function DwarfRow({ className }: { className?: string }) {
+export const DwarfRow = ({ className }: { className?: string }) => {
   return (
     <div aria-hidden className={cn('flex items-end gap-1', className)}>
       <SceneStyles />

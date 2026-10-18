@@ -22,7 +22,7 @@ const SECTION_LINES = 8
 type Legends = { worldId: number; known: Set<number> } | null
 
 /** The fortress's book: every season the app knows anything of, newest first, under its year. */
-export function Seasons() {
+export const Seasons = () => {
   const seasons = useFortSeasons()
   const units = useFortUnits().data?.units
   const world = useFortOverview().data?.state?.world
@@ -113,7 +113,7 @@ export function Seasons() {
   )
 }
 
-function SeasonCard({
+const SeasonCard = ({
   season,
   recap,
   current,
@@ -126,7 +126,7 @@ function SeasonCard({
   /** When the worker began reading, for a season before it. */
   startedIn: SeasonRef | null
   legends: Legends
-}) {
+}) => {
   return (
     <section className="flex flex-col gap-4 p-4">
       <div className="flex flex-col gap-1.5">
@@ -157,7 +157,7 @@ function SeasonCard({
   )
 }
 
-function SectionLines({ section, legends }: { section: RecapSection; legends: Legends }) {
+const SectionLines = ({ section, legends }: { section: RecapSection; legends: Legends }) => {
   const [all, setAll] = React.useState(false)
   const folded = !all && section.lines.length > SECTION_LINES + 2
   const shown = folded ? section.lines.slice(0, SECTION_LINES) : section.lines

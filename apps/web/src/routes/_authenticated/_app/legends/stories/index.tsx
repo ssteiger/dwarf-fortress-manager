@@ -12,7 +12,7 @@ import {
 } from '../-components/LegendsChrome'
 import { FeaturedStory, StoryCard, featuredStories, useStories } from '../-components/Stories'
 
-function StoriesPage() {
+const StoriesPage = () => {
   const { world } = Route.useSearch()
   return (
     <LegendsShell section="stories" world={world}>
@@ -23,7 +23,7 @@ function StoriesPage() {
   )
 }
 
-function StoriesBody({ worldId, civId }: { worldId: number; civId: number | null }) {
+const StoriesBody = ({ worldId, civId }: { worldId: number; civId: number | null }) => {
   const stories = useStories(worldId)
   const featured = React.useMemo(() => featuredStories(stories.data, civId), [stories.data, civId])
 
@@ -68,7 +68,7 @@ function StoriesBody({ worldId, civId }: { worldId: number; civId: number | null
 
 const GROUP_PREVIEW = 3
 
-function StoryGroupSection({
+const StoryGroupSection = ({
   group,
   names,
   worldId,
@@ -76,7 +76,7 @@ function StoryGroupSection({
   group: StoryGroup
   names: Stories['names']
   worldId: number
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const shown = all ? group.stories : group.stories.slice(0, GROUP_PREVIEW)
   return (

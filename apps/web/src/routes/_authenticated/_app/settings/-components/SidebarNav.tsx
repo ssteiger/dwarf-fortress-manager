@@ -9,7 +9,7 @@ export interface SettingsNavItem {
   icon: LucideIcon
 }
 
-export function SidebarNav({ items }: { items: SettingsNavItem[] }) {
+export const SidebarNav = ({ items }: { items: SettingsNavItem[] }) => {
   const pathname = useLocation({ select: (l) => l.pathname.replace(/\/+$/, '') })
   return (
     <nav

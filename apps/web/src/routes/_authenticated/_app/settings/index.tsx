@@ -43,7 +43,7 @@ function useSystemReducedMotion() {
   return reduced
 }
 
-function GeneralSettingsPage() {
+const GeneralSettingsPage = () => {
   const theme = useTheme()
   const prefs = usePreferences()
   const systemReduced = useSystemReducedMotion()

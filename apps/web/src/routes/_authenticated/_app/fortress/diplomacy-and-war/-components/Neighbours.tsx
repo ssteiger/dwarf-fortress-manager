@@ -44,7 +44,7 @@ export function holdingsText(power: FortPower): string {
 }
 
 /** Every power the page lists, nearest first, with its stance and who of it is here. */
-export function Neighbours({
+export const Neighbours = ({
   d,
   powers,
   stances,
@@ -64,7 +64,7 @@ export function Neighbours({
   onShowDistant: (value: boolean) => void
   distantCount: number
   onOpen: OpenPower
-}) {
+}) => {
   const [filter, setFilter] = React.useState<Filter>('all')
   const counts = Object.fromEntries(
     (Object.keys(FILTERS) as Filter[]).map((key) => [
@@ -146,7 +146,7 @@ export function Neighbours({
   )
 }
 
-function NeighbourRow({
+const NeighbourRow = ({
   d,
   power,
   stance,
@@ -160,7 +160,7 @@ function NeighbourRow({
   here: FortUnit[]
   caravans: FortCaravan[]
   onOpen: OpenPower
-}) {
+}) => {
   const war =
     stance.hostile && power.war_id != null ? d.wars.find((w) => w.id === power.war_id) : undefined
   const behaviour = power.behaviour.filter((flag) => BEHAVIOUR[flag])

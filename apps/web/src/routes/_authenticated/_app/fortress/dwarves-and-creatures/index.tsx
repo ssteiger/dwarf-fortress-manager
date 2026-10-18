@@ -22,7 +22,7 @@ function onTheMap(units: FortUnit[]): string {
   return `${living.length.toLocaleString()} on the map${list ? `: ${list}` : ''}`
 }
 
-function DwarvesAndCreaturesPage() {
+const DwarvesAndCreaturesPage = () => {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortUnits()
   const [selected, setSelected] = React.useState<FortUnit | null>(null)

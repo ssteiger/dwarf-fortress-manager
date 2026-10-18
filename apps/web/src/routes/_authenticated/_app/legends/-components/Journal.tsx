@@ -66,7 +66,7 @@ export function splitTags(line: string): string[] {
  * Note editor shared by the pin popover and the journal page. Saves on
  * demand; the parent decides what "saved" and "removed" mean.
  */
-export function NoteEditor({
+export const NoteEditor = ({
   note,
   tags,
   saving,
@@ -82,7 +82,7 @@ export function NoteEditor({
   onRemove?: () => void
   autoFocus?: boolean
   compact?: boolean
-}) {
+}) => {
   const [text, setText] = React.useState(note)
   const [tagLine, setTagLine] = React.useState(tags.join(', '))
   React.useEffect(() => setText(note), [note])
@@ -140,7 +140,7 @@ export function NoteEditor({
  * Pin anything to the journal. Filled when pinned; opens a small editor for
  * the note and tags. `target.title` is what the journal will show.
  */
-export function PinButton({
+export const PinButton = ({
   worldId,
   target,
   className,
@@ -153,7 +153,7 @@ export function PinButton({
   size?: 'icon' | 'sm'
   /** Visible text beside the icon, for prominent placements. */
   label?: string
-}) {
+}) => {
   const journal = useJournal(worldId)
   const { save, remove } = useJournalMutations(worldId)
   const existing = findNote(journal.data, target)

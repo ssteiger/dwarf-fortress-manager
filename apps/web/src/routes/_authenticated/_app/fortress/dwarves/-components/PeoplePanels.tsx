@@ -21,7 +21,7 @@ import { ConcernBadges, type OpenUnit, UnitChip } from '../../-components/Insigh
 
 const SEVERITY_ORDER: Record<Concern['severity'], number> = { danger: 0, warning: 1, info: 2 }
 
-function ShowAll({ hidden, onClick }: { hidden: number; onClick: () => void }) {
+const ShowAll = ({ hidden, onClick }: { hidden: number; onClick: () => void }) => {
   if (hidden <= 0) return null
   return (
     <Button
@@ -56,7 +56,7 @@ function firstSentence(text: string): string {
 }
 
 /** Citizens with a need, a wound, a dark mood or nothing to do, the worst first. */
-export function HelpList({ entries, onOpen }: { entries: HelpEntry[]; onOpen: OpenUnit }) {
+export const HelpList = ({ entries, onOpen }: { entries: HelpEntry[]; onOpen: OpenUnit }) => {
   const [all, setAll] = React.useState(false)
   const shown = capped(entries, HELP_SHOWN, all)
   return (
@@ -123,7 +123,7 @@ export function HelpList({ entries, onOpen }: { entries: HelpEntry[]; onOpen: Op
 const STRIP_SHOWN = 5
 
 /** The worst few of `HelpList`, in a row, for the overview; each opens the dwarf's page. */
-export function HelpStrip({ entries, className }: { entries: HelpEntry[]; className?: string }) {
+export const HelpStrip = ({ entries, className }: { entries: HelpEntry[]; className?: string }) => {
   const shown = entries.slice(0, STRIP_SHOWN)
   return (
     <Section
@@ -264,7 +264,7 @@ function workGroups(citizens: FortUnit[]): WorkGroup[] {
   return groups
 }
 
-export function WorkGroups({ citizens, onOpen }: { citizens: FortUnit[]; onOpen: OpenUnit }) {
+export const WorkGroups = ({ citizens, onOpen }: { citizens: FortUnit[]; onOpen: OpenUnit }) => {
   const groups = React.useMemo(() => workGroups(citizens), [citizens])
   const idle = citizens.filter(isIdle).length
   return (
@@ -327,7 +327,7 @@ export function WorkGroups({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
 // Squads
 
 /** Each squad's alert routine, orders, uniform and who serves in it. */
-export function Squads({
+export const Squads = ({
   squads,
   units,
   onOpen,
@@ -335,7 +335,7 @@ export function Squads({
   squads: FortSquad[]
   units: FortUnit[]
   onOpen: OpenUnit
-}) {
+}) => {
   const byId = React.useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
   if (!squads.length) return null
   return (
@@ -476,7 +476,7 @@ function ratingOf(unit: FortUnit, token: string): number | null {
   return skill ? skill[1] : null
 }
 
-export function SkillCoverage({
+export const SkillCoverage = ({
   citizens,
   wasted,
   loading,
@@ -486,7 +486,7 @@ export function SkillCoverage({
   wasted: FortWastedTalent[]
   loading: boolean
   onOpen: OpenUnit
-}) {
+}) => {
   const [allWasted, setAllWasted] = React.useState(false)
   const adults = React.useMemo(() => citizens.filter(isGrownCitizen), [citizens])
   const byId = React.useMemo(() => new Map(citizens.map((unit) => [unit.id, unit])), [citizens])
@@ -686,7 +686,7 @@ function pairs(
   return [...rows.values()].sort((x, y) => x.rank - y.rank)
 }
 
-function BondColumn({
+const BondColumn = ({
   title,
   count,
   empty,
@@ -702,7 +702,7 @@ function BondColumn({
   children: React.ReactNode
   hidden: number
   onShowAll: () => void
-}) {
+}) => {
   return (
     <section className="flex min-w-0 flex-col">
       <h3 className="flex items-baseline gap-2 pb-2 text-sm font-medium">
@@ -720,7 +720,7 @@ function BondColumn({
   )
 }
 
-export function Bonds({
+export const Bonds = ({
   citizens,
   bonds,
   loading,
@@ -730,7 +730,7 @@ export function Bonds({
   bonds: FortBond[]
   loading: boolean
   onOpen: OpenUnit
-}) {
+}) => {
   const [open, setOpen] = React.useState({ family: false, friends: false, foes: false })
   const byId = React.useMemo(() => new Map(citizens.map((unit) => [unit.id, unit])), [citizens])
   const families = React.useMemo(() => households(bonds, byId), [bonds, byId])

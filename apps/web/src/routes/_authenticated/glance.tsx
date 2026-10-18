@@ -44,7 +44,7 @@ const MAX_STRUGGLING = 5
 const MAX_WARNINGS = 4
 const MAX_CHRONICLE = 8
 
-function GlancePage() {
+const GlancePage = () => {
   usePreferencesSync()
   const overview = useFortOverview()
   const unitsQuery = useFortUnits()
@@ -101,7 +101,7 @@ function GlancePage() {
   )
 }
 
-function Header({ state }: { state: FortState | null }) {
+const Header = ({ state }: { state: FortState | null }) => {
   useTick(5000)
   const failing = useFailingFortReads()
   const world = state?.world ?? null
@@ -140,7 +140,7 @@ function Header({ state }: { state: FortState | null }) {
   )
 }
 
-function GameStatus({ state }: { state: FortState }) {
+const GameStatus = ({ state }: { state: FortState }) => {
   if (state.status === 'live')
     return (
       <span className="inline-flex items-center gap-1">
@@ -163,7 +163,7 @@ function GameStatus({ state }: { state: FortState }) {
   )
 }
 
-function Heading({ children, count }: { children: React.ReactNode; count?: number }) {
+const Heading = ({ children, count }: { children: React.ReactNode; count?: number }) => {
   return (
     <h2 className="mb-1 flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
       {children}
@@ -172,7 +172,7 @@ function Heading({ children, count }: { children: React.ReactNode; count?: numbe
   )
 }
 
-function Urgent({ notices }: { notices: Notice[] }) {
+const Urgent = ({ notices }: { notices: Notice[] }) => {
   const top = notices[0]
   if (!top)
     return (
@@ -209,7 +209,7 @@ function troubles(unit: FortUnit): string[] {
   return out
 }
 
-function Watched({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<number> }) {
+const Watched = ({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<number> }) => {
   const shown = units.filter((u) => watched.has(u.id) && isLiving(u))
   if (!shown.length)
     return watched.size ? null : (
@@ -259,7 +259,7 @@ function Watched({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<n
   )
 }
 
-function Struggling({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<number> }) {
+const Struggling = ({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<number> }) => {
   const struggling = units
     .filter(
       (u) =>
@@ -297,7 +297,7 @@ function Struggling({ units, watched }: { units: FortUnit[]; watched: ReadonlySe
   )
 }
 
-function Warnings({ notices }: { notices: Notice[] }) {
+const Warnings = ({ notices }: { notices: Notice[] }) => {
   if (!notices.length) return null
   return (
     <section className="shrink-0 px-3 py-2">
@@ -331,7 +331,7 @@ function Warnings({ notices }: { notices: Notice[] }) {
   )
 }
 
-function Chronicle({ events }: { events: FortEvent[] }) {
+const Chronicle = ({ events }: { events: FortEvent[] }) => {
   const story = events
     .filter((e) => STORY_KINDS[storyKind(e)].story)
     .sort((a, b) => b.id - a.id)

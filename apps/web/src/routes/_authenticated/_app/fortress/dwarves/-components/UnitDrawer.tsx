@@ -22,7 +22,7 @@ import { DwarfDetails, type DwarfTab } from './DwarfDetails'
 import { UnitLinks, legendsRefFor, useFortLegendsWorldId, useKnownHistFigures } from './UnitLinks'
 
 /** A unit's details beside the list they were opened from, with the way to their full page. */
-export function UnitDrawer({ unit, onClose }: { unit: FortUnit | null; onClose: () => void }) {
+export const UnitDrawer = ({ unit, onClose }: { unit: FortUnit | null; onClose: () => void }) => {
   const [tab, setTab] = React.useState<DwarfTab>('overview')
   const legendsWorldId = useFortLegendsWorldId()
   const knownFigures = useKnownHistFigures(legendsWorldId, [unit?.hist_figure_id ?? -1])

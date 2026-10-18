@@ -26,7 +26,7 @@ const GROUPS: { key: PeopleGroup; title: string; empty: string; description?: st
 
 const SHOWN = 8
 
-export function PeopleTab({
+export const PeopleTab = ({
   unit,
   units,
   compact,
@@ -34,7 +34,7 @@ export function PeopleTab({
   unit: FortUnit
   units: Map<number, FortUnit>
   compact?: boolean
-}) {
+}) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   if (!sheet) return <SheetMissing what="Family, friends, grudges and the groups they belong to" />
   const rels = relations(sheet)
@@ -75,7 +75,7 @@ export function PeopleTab({
   )
 }
 
-function PeopleSection({
+const PeopleSection = ({
   title,
   description,
   empty,
@@ -89,7 +89,7 @@ function PeopleSection({
   list: Relation[]
   units: Map<number, FortUnit>
   race: string
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const shown = all ? list : list.slice(0, SHOWN)
   return (
@@ -127,7 +127,7 @@ function PeopleSection({
   )
 }
 
-function PersonRow({
+const PersonRow = ({
   relation,
   units,
   race,
@@ -135,7 +135,7 @@ function PersonRow({
   relation: Relation
   units: Map<number, FortUnit>
   race: string
-}) {
+}) => {
   const { person, label, detail, tone } = relation
   const known = person.kind === 'known'
   const feelings = known

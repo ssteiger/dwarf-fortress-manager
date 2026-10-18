@@ -29,7 +29,7 @@ export function mapRadius(powers: FortPower[]): number {
 }
 
 /** The fortress at the centre, every listed holding around it, north up. */
-export function NeighbourMap({
+export const NeighbourMap = ({
   powers,
   stances,
   selectedId,
@@ -39,7 +39,7 @@ export function NeighbourMap({
   stances: Map<number, Stance>
   selectedId: number | null
   onOpen: OpenPower
-}) {
+}) => {
   const R = mapRadius(powers)
   const pad = R * 0.12
   const span = 2 * (R + pad)

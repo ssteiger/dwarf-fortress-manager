@@ -40,7 +40,7 @@ interface WorldSearch {
 
 type Panel = 'year' | 'civs' | 'land'
 
-function WorldPage() {
+const WorldPage = () => {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   return (
@@ -62,7 +62,7 @@ function WorldPage() {
   )
 }
 
-function WorldBody({
+const WorldBody = ({
   worldId,
   summary,
   counts,
@@ -78,7 +78,7 @@ function WorldBody({
   onYear: (year: number | undefined) => void
   civ: number | null
   onCiv: (civ: number | null) => void
-}) {
+}) => {
   const navigate = useNavigate()
   const assets = useDfAssets()
   const [panel, setPanel] = React.useState<Panel>('year')
@@ -514,7 +514,7 @@ function WorldBody({
   )
 }
 
-function PanelHeading({
+const PanelHeading = ({
   title,
   description,
   action,
@@ -522,7 +522,7 @@ function PanelHeading({
   title?: string
   description: string
   action?: React.ReactNode
-}) {
+}) => {
   return (
     <div className="mb-3 flex items-start justify-between gap-3">
       <div>

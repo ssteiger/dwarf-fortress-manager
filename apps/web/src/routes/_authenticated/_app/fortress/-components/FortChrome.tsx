@@ -43,7 +43,7 @@ import { STRESS_CLASSES, isLiving, stressLabel, unitNeeds } from '~/lib/fortress
 import { firstName } from '~/lib/fortress/people/units'
 
 /** Title row shared by every fortress page. */
-export function PageHeader({
+export const PageHeader = ({
   title,
   description,
   updatedAt,
@@ -59,7 +59,7 @@ export function PageHeader({
   onRefresh?: () => void
   actions?: React.ReactNode
   className?: string
-}) {
+}) => {
   useTick(1000)
   const updatedLabel = updatedAt
     ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true })
@@ -96,7 +96,7 @@ export function PageHeader({
  * What stands between the page and a fresh read: reads the app could not
  * make, a dump in a format it does not know, a game it cannot reach.
  */
-export function StatusBanner({ state }: { state: FortState | null | undefined }) {
+export const StatusBanner = ({ state }: { state: FortState | null | undefined }) => {
   useTick(5000)
   const failing = useFailingFortReads()
   return (
@@ -109,7 +109,7 @@ export function StatusBanner({ state }: { state: FortState | null | undefined })
 }
 
 /** `StatusBanner` as a band of a flat page; gone when there is nothing to say. */
-export function StatusBand({ state }: { state: FortState | null | undefined }) {
+export const StatusBand = ({ state }: { state: FortState | null | undefined }) => {
   return (
     <div className="flex flex-col gap-3 border-b p-4 empty:hidden">
       <StatusBanner state={state} />
@@ -143,7 +143,7 @@ const READ_NAMES: Record<string, string> = {
   work: 'the work',
 }
 
-function ReadProblems({ failing }: { failing: FailingRead[] }) {
+const ReadProblems = ({ failing }: { failing: FailingRead[] }) => {
   const client = useQueryClient()
   const [retrying, setRetrying] = React.useState(false)
   const what = [
@@ -194,7 +194,7 @@ function listWords(words: string[]): string {
 }
 
 /** A dump written by a game script older or newer than this app. */
-function VersionNotice() {
+const VersionNotice = () => {
   const version = useLastDumpState()?.dumpVersion ?? null
   if (version === null || version === DUMP_VERSION) return null
   return (
@@ -224,7 +224,7 @@ function VersionNotice() {
   )
 }
 
-function GameStatus({ state }: { state: FortState | null | undefined }) {
+const GameStatus = ({ state }: { state: FortState | null | undefined }) => {
   if (!state) {
     return (
       <Alert>
@@ -269,7 +269,7 @@ function GameStatus({ state }: { state: FortState | null | undefined }) {
  * A part of a page that fails to render says so in its place while the rest
  * of the page stays, and tries again when the next dump lands.
  */
-export function SectionBoundary({
+export const SectionBoundary = ({
   name,
   className,
   children,
@@ -278,7 +278,7 @@ export function SectionBoundary({
   /** Wraps the error in its place, for a part that brings its own padding. */
   className?: string
   children: React.ReactNode
-}) {
+}) => {
   const dumpAt = useLastDumpState()?.dumpCapturedAt ?? ''
   return (
     <CatchBoundary
@@ -307,11 +307,11 @@ export function SectionBoundary({
   )
 }
 
-export function FortBreadcrumbs({
+export const FortBreadcrumbs = ({
   items,
 }: {
   items: { label: string; to?: string }[]
-}) {
+}) => {
   return (
     <Breadcrumb>
       <BreadcrumbList>
@@ -334,7 +334,7 @@ export function FortBreadcrumbs({
   )
 }
 
-export function UnitConditionBadges({ unit }: { unit: FortUnit }) {
+export const UnitConditionBadges = ({ unit }: { unit: FortUnit }) => {
   const needs = unitNeeds(unit)
   const living = isLiving(unit)
   return (
@@ -365,7 +365,7 @@ export function UnitConditionBadges({ unit }: { unit: FortUnit }) {
 }
 
 /** Pins a creature to the watch list, or takes them off it. */
-export function WatchButton({ unit, size = 'sm' }: { unit: FortUnit; size?: 'sm' | 'icon' }) {
+export const WatchButton = ({ unit, size = 'sm' }: { unit: FortUnit; size?: 'sm' | 'icon' }) => {
   const { ids, toggle, fortKey } = useWatchList()
   if (!fortKey) return null
   const watching = ids.has(unit.id)
@@ -388,7 +388,7 @@ export function WatchButton({ unit, size = 'sm' }: { unit: FortUnit; size?: 'sm'
   )
 }
 
-export function MoodBadge({ category, className }: { category: number; className?: string }) {
+export const MoodBadge = ({ category, className }: { category: number; className?: string }) => {
   const clamped = Math.min(Math.max(category, 0), 6)
   return (
     <Badge className={cn('border-transparent capitalize', STRESS_CLASSES[clamped], className)}>
@@ -398,7 +398,7 @@ export function MoodBadge({ category, className }: { category: number; className
 }
 
 /** One cell of a `Stats` strip: label, big number, the detail beneath it. */
-export function Reading({
+export const Reading = ({
   title,
   value,
   hint,
@@ -412,7 +412,7 @@ export function Reading({
   Icon?: React.ComponentType<{ className?: string }>
   accentClassName?: string
   children?: React.ReactNode
-}) {
+}) => {
   return (
     <Stat className="justify-start">
       <StatTitle className="flex items-center gap-1.5">
@@ -426,7 +426,7 @@ export function Reading({
   )
 }
 
-export function EmptyState({
+export const EmptyState = ({
   title,
   children,
   className,
@@ -434,7 +434,7 @@ export function EmptyState({
   title: string
   children?: React.ReactNode
   className?: string
-}) {
+}) => {
   return (
     <div className={cn('rounded-xl border border-dashed p-10 text-center', className)}>
       <div className="font-medium">{title}</div>

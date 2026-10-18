@@ -109,7 +109,7 @@ export function useUnitCommands(unitId: number) {
   return { runs, queue, latest }
 }
 
-function RunLine({ run }: { run: UnitCommandRun }) {
+const RunLine = ({ run }: { run: UnitCommandRun }) => {
   const age = Date.now() - new Date(run.createdAt).getTime()
   if (run.status === 'pending' || run.status === 'processing')
     return (
@@ -142,13 +142,13 @@ function RunLine({ run }: { run: UnitCommandRun }) {
 }
 
 /** Centres the game on them. Renders nothing for units off the map. */
-export function ShowInGameButton({
+export const ShowInGameButton = ({
   unit,
   size = 'sm',
 }: {
   unit: FortUnit
   size?: 'sm' | 'icon'
-}) {
+}) => {
   const { oneClickActions } = usePreferences()
   const { queue, latest } = useUnitCommands(unit.id)
   if (unit.x === null) return null
@@ -192,7 +192,7 @@ export function ShowInGameButton({
   )
 }
 
-function NameEditor({
+const NameEditor = ({
   unit,
   action,
   label,
@@ -206,7 +206,7 @@ function NameEditor({
   current: string | null
   placeholder: string
   hint: React.ReactNode
-}) {
+}) => {
   const { oneClickActions } = usePreferences()
   const { queue, latest } = useUnitCommands(unit.id)
   const [draft, setDraft] = React.useState(current ?? '')
@@ -261,7 +261,10 @@ const CHEAT_ICONS: Record<'calm' | 'fillneeds' | 'heal', typeof SunIcon> = {
   heal: HeartPulseIcon,
 }
 
-function CheatButton({ unit, action }: { unit: FortUnit; action: 'calm' | 'fillneeds' | 'heal' }) {
+const CheatButton = ({
+  unit,
+  action,
+}: { unit: FortUnit; action: 'calm' | 'fillneeds' | 'heal' }) => {
   const spec = UNIT_ACTIONS[action]
   const { oneClickActions } = usePreferences()
   const { queue, latest } = useUnitCommands(unit.id)
@@ -312,7 +315,7 @@ function CheatButton({ unit, action }: { unit: FortUnit; action: 'calm' | 'filln
 }
 
 /** One trouble, with its step-by-step guide folded underneath. */
-export function ConcernRow({ concern, unit }: { concern: Concern; unit: FortUnit }) {
+export const ConcernRow = ({ concern, unit }: { concern: Concern; unit: FortUnit }) => {
   const [open, setOpen] = React.useState(false)
   const guide = React.useMemo(() => concernGuide(concern, unit), [concern, unit])
   return (
@@ -353,7 +356,7 @@ export function ConcernRow({ concern, unit }: { concern: Concern; unit: FortUnit
   )
 }
 
-export function ActionsTab({ unit, compact }: { unit: FortUnit; compact?: boolean }) {
+export const ActionsTab = ({ unit, compact }: { unit: FortUnit; compact?: boolean }) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const living = isLiving(unit)
   const ours = living && unit.flags.includes('fort_controlled')

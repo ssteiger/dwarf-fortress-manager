@@ -113,7 +113,7 @@ function buildingLabel(b: FortBuilding): string {
   return splitPascal(b.type)
 }
 
-function WorkPage() {
+const WorkPage = () => {
   const { tab = 'checklist' } = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const overview = useFortOverview()
@@ -412,7 +412,7 @@ function WorkPage() {
             }}
             className="gap-0"
           >
-            <div className="sticky top-0 z-20 border-b bg-background px-4 py-3">
+            <div className="border-b px-4 py-3">
               <TabsList className="h-auto flex-wrap">
                 {TABS.map(({ key, label, icon: Icon }) => (
                   <TabsTrigger key={key} value={key} className="gap-1.5">
@@ -660,7 +660,7 @@ function WorkPage() {
   )
 }
 
-function SeasonIcon({ season }: { season: string }) {
+const SeasonIcon = ({ season }: { season: string }) => {
   const Icon =
     season === 'spring'
       ? SproutIcon
@@ -677,7 +677,7 @@ function stockpileLabel(b: FortBuilding): string {
   return b.name || b.custom || 'Unnamed stockpile'
 }
 
-function BuildingTable({
+const BuildingTable = ({
   title,
   buildings,
   showJobs,
@@ -691,7 +691,7 @@ function BuildingTable({
   showItems: boolean
   unitNames: Map<number, string>
   labelOf?: (building: FortBuilding) => string
-}) {
+}) => {
   const grouped = React.useMemo<BuildingGroup[]>(() => {
     const m = new Map<string, FortBuilding[]>()
     for (const b of buildings) {

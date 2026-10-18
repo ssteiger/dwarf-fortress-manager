@@ -72,7 +72,7 @@ const STATUS_STYLE: Record<
   },
 }
 
-export function StatusIcon({ status, className }: { status: AdviceStatus; className?: string }) {
+export const StatusIcon = ({ status, className }: { status: AdviceStatus; className?: string }) => {
   const { Icon, icon } = STATUS_STYLE[status]
   return (
     <Icon
@@ -82,7 +82,7 @@ export function StatusIcon({ status, className }: { status: AdviceStatus; classN
   )
 }
 
-function OneClickHint({ actions }: { actions?: readonly DfhackAction[] }) {
+const OneClickHint = ({ actions }: { actions?: readonly DfhackAction[] }) => {
   const count = useActionsToOffer(actions).length
   if (!count) return null
   return (
@@ -94,7 +94,7 @@ function OneClickHint({ actions }: { actions?: readonly DfhackAction[] }) {
 }
 
 /** One piece of advice: what the dump shows. Click for the step-by-step guide. */
-export function AdviceCard({ advice }: { advice: Advice }) {
+export const AdviceCard = ({ advice }: { advice: Advice }) => {
   const open = useOpenGuide()
   const style = STATUS_STYLE[advice.status]
   const AreaIcon = AREA_ICON[advice.area]
@@ -149,7 +149,7 @@ export function AdviceCard({ advice }: { advice: Advice }) {
 }
 
 /** Problems first, then what needs attention. */
-export function NextSteps({ advice, max = 8 }: { advice: Advice[]; max?: number }) {
+export const NextSteps = ({ advice, max = 8 }: { advice: Advice[]; max?: number }) => {
   const [all, setAll] = React.useState(false)
   const todo = advice.filter((a) => a.status !== 'good')
   const shown = all ? todo : todo.slice(0, max)
@@ -177,7 +177,7 @@ export function NextSteps({ advice, max = 8 }: { advice: Advice[]; max?: number 
 }
 
 /** The checks that already pass, by area, one line each. */
-export function FineChecks({ advice }: { advice: Advice[] }) {
+export const FineChecks = ({ advice }: { advice: Advice[] }) => {
   const open = useOpenGuide()
   const fine = advice
     .filter((a) => a.status === 'good')
@@ -211,7 +211,7 @@ export function FineChecks({ advice }: { advice: Advice[] }) {
 // ---------------------------------------------------------------------------
 // Situations
 
-export function SituationList({ situations }: { situations: Situation[] }) {
+export const SituationList = ({ situations }: { situations: Situation[] }) => {
   const active = situations.filter((s) => s.now)
   const rest = situations.filter((s) => !s.now)
   return (
@@ -248,7 +248,7 @@ export function SituationList({ situations }: { situations: Situation[] }) {
   )
 }
 
-function SituationRow({ situation }: { situation: Situation }) {
+const SituationRow = ({ situation }: { situation: Situation }) => {
   const open = useOpenGuide()
   const active = Boolean(situation.now)
   return (
@@ -289,7 +289,7 @@ const QUEUE_COLUMNS =
 const QUEUE_WORKERS_SHOWN = 6
 
 /** Every kind of queued job in one row: how many, how many being worked or stuck, and by whom. */
-export function JobQueueList({ groups, advice }: { groups: JobGroup[]; advice: Advice[] }) {
+export const JobQueueList = ({ groups, advice }: { groups: JobGroup[]; advice: Advice[] }) => {
   const open = useOpenGuide()
   const max = Math.max(1, ...groups.map((g) => g.total))
   if (!groups.length) return <p className="text-sm text-muted-foreground">Nothing is queued.</p>
@@ -388,7 +388,7 @@ export function JobQueueList({ groups, advice }: { groups: JobGroup[]; advice: A
   )
 }
 
-export function WorkshopList({
+export const WorkshopList = ({
   rows,
   idle,
   max = 10,
@@ -396,7 +396,7 @@ export function WorkshopList({
   rows: WorkshopRow[]
   idle: FortUnit[]
   max?: number
-}) {
+}) => {
   const open = useOpenGuide()
   const [all, setAll] = React.useState(false)
   const shown = all ? rows : rows.slice(0, max)

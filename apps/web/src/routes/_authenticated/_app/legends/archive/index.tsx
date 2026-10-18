@@ -142,7 +142,7 @@ function defaultSorting(tabKey: string): SortingState {
   return tabKey === 'figures' ? [{ id: 'events', desc: true }] : [{ id: 'name', desc: false }]
 }
 
-function ArchivePage() {
+const ArchivePage = () => {
   const search = Route.useSearch()
   const navigate = useNavigate({ from: Route.fullPath })
   const setSearch = (patch: Partial<ArchiveSearch>, replace = false) =>
@@ -242,7 +242,7 @@ interface Facets {
   to?: number
 }
 
-function RecordsArchive({
+const RecordsArchive = ({
   worldId,
   summary,
   archive,
@@ -262,7 +262,7 @@ function RecordsArchive({
   onQuery: (q: string) => void
   onType: (type: string[]) => void
   onFacets: (patch: Partial<Facets>) => void
-}) {
+}) => {
   const tab = BROWSE_TABS.find((t) => t.key === archive) ?? BROWSE_TABS[0]
   const [search, setSearchText] = React.useState(q)
   const [debounced, setDebounced] = React.useState(q)
@@ -424,8 +424,8 @@ function RecordsArchive({
           ) : null}
         </div>
       ) : null}
-      {/* As tall as the window below the app header and the sticky section nav (4rem + border). */}
-      <div className="flex h-[calc(100svh-7rem-1px)] shrink-0 flex-col">
+      {/* As tall as the window below the app header; the page scrolls past the filters to it. */}
+      <div className="flex h-[calc(100svh-3rem)] shrink-0 flex-col">
         <DataTable
           fill
           data={results.data?.rows ?? []}

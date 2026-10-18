@@ -20,7 +20,7 @@ import type { FixNote, FixStep } from '~/lib/fortress/advice/fixes'
 import { getFortFixes } from '~/lib/fortress/server/work'
 
 /** Opens the work orders that make what the stuck jobs lack, one step at a time. */
-export function FixStepsButton() {
+export const FixStepsButton = () => {
   const [open, setOpen] = React.useState(false)
   return (
     <Drawer direction="right" open={open} onOpenChange={setOpen}>
@@ -53,7 +53,7 @@ export function FixStepsButton() {
   )
 }
 
-function FixPlan() {
+const FixPlan = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['fort', 'fixes'],
     queryFn: () => getFortFixes(),
@@ -92,7 +92,7 @@ function FixPlan() {
   )
 }
 
-function StepItem({ step, number }: { step: FixStep; number: number }) {
+const StepItem = ({ step, number }: { step: FixStep; number: number }) => {
   return (
     <li className="flex gap-3">
       <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold tabular-nums">
@@ -122,7 +122,7 @@ function StepItem({ step, number }: { step: FixStep; number: number }) {
   )
 }
 
-function Notes({ notes }: { notes: FixNote[] }) {
+const Notes = ({ notes }: { notes: FixNote[] }) => {
   return (
     <section className="flex flex-col gap-3 border-t pt-4">
       <h3 className="text-sm font-medium">What a work order would not fix</h3>

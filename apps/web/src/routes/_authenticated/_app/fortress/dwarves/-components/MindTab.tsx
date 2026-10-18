@@ -43,7 +43,7 @@ function focusStanding(focus: number) {
   return 'danger' as const
 }
 
-export function MindTab({
+export const MindTab = ({
   unit,
   now,
   compact,
@@ -51,7 +51,7 @@ export function MindTab({
   unit: FortUnit
   now: GameTime | null
   compact?: boolean
-}) {
+}) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const noMind = unit.traits == null && unit.values == null && unit.thoughts == null
   return (
@@ -87,7 +87,7 @@ export function MindTab({
   )
 }
 
-function NeedsSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
+const NeedsSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) => {
   if (!sheet.needs.length) return null
   const focus = sheet.focus
   const unmet = sheet.needs.filter((n) => n[1] < -999).length
@@ -148,7 +148,7 @@ function NeedsSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
   )
 }
 
-function PersonalitySection({ unit }: { unit: FortUnit }) {
+const PersonalitySection = ({ unit }: { unit: FortUnit }) => {
   const traits = unit.traits ?? []
   const values = unit.values ?? []
   if (!traits.length && !values.length) return null
@@ -218,7 +218,7 @@ function PersonalitySection({ unit }: { unit: FortUnit }) {
   )
 }
 
-function DrivesSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
+const DrivesSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) => {
   const religions = sheet.groups.filter(
     ([, type, link]) => type === 'Religion' && !/^FORMER/.test(link),
   )
@@ -256,7 +256,7 @@ function DrivesSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
   )
 }
 
-function LikesSection({ sheet }: { sheet: UnitSheet }) {
+const LikesSection = ({ sheet }: { sheet: UnitSheet }) => {
   const groups = preferenceGroups(sheet)
   if (!groups.length) return null
   return (
@@ -286,7 +286,7 @@ function LikesSection({ sheet }: { sheet: UnitSheet }) {
   )
 }
 
-function MemoriesSection({
+const MemoriesSection = ({
   unit,
   sheet,
   now,
@@ -294,7 +294,7 @@ function MemoriesSection({
   unit: FortUnit
   sheet: UnitSheet
   now: GameTime | null
-}) {
+}) => {
   const memories = sheet.memories ?? []
   const core = sheet.core_memories ?? []
   if (!memories.length && !core.length) return null
@@ -337,7 +337,7 @@ function MemoriesSection({
   )
 }
 
-function MemoryList({
+const MemoryList = ({
   label,
   memories,
   now,
@@ -345,7 +345,7 @@ function MemoryList({
   label: string
   memories: NonNullable<UnitSheet['memories']>
   now: GameTime | null
-}) {
+}) => {
   if (!memories.length) return null
   return (
     <div>
@@ -364,7 +364,7 @@ function MemoryList({
   )
 }
 
-export function ThoughtRow({
+export const ThoughtRow = ({
   thought,
   now,
   hideHint,
@@ -372,7 +372,7 @@ export function ThoughtRow({
   thought: [string, string, number, number, number]
   now: GameTime | null
   hideHint?: boolean
-}) {
+}) => {
   const [name, emotion, , year, tick] = thought
   const tone = emotionTone(emotion)
   const phrase = thoughtPhrase(name, emotion)

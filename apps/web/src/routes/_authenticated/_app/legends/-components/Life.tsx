@@ -8,7 +8,7 @@ import { Section, Telling } from './LegendsChrome'
 import { NarrateButton } from './Narrator'
 
 /** A figure's life told from the record, ahead of the lists it is built from. */
-export function TheirLife({
+export const TheirLife = ({
   worldId,
   id,
   title,
@@ -19,7 +19,7 @@ export function TheirLife({
   title: string
   /** Shown above the telling, e.g. the figure's tie to your fortress. */
   before?: React.ReactNode
-}) {
+}) => {
   const life = useQuery({
     queryKey: ['legends', 'life', worldId, id],
     queryFn: () => getLifeStory({ data: { worldId, id } }),

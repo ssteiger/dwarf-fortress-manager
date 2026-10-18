@@ -26,7 +26,7 @@ const UNIT_COLORS = {
   other: '#e5e7eb',
 } as const
 
-function MapPage() {
+const MapPage = () => {
   const overview = useFortOverview()
   const [z, setZ] = React.useState<number | null>(null)
   const [reveal, setReveal] = React.useState(false)
@@ -191,7 +191,7 @@ function MapPage() {
   )
 }
 
-function Legend() {
+const Legend = () => {
   const swatches: [string, string][] = [
     ['#7c7c84', 'stone wall'],
     ['#3f3f46', 'stone floor'],
@@ -229,7 +229,7 @@ const MINERAL_KIND_RANK = { ore: 0, gem: 1, mineral: 2 } as const
 const MINERALS_SHOWN = 14
 
 /** The ores and gems still in the rock on this level, by how many tiles of each there are. */
-function MineralList({
+const MineralList = ({
   data,
   grid,
   reveal,
@@ -237,7 +237,7 @@ function MineralList({
   data: FortMapLevel
   grid: LevelGrid
   reveal: boolean
-}) {
+}) => {
   const rows = React.useMemo(() => {
     const counts = new Map<number, number>()
     for (let i = 0; i < grid.veins.length; i++) {
@@ -350,7 +350,7 @@ function parseColor(color: string): [number, number, number] {
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0]
 }
 
-function MapCanvas({
+const MapCanvas = ({
   data,
   grid,
   reveal,
@@ -365,7 +365,7 @@ function MapCanvas({
   onHover: (info: { x: number; y: number; label: string } | null) => void
   /** +1 for the level above, -1 for the one below. */
   onStepLevel: (delta: number) => void
-}) {
+}) => {
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const [pointer, setPointer] = React.useState<{ px: number; py: number; label: string } | null>(
     null,

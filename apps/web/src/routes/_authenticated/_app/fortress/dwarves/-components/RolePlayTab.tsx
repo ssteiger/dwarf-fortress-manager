@@ -91,7 +91,7 @@ function useUnitNote(unitId: number) {
   return { query, note, draft, setDraft, save, append }
 }
 
-export function RolePlayTab({
+export const RolePlayTab = ({
   unit,
   now,
   compact,
@@ -99,7 +99,7 @@ export function RolePlayTab({
   unit: FortUnit
   now: GameTime | null
   compact?: boolean
-}) {
+}) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const character = React.useMemo(() => characterSheet(unit, sheet), [unit, sheet])
   const hooks = React.useMemo(() => storyHooks(unit, sheet, now), [unit, sheet, now])
@@ -242,7 +242,7 @@ export function RolePlayTab({
   )
 }
 
-function VoiceSection({
+const VoiceSection = ({
   unit,
   now,
   onKeep,
@@ -250,7 +250,7 @@ function VoiceSection({
   unit: FortUnit
   now: GameTime | null
   onKeep: (text: string) => void
-}) {
+}) => {
   const status = useQuery({
     queryKey: ['fort', 'voice-status'],
     queryFn: () => getVoiceStatus(),

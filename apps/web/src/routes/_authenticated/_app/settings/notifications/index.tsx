@@ -111,7 +111,7 @@ const PERMISSION_NOTE: Record<Permission, string> = {
   unsupported: 'This browser cannot show desktop notifications.',
 }
 
-function AlertSettingsPage() {
+const AlertSettingsPage = () => {
   const mode = useAlertMode()
   const { alertKinds } = usePreferences()
   const [permission, refreshPermission] = useNotificationPermission()

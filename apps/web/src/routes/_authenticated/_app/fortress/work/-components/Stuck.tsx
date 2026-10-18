@@ -14,7 +14,7 @@ import { useOpenGuide } from '../../-components/Guide'
 import { UnitChips } from '../../-components/Insights'
 import { FixStepsButton } from './FixSteps'
 
-function GuideButton({ advice, label }: { advice: Advice | undefined; label: string }) {
+const GuideButton = ({ advice, label }: { advice: Advice | undefined; label: string }) => {
   const open = useOpenGuide()
   if (!advice) return null
   return (
@@ -25,7 +25,7 @@ function GuideButton({ advice, label }: { advice: Advice | undefined; label: str
   )
 }
 
-function Count({ n }: { n: number }) {
+const Count = ({ n }: { n: number }) => {
   return n ? (
     <span className="text-sm font-normal text-muted-foreground tabular-nums">
       {n.toLocaleString()}
@@ -36,7 +36,7 @@ function Count({ n }: { n: number }) {
 const WHERE_SHOWN = 4
 
 /** The way into the step-by-step work orders, while anything is suspended or failing. */
-export function StuckFixes({ suspended, failing }: { suspended: number; failing: number }) {
+export const StuckFixes = ({ suspended, failing }: { suspended: number; failing: number }) => {
   if (!suspended && !failing) return null
   const what = [
     suspended ? `${suspended} suspended ${suspended === 1 ? 'job' : 'jobs'}` : null,
@@ -58,7 +58,7 @@ export function StuckFixes({ suspended, failing }: { suspended: number; failing:
 }
 
 /** Suspended jobs, a line per kind of job at each kind of building, with where they are. */
-export function SuspendedJobs({
+export const SuspendedJobs = ({
   jobs,
   buildingNames,
   advice,
@@ -66,7 +66,7 @@ export function SuspendedJobs({
   jobs: FortJob[]
   buildingNames: Map<number, string>
   advice: Advice | undefined
-}) {
+}) => {
   const groups = React.useMemo(() => {
     const byKind = new Map<
       string,
@@ -141,13 +141,13 @@ export function SuspendedJobs({
 }
 
 /** Jobs the game keeps cancelling, with the reason it gives and what usually fixes it. */
-export function FailingJobs({
+export const FailingJobs = ({
   alerts,
   advice,
 }: {
   alerts: FortAlert[]
   advice: Advice | undefined
-}) {
+}) => {
   const failing = alerts.filter((alert) => alert.kind === 'cancellation')
   return (
     <Section
@@ -206,7 +206,7 @@ export function FailingJobs({
 }
 
 /** Workshops the fortress is missing, or that nobody has the skill to work. */
-export function UnworkableWork({ rows, idle }: { rows: WorkshopRow[]; idle: FortUnit[] }) {
+export const UnworkableWork = ({ rows, idle }: { rows: WorkshopRow[]; idle: FortUnit[] }) => {
   const open = useOpenGuide()
   const blocked = rows.filter(
     (row) =>
@@ -274,7 +274,7 @@ export function UnworkableWork({ rows, idle }: { rows: WorkshopRow[]; idle: Fort
 }
 
 /** Grown citizens with no job, no squad and no mood. */
-export function IdleHands({ idle, advice }: { idle: FortUnit[]; advice: Advice | undefined }) {
+export const IdleHands = ({ idle, advice }: { idle: FortUnit[]; advice: Advice | undefined }) => {
   return (
     <Section
       icon={<CoffeeIcon className="size-4 text-primary" />}

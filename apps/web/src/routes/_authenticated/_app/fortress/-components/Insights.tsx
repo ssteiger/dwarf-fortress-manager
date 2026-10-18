@@ -63,7 +63,7 @@ export type OpenUnit = (unit: FortUnit) => void
 // Dwarves as links
 
 /** A dwarf's sprite and first name: opens them in place when `onOpen` is given, else links. */
-export function UnitChip({
+export const UnitChip = ({
   unit,
   onOpen,
   className,
@@ -71,7 +71,7 @@ export function UnitChip({
   unit: FortUnit
   onOpen?: OpenUnit
   className?: string
-}) {
+}) => {
   const body = (
     <>
       <CreatureSprite unit={unit} size={20} className="-my-1 shrink-0" />
@@ -100,7 +100,7 @@ export function UnitChip({
   )
 }
 
-export function UnitChips({
+export const UnitChips = ({
   units,
   onOpen,
   max = 10,
@@ -108,7 +108,7 @@ export function UnitChips({
   units: FortUnit[]
   onOpen?: OpenUnit
   max?: number
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const shown = all ? units : units.slice(0, max)
   return (
@@ -130,7 +130,7 @@ export function UnitChips({
 }
 
 /** An announcement with the dwarves it names turned into links. */
-export function AnnouncementText({
+export const AnnouncementText = ({
   parts,
   onOpen,
   legends,
@@ -139,7 +139,7 @@ export function AnnouncementText({
   onOpen?: OpenUnit
   /** Figures off the map link to their legends when the export has them. */
   legends?: { worldId: number; known: Set<number> } | null
-}) {
+}) => {
   return (
     <>
       {parts.map((part, i) =>
@@ -202,7 +202,7 @@ const SEVERITY_STYLE: Record<Severity, { disc: string; Icon: typeof InfoIcon }> 
 
 const NOTICE_LINES = 4
 
-export function NoticeCard({
+export const NoticeCard = ({
   notice,
   onOpen,
   onGuide,
@@ -211,7 +211,7 @@ export function NoticeCard({
   onOpen?: OpenUnit
   /** Opens the step-by-step guide for this notice. */
   onGuide?: (notice: Notice) => void
-}) {
+}) => {
   const style = SEVERITY_STYLE[notice.severity]
   const Icon = style.Icon
   const [allLines, setAllLines] = React.useState(false)
@@ -306,7 +306,7 @@ export function NoticeCard({
 }
 
 /** Urgent notices open; the smaller ones fold under a line so they do not bury the rest. */
-export function NoticeList({
+export const NoticeList = ({
   notices,
   onOpen,
   onGuide,
@@ -316,7 +316,7 @@ export function NoticeList({
   onOpen?: OpenUnit
   onGuide?: (notice: Notice) => void
   foldInfo?: boolean
-}) {
+}) => {
   const [showMinor, setShowMinor] = React.useState(false)
   const major = foldInfo ? notices.filter((n) => n.severity !== 'info') : notices
   const minor = foldInfo ? notices.filter((n) => n.severity === 'info') : []
@@ -363,10 +363,10 @@ export function NoticeList({
   )
 }
 
-export function ConcernBadges({
+export const ConcernBadges = ({
   concerns,
   className,
-}: { concerns: Concern[]; className?: string }) {
+}: { concerns: Concern[]; className?: string }) => {
   if (!concerns.length) return null
   return (
     <div className={cn('flex flex-wrap gap-1', className)}>
@@ -391,7 +391,10 @@ export function ConcernBadges({
 // ---------------------------------------------------------------------------
 // What everyone is doing
 
-export function ActivityBoard({ groups, onOpen }: { groups: ActivityGroup[]; onOpen?: OpenUnit }) {
+export const ActivityBoard = ({
+  groups,
+  onOpen,
+}: { groups: ActivityGroup[]; onOpen?: OpenUnit }) => {
   if (!groups.length) return <p className="text-sm text-muted-foreground">Nobody is about.</p>
   return (
     <ul className="flex flex-col gap-2.5">
@@ -443,7 +446,7 @@ export function ActivityBoard({ groups, onOpen }: { groups: ActivityGroup[]; onO
 // ---------------------------------------------------------------------------
 // What they are feeling
 
-function FeelingRow({
+const FeelingRow = ({
   feeling,
   onOpen,
   onGuide,
@@ -451,7 +454,7 @@ function FeelingRow({
   feeling: Feeling
   onOpen?: OpenUnit
   onGuide?: (feeling: Feeling) => void
-}) {
+}) => {
   const [open, setOpen] = React.useState(false)
   return (
     <li className="flex flex-col gap-1.5 py-2">
@@ -511,7 +514,7 @@ function FeelingRow({
 }
 
 /** The month's thoughts across the fortress: what weighs on them, what lifts them. */
-export function FeelingsPanel({
+export const FeelingsPanel = ({
   feelings,
   onOpen,
   onGuide,
@@ -520,7 +523,7 @@ export function FeelingsPanel({
   onOpen?: OpenUnit
   /** Opens the step-by-step guide for a troubling feeling. */
   onGuide?: (feeling: Feeling) => void
-}) {
+}) => {
   const bad = feelings.filter((f) => f.tone === 'bad').slice(0, 6)
   const good = feelings.filter((f) => f.tone !== 'bad').slice(0, 6)
   if (!feelings.length)
@@ -576,7 +579,7 @@ const TONE_CLASS = {
   muted: 'text-muted-foreground',
 } as const
 
-export function StoryIcon({ kind, className }: { kind: StoryKind; className?: string }) {
+export const StoryIcon = ({ kind, className }: { kind: StoryKind; className?: string }) => {
   const Icon = KIND_ICON[kind]
   return <Icon className={cn('size-4 shrink-0', TONE_CLASS[STORY_KINDS[kind].tone], className)} />
 }
@@ -625,7 +628,7 @@ const dayMonth = (event: FortEvent) =>
  * Announcements grouped by season, newest first, with the dwarves they name
  * linked. Entries after `newAfter` are marked as new since the last visit.
  */
-export function StoryFeed({
+export const StoryFeed = ({
   events,
   link,
   newAfter = null,
@@ -637,7 +640,7 @@ export function StoryFeed({
   newAfter?: number | null
   onOpen?: OpenUnit
   limit?: number
-}) {
+}) => {
   const seasons = React.useMemo(() => {
     const out: { title: string; events: FortEvent[] }[] = []
     for (const event of events.slice(0, limit)) {
@@ -701,7 +704,7 @@ const ALERT_LABELS: Record<AlertMode, string> = {
 }
 
 /** Choose how new happenings are announced: toasts, desktop notifications, or not at all. */
-export function AlertsMenu() {
+export const AlertsMenu = () => {
   const mode = useAlertMode()
   const Icon = mode === 'off' ? BellOffIcon : mode === 'desktop' ? BellRingIcon : BellIcon
   const choose = async (next: string) => {

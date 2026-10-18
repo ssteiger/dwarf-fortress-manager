@@ -206,7 +206,7 @@ function topics(d: FortDiplomacy, stances: Map<number, Stance>): Topic[] {
 }
 
 /** How to deal with envoys, caravans, sieges, thieves, missions and petitions. */
-export function Playbook({ d, stances }: { d: FortDiplomacy; stances: Map<number, Stance> }) {
+export const Playbook = ({ d, stances }: { d: FortDiplomacy; stances: Map<number, Stance> }) => {
   return (
     <Section
       icon={<BookMarkedIcon className="size-4 text-primary" />}

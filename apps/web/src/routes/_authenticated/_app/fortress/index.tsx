@@ -91,7 +91,7 @@ const FOOD_STOCKS = ['meals', 'meat', 'fish', 'plants', 'cheese', 'eggs']
 
 type FeedFilter = 'story' | 'all'
 
-function OverviewPage() {
+const OverviewPage = () => {
   return (
     <GuideProvider>
       <OverviewBody />
@@ -99,7 +99,7 @@ function OverviewPage() {
   )
 }
 
-function OverviewBody() {
+const OverviewBody = () => {
   const { data, isFetching, refetch, dataUpdatedAt } = useFortOverview()
   const unitsQuery = useFortUnits()
   const concerns = useFortConcerns()
@@ -357,13 +357,13 @@ function OverviewBody() {
 }
 
 /** What is dangerous right now, a line each, above the story; the guide holds who and how. */
-function DangerStrip({
+const DangerStrip = ({
   notices,
   onGuide,
 }: {
   notices: Notice[]
   onGuide: (notice: Notice) => void
-}) {
+}) => {
   return (
     <section
       aria-label="Dangerous right now"
@@ -395,7 +395,7 @@ function DangerStrip({
 }
 
 /** Opens the compact view in a narrow window of its own, to keep beside the game. */
-function GlanceButton() {
+const GlanceButton = () => {
   return (
     <Button
       size="sm"
@@ -417,7 +417,7 @@ const LEAD_SENTENCES = 4
 const WATCHED_LINES = 6
 
 /** What happened since the overview was last open, told as a story, in wall-clock and in game time. */
-function SinceLastLook({
+const SinceLastLook = ({
   lastSeen,
   events,
   now,
@@ -431,7 +431,7 @@ function SinceLastLook({
   fortName: string
   units: FortUnit[]
   ownGroups: ReadonlySet<number> | undefined
-}) {
+}) => {
   const source = useFortRecap(
     lastSeen.game ? { year: lastSeen.game.year, tick: lastSeen.game.tick + 1 } : null,
   )
@@ -568,7 +568,7 @@ function SinceLastLook({
   )
 }
 
-function StorySection({
+const StorySection = ({
   events,
   link,
   newAfter,
@@ -580,7 +580,7 @@ function StorySection({
   newAfter: number | null
   undone: number
   present: string | null
-}) {
+}) => {
   const [filter, setFilter] = React.useState<FeedFilter>('story')
   const shown = React.useMemo(
     () => (filter === 'all' ? events : events.filter((e) => STORY_KINDS[storyKind(e)].story)),
@@ -632,7 +632,7 @@ function StorySection({
   )
 }
 
-function Stores({ summary, population }: { summary: FortSummary; population: number }) {
+const Stores = ({ summary, population }: { summary: FortSummary; population: number }) => {
   const count = (key: string) => summary.stocks.find((s) => s.key === key)?.count ?? 0
   const drink = count('drink')
   const food = FOOD_STOCKS.reduce((sum, key) => sum + count(key), 0)
@@ -674,7 +674,7 @@ function Stores({ summary, population }: { summary: FortSummary; population: num
   )
 }
 
-function PerDwarf({
+const PerDwarf = ({
   label,
   total,
   each,
@@ -684,7 +684,7 @@ function PerDwarf({
   total: number
   each: number
   low: boolean
-}) {
+}) => {
   return (
     <div>
       <div className="text-sm text-muted-foreground">
@@ -707,7 +707,7 @@ function PerDwarf({
   )
 }
 
-function MoodBar({ counts }: { counts: number[] }) {
+const MoodBar = ({ counts }: { counts: number[] }) => {
   const total = counts.reduce((a, b) => a + b, 0)
   if (total === 0)
     return <p className="text-sm text-muted-foreground">No citizens to be happy or sad.</p>

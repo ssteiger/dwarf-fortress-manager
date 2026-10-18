@@ -139,7 +139,7 @@ export function useSelectedWorld(requestedId?: number) {
   }
 }
 
-export function LegendsShell({
+export const LegendsShell = ({
   section,
   world: requestedWorld,
   fill = false,
@@ -158,7 +158,7 @@ export function LegendsShell({
     live: LiveFortress | null
     matchesLive: boolean
   }) => React.ReactNode
-}) {
+}) => {
   const navigate = useNavigate()
   const { legends, worlds, selectedWorld, worldId, liveWorldName, live, matchesLive } =
     useSelectedWorld(requestedWorld)
@@ -234,7 +234,7 @@ export function LegendsShell({
         )
       ) : (
         <>
-          <div className="sticky top-0 z-20 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3">
             <nav
               aria-label="Legends sections"
               className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"
@@ -282,7 +282,7 @@ export function recordName(hit: Pick<LegendsHit, 'kind' | 'id' | 'name' | 'type'
   return `${kindLabel(hit.kind)} #${hit.id}`
 }
 
-export function RecordLink({
+export const RecordLink = ({
   kind,
   id,
   name,
@@ -298,7 +298,7 @@ export function RecordLink({
   worldId: number | null
   className?: string
   children?: React.ReactNode
-}) {
+}) => {
   return (
     <Link
       to="/legends/$kind/$id"
@@ -321,7 +321,7 @@ export function isUnrecorded(names: NameIndex, kind: string, id: number): boolea
 }
 
 /** Link to a record by id when its name is in the index, plain text otherwise. */
-export function NamedRef({
+export const NamedRef = ({
   kind,
   id,
   names,
@@ -333,7 +333,7 @@ export function NamedRef({
   names: NameIndex
   worldId: number | null
   fallback?: string
-}) {
+}) => {
   if (id === null || id === undefined || id < 0)
     return <span className="text-muted-foreground">{fallback ?? 'none'}</span>
   if (isUnrecorded(names, kind, id))
@@ -349,11 +349,11 @@ export function NamedRef({
   return <RecordLink kind={kind} id={id} name={name ?? null} worldId={worldId} />
 }
 
-export function Breadcrumbs({
+export const Breadcrumbs = ({
   items,
 }: {
   items: { label: string; to?: string; search?: Record<string, unknown> }[]
-}) {
+}) => {
   return (
     <nav
       aria-label="Breadcrumb"
@@ -380,13 +380,13 @@ export function Breadcrumbs({
 }
 
 /** A key/value grid for a handful of facts. */
-export function Facts({
+export const Facts = ({
   items,
   className,
 }: {
   items: { label: string; value: React.ReactNode }[]
   className?: string
-}) {
+}) => {
   const shown = items.filter(
     (item) => item.value !== null && item.value !== undefined && item.value !== '',
   )
@@ -406,7 +406,7 @@ export function Facts({
 }
 
 /** A list of records with their one-line context. */
-export function HitRows({
+export const HitRows = ({
   hits,
   worldId,
   total,
@@ -420,7 +420,7 @@ export function HitRows({
   emptyText?: string
   showKind?: boolean
   years?: boolean
-}) {
+}) => {
   if (!hits.length) return <p className="text-sm text-muted-foreground">{emptyText}</p>
   return (
     <ul className="divide-y">
@@ -460,10 +460,10 @@ export function HitRows({
   )
 }
 
-export function Fragments({
+export const Fragments = ({
   fragments,
   worldId,
-}: { fragments: Fragment[]; worldId: number | null }) {
+}: { fragments: Fragment[]; worldId: number | null }) => {
   return (
     <>
       {fragments.map((f, i) =>
@@ -487,7 +487,7 @@ export function Fragments({
 }
 
 /** Told prose: paragraphs at reading measure, names kept as links. */
-export function Telling({
+export const Telling = ({
   paragraphs,
   worldId,
   className,
@@ -495,7 +495,7 @@ export function Telling({
   paragraphs: Fragment[][]
   worldId: number | null
   className?: string
-}) {
+}) => {
   return (
     <div className={cn('max-w-[70ch] space-y-3 text-base leading-relaxed', className)}>
       {paragraphs.map((p, i) => (
@@ -518,7 +518,7 @@ const CATEGORY_DOT: Record<string, string> = {
 }
 
 /** One event as a sentence, with its date and category mark. */
-export function EventLine({
+export const EventLine = ({
   event,
   names,
   worldId,
@@ -537,7 +537,7 @@ export function EventLine({
   dateLabel?: string
   /** Rendered after the sentence, e.g. a count of similar events. */
   after?: React.ReactNode
-}) {
+}) => {
   const p = event.payload
   const plus = plusOf(p)
   const type =
@@ -585,7 +585,7 @@ export function EventLine({
   )
 }
 
-export function KindBadge({ kind }: { kind: string }) {
+export const KindBadge = ({ kind }: { kind: string }) => {
   return <Badge variant="outline">{kindLabel(kind)}</Badge>
 }
 

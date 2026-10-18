@@ -178,7 +178,7 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
   },
 ]
 
-export function DwarfDetails({
+export const DwarfDetails = ({
   unitId,
   compact,
   legends = null,
@@ -191,7 +191,7 @@ export function DwarfDetails({
   /** Controlled tab, e.g. from the URL; otherwise the component keeps its own. */
   tab?: DwarfTab
   onTabChange?: (tab: DwarfTab) => void
-}) {
+}) => {
   const { data, isLoading } = useFortUnit(unitId)
   const overview = useFortOverview()
   const everyone = useFortUnits()
@@ -312,13 +312,13 @@ export function DwarfDetails({
   )
 }
 
-function ArchivedNote({
+const ArchivedNote = ({
   unit,
   archived,
 }: {
   unit: FortUnit
   archived: NonNullable<FortUnitDetail['archived']>
-}) {
+}) => {
   const p = pronouns(unit)
   const when = formatGameTick(archived.year, archived.tick)
   const what = archived.reason === 'died' ? 'died' : 'left the map'
@@ -330,7 +330,7 @@ function ArchivedNote({
   )
 }
 
-function TipCount({ unit }: { unit: FortUnit }) {
+const TipCount = ({ unit }: { unit: FortUnit }) => {
   const count = unit.sheet
     ? careTips(unit, unit.sheet).filter((t) => t.standing !== 'ok').length
     : 0
@@ -342,7 +342,7 @@ function TipCount({ unit }: { unit: FortUnit }) {
   )
 }
 
-function StatStrip({
+const StatStrip = ({
   unit,
   detail,
   compact,
@@ -350,7 +350,7 @@ function StatStrip({
   unit: FortUnit
   detail: FortUnitDetail | undefined
   compact?: boolean
-}) {
+}) => {
   const living = isLiving(unit)
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const hurt = sheet ? injuries(sheet).length : unit.wounds
@@ -359,12 +359,7 @@ function StatStrip({
   const syndromes = sheet ? syndromeNames(sheet) : []
   const citizenish = isCitizenish(unit)
   return (
-    <Stats
-      className={cn(
-        'border-b-0',
-        compact && 'grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2',
-      )}
-    >
+    <Stats className={cn(compact && 'grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2')}>
       <Reading
         title="Doing"
         value={
@@ -454,7 +449,7 @@ function StatStrip({
   )
 }
 
-function OverviewTab({
+const OverviewTab = ({
   unit,
   detail,
   now,
@@ -470,7 +465,7 @@ function OverviewTab({
   legends: UnitLegendsRef | null
   units: Map<number, FortUnit>
   onTab: (tab: DwarfTab) => void
-}) {
+}) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const bloodPct =
     unit.blood !== null && unit.blood_max ? Math.round((unit.blood / unit.blood_max) * 100) : null
@@ -689,7 +684,10 @@ function OverviewTab({
 }
 
 /** What a dwarf in a strange mood demands, what they have, and what the stores hold. */
-function StrangeMoodSection({ unit, workshop }: { unit: FortUnit; workshop: FortBuilding | null }) {
+const StrangeMoodSection = ({
+  unit,
+  workshop,
+}: { unit: FortUnit; workshop: FortBuilding | null }) => {
   const mood = unit.strange_mood
   if (!mood) return null
   const summary = moodNeedsText(mood)
@@ -774,7 +772,7 @@ function StrangeMoodSection({ unit, workshop }: { unit: FortUnit; workshop: Fort
   )
 }
 
-function ChronicleSection({
+const ChronicleSection = ({
   unit,
   legends,
   compact,
@@ -784,7 +782,7 @@ function ChronicleSection({
   legends: UnitLegendsRef | null
   compact?: boolean
   units: Map<number, FortUnit>
-}) {
+}) => {
   const link = React.useMemo(() => makeNameLinker([...units.values()]), [units])
   const mentionedName = unit.name.trim()
   const mentions = useQuery({
@@ -858,7 +856,10 @@ function ChronicleSection({
   )
 }
 
-function GearTab({ detail, compact }: { detail: FortUnitDetail | undefined; compact?: boolean }) {
+const GearTab = ({
+  detail,
+  compact,
+}: { detail: FortUnitDetail | undefined; compact?: boolean }) => {
   const inventory = detail?.inventory ?? []
   const carriedValue = inventory.reduce((sum, row) => sum + (row.item?.value ?? 0), 0)
   return (
@@ -888,7 +889,7 @@ function GearTab({ detail, compact }: { detail: FortUnitDetail | undefined; comp
   )
 }
 
-function NeedMeter({
+const NeedMeter = ({
   label,
   timer,
   dangerAt,
@@ -900,7 +901,7 @@ function NeedMeter({
   dangerAt?: number
   filled?: number
   state: { label: string; severity: 'ok' | 'warning' | 'danger' } | null
-}) {
+}) => {
   const pct =
     filled ??
     100 - Math.min(100, Math.max(0, dangerAt ? Math.round(((timer ?? 0) / dangerAt) * 100) : 0))

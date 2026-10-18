@@ -100,7 +100,7 @@ export function legendsRefFor(
  * Opens this unit in legends, when the export has their historical figure,
  * and in the chronicle, when the game has given them a name announcements can quote.
  */
-export function UnitLinks({
+export const UnitLinks = ({
   unit,
   legends,
   variant = 'icon',
@@ -110,7 +110,7 @@ export function UnitLinks({
   legends: UnitLegendsRef | null
   variant?: 'icon' | 'button'
   stopPropagation?: boolean
-}) {
+}) => {
   const name = unit.name.trim()
   if (!name && !legends) return null
   const halt = stopPropagation ? (event: React.MouseEvent) => event.stopPropagation() : undefined

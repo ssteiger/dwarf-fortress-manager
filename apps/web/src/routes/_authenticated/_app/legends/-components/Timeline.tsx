@@ -44,7 +44,7 @@ function foldRuns(events: LegendsRecord[], min = 3): TimelineRow[] {
   return rows
 }
 
-function EventRun({
+const EventRun = ({
   events,
   names,
   worldId,
@@ -52,7 +52,7 @@ function EventRun({
   events: LegendsRecord[]
   names: NameIndex
   worldId: number
-}) {
+}) => {
   const [open, setOpen] = React.useState(false)
   const first = events[0]
   const last = events[events.length - 1]
@@ -108,7 +108,7 @@ const EVENTS_FILTER: Record<string, 'hf' | 'civ' | 'site' | 'artifact'> = {
  * Filter by what kind of thing happened; page through the rest. Routine
  * gatherings are skipped until asked for, except on the gathering itself.
  */
-export function Timeline({
+export const Timeline = ({
   worldId,
   kind,
   id,
@@ -120,7 +120,7 @@ export function Timeline({
   id: number
   title?: string
   description?: string
-}) {
+}) => {
   const [category, setCategory] = React.useState<string>('all')
   const [order, setOrder] = React.useState<'asc' | 'desc'>('asc')
   const [page, setPage] = React.useState(0)
@@ -343,7 +343,7 @@ export function Timeline({
   )
 }
 
-export function FilterChip({
+export const FilterChip = ({
   active,
   onClick,
   count,
@@ -353,7 +353,7 @@ export function FilterChip({
   onClick: () => void
   count?: number
   children: React.ReactNode
-}) {
+}) => {
   return (
     <button
       type="button"

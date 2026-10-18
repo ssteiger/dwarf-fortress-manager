@@ -36,7 +36,7 @@ function headline(data: FortDead | undefined): string {
 
 const nameOf = (person: { name: string }) => cleanAnnouncement(person.name)
 
-function FallenName({ fallen }: { fallen: Pick<FortFallen, 'id' | 'name' | 'page'> }) {
+const FallenName = ({ fallen }: { fallen: Pick<FortFallen, 'id' | 'name' | 'page'> }) => {
   return fallen.page ? (
     <Link
       to="/fortress/dwarves/$id"
@@ -84,7 +84,7 @@ function restLine(fallen: FortFallen): string | null {
   return [body, memorial].filter(Boolean).join(' ') || null
 }
 
-function LegendsLink({ hf, worldId }: { hf: number; worldId: number }) {
+const LegendsLink = ({ hf, worldId }: { hf: number; worldId: number }) => {
   return (
     <Link
       to="/legends/$kind/$id"
@@ -98,7 +98,7 @@ function LegendsLink({ hf, worldId }: { hf: number; worldId: number }) {
   )
 }
 
-function FallenRow({ fallen, worldId }: { fallen: FortFallen; worldId: number | null }) {
+const FallenRow = ({ fallen, worldId }: { fallen: FortFallen; worldId: number | null }) => {
   const rest = restLine(fallen)
   return (
     <li className="flex flex-col gap-0.5 border-b py-2 last:border-b-0">
@@ -128,7 +128,7 @@ function FallenRow({ fallen, worldId }: { fallen: FortFallen; worldId: number | 
   )
 }
 
-function Restless({ ghosts, worldId }: { ghosts: FortFallen[]; worldId: number | null }) {
+const Restless = ({ ghosts, worldId }: { ghosts: FortFallen[]; worldId: number | null }) => {
   return (
     <Section
       title="Still walking as ghosts"
@@ -149,7 +149,7 @@ function Restless({ ghosts, worldId }: { ghosts: FortFallen[]; worldId: number |
   )
 }
 
-function Unburied({ dead, worldId }: { dead: FortFallen[]; worldId: number | null }) {
+const Unburied = ({ dead, worldId }: { dead: FortFallen[]; worldId: number | null }) => {
   return (
     <Section
       title="Lying unburied"
@@ -168,7 +168,7 @@ function Unburied({ dead, worldId }: { dead: FortFallen[]; worldId: number | nul
   )
 }
 
-function Causes({ dead }: { dead: FortFallen[] }) {
+const Causes = ({ dead }: { dead: FortFallen[] }) => {
   const counts = React.useMemo(() => {
     const byPhrase = new Map<string, number>()
     for (const d of dead) {
@@ -193,7 +193,7 @@ function Causes({ dead }: { dead: FortFallen[] }) {
   )
 }
 
-function Departed({ departed }: { departed: FortDeparted[] }) {
+const Departed = ({ departed }: { departed: FortDeparted[] }) => {
   if (!departed.length) return null
   return (
     <Section
@@ -216,7 +216,7 @@ function Departed({ departed }: { departed: FortDeparted[] }) {
   )
 }
 
-function DeadPage() {
+const DeadPage = () => {
   const overview = useFortOverview()
   const { data, isFetching, refetch } = useFortDead()
   const worldId = useFortLegendsWorldId()

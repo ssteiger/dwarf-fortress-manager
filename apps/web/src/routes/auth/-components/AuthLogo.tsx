@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { PickaxeIcon } from 'lucide-react'
 
-export function AuthLogo() {
+export const AuthLogo = () => {
   return (
     <Link to="/" aria-label="Go home" className="flex items-center gap-2">
       <PickaxeIcon className="h-6 w-6 text-foreground" aria-hidden="true" />

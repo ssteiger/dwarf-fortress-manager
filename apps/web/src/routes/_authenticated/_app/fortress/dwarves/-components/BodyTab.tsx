@@ -25,7 +25,7 @@ import {
 } from '~/lib/fortress/people/character'
 import { Meter, Muted, Section, SheetMissing, capitalize } from './SheetParts'
 
-export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }) {
+export const BodyTab = ({ unit, compact }: { unit: FortUnit; compact?: boolean }) => {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   return (
     <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
@@ -42,7 +42,7 @@ export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }
   )
 }
 
-function SkillsSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | null }) {
+const SkillsSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | null }) => {
   if (!sheet) {
     return (
       <Section title="Skills" count={unit.skills.length}>
@@ -136,7 +136,7 @@ function SkillsSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | nul
   )
 }
 
-function AttributesSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
+const AttributesSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) => {
   const physical = sheet.attributes.filter((a) => a[1] === 'P')
   const mental = sheet.attributes.filter((a) => a[1] === 'M')
   return (
@@ -152,13 +152,13 @@ function AttributesSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }
   )
 }
 
-function AttributeList({
+const AttributeList = ({
   label,
   attributes,
 }: {
   label: string
   attributes: UnitSheet['attributes']
-}) {
+}) => {
   if (!attributes.length) return null
   return (
     <div>
@@ -172,7 +172,7 @@ function AttributeList({
   )
 }
 
-function AttributeRow({ attr }: { attr: UnitSheet['attributes'][number] }) {
+const AttributeRow = ({ attr }: { attr: UnitSheet['attributes'][number] }) => {
   const [token, , value, max, ranges] = attr
   const median = ranges[3] || 1000
   const tier = attributeTier(value, ranges)
@@ -203,7 +203,7 @@ function AttributeRow({ attr }: { attr: UnitSheet['attributes'][number] }) {
   )
 }
 
-function HealthSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | null }) {
+const HealthSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | null }) => {
   const hurt = sheet ? injuries(sheet) : []
   const syndromes = sheet ? syndromeNames(sheet) : []
   const health = useFortConcerns().data?.health ?? null
@@ -269,7 +269,7 @@ function HealthSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet | nul
 }
 
 /** What the game says this dwarf waits for from the doctors, and what holds it up. */
-function Treatment({ health, needs }: { health: FortHealth; needs: PatientNeed[] }) {
+const Treatment = ({ health, needs }: { health: FortHealth; needs: PatientNeed[] }) => {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-muted-foreground">Waiting for the doctors</span>
@@ -291,7 +291,7 @@ function Treatment({ health, needs }: { health: FortHealth; needs: PatientNeed[]
   )
 }
 
-function WorkSection({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) {
+const WorkSection = ({ unit, sheet }: { unit: FortUnit; sheet: UnitSheet }) => {
   const groups = sheet.groups.filter(
     ([, type, link]) => type !== 'Religion' && !/^FORMER/.test(link) && link !== 'POSITION',
   )

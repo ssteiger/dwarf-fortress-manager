@@ -152,7 +152,7 @@ export function describeRecord(kind: string, p: LegendsPayload, names: NameIndex
 // ---------------------------------------------------------------------------
 // Shared bits
 
-function Chips({ items }: { items: (string | null | undefined | false)[] }) {
+const Chips = ({ items }: { items: (string | null | undefined | false)[] }) => {
   const shown = items.filter((i): i is string => typeof i === 'string' && i !== '')
   if (!shown.length) return null
   return (
@@ -166,7 +166,7 @@ function Chips({ items }: { items: (string | null | undefined | false)[] }) {
   )
 }
 
-function RefList({
+const RefList = ({
   kind,
   ids,
   names,
@@ -178,7 +178,7 @@ function RefList({
   names: NameIndex
   worldId: number
   max?: number
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const unique = [...new Set(ids)]
   const recorded = unique.filter((id) => !isUnrecorded(names, kind, id))
@@ -211,7 +211,7 @@ function RefList({
 }
 
 /** "and 12 more not in this export", for references the export does not contain. */
-function UnrecordedNote({ count, kind, lead }: { count: number; kind: string; lead: boolean }) {
+const UnrecordedNote = ({ count, kind, lead }: { count: number; kind: string; lead: boolean }) => {
   const noun = count === 1 ? kindLabel(kind).toLowerCase() : kindPlural(kind).toLowerCase()
   return (
     <span
@@ -223,7 +223,7 @@ function UnrecordedNote({ count, kind, lead }: { count: number; kind: string; le
   )
 }
 
-function LinkGroup({
+const LinkGroup = ({
   label,
   entries,
   kind,
@@ -237,7 +237,7 @@ function LinkGroup({
   names: NameIndex
   worldId: number
   max?: number
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const recorded = entries.filter((entry) => !isUnrecorded(names, kind, entry.id))
   const missing = entries.length - recorded.length
@@ -272,7 +272,7 @@ function LinkGroup({
   )
 }
 
-function LinkGroups({
+const LinkGroups = ({
   groups,
   kind,
   names,
@@ -282,7 +282,7 @@ function LinkGroups({
   kind: string
   names: NameIndex
   worldId: number
-}) {
+}) => {
   return (
     <div className="flex flex-col gap-4">
       {[...groups.entries()].map(([label, entries]) => (
@@ -299,12 +299,12 @@ function LinkGroups({
   )
 }
 
-function TimelineRow({ timeline }: { timeline?: React.ReactNode }) {
+const TimelineRow = ({ timeline }: { timeline?: React.ReactNode }) => {
   if (!timeline) return null
   return <div className="lg:col-span-3">{timeline}</div>
 }
 
-function MapAndFacts({ map, facts }: { map?: React.ReactNode; facts: React.ReactNode }) {
+const MapAndFacts = ({ map, facts }: { map?: React.ReactNode; facts: React.ReactNode }) => {
   if (!map) return facts
   return (
     <div className="grid items-start gap-6 lg:grid-cols-2">
@@ -314,7 +314,7 @@ function MapAndFacts({ map, facts }: { map?: React.ReactNode; facts: React.React
   )
 }
 
-function MiniMap({
+const MiniMap = ({
   map,
   worldId,
   focus,
@@ -326,7 +326,7 @@ function MiniMap({
   focus?: { x: number; y: number } | null
   highlightRegion?: number | null
   highlightSites?: ReadonlySet<number> | null
-}) {
+}) => {
   const navigate = useNavigate()
   if (!map) return <div className="aspect-square w-full animate-pulse rounded-lg bg-muted" />
   const open = (kind: string, id: number) =>
@@ -407,7 +407,7 @@ function groupLinks(links: JsonObject[], idKey: string, typeKey: string, order: 
   return groups
 }
 
-export function FigureSections({
+export const FigureSections = ({
   payload: p,
   plus,
   names,
@@ -415,7 +415,7 @@ export function FigureSections({
   positions,
   worldId,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const [allSkills, setAllSkills] = React.useState(false)
   const birth = num(p.birth_year)
   const death = num(p.death_year)
@@ -814,7 +814,7 @@ function mergeStructures(p: LegendsPayload, plus: JsonObject): Structure[] {
   return out
 }
 
-export function SiteSections({
+export const SiteSections = ({
   payload: p,
   plus,
   names,
@@ -822,7 +822,7 @@ export function SiteSections({
   worldId,
   map,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const at = parseCoord(p.coords)
   const region = regionAt(map, at)
   const structures = mergeStructures(p, plus)
@@ -1028,7 +1028,7 @@ export function SiteSections({
 // ---------------------------------------------------------------------------
 // Entity
 
-export function EntitySections({
+export const EntitySections = ({
   record,
   payload: p,
   plus,
@@ -1037,7 +1037,7 @@ export function EntitySections({
   worldId,
   map,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const positions = objList(plus.entity_position)
   const assignments = objList(plus.entity_position_assignment)
   const holders = new Map<number, number[]>()
@@ -1272,14 +1272,14 @@ export function EntitySections({
 // ---------------------------------------------------------------------------
 // Artifact
 
-export function ArtifactSections({
+export const ArtifactSections = ({
   payload: p,
   plus,
   names,
   related,
   worldId,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const item = (p.item as JsonObject | undefined) ?? {}
   const writing = num(plus.writing) ?? num(item.writing_written_content_id)
   const first = related.firstEvent
@@ -1364,14 +1364,14 @@ export function ArtifactSections({
 // ---------------------------------------------------------------------------
 // Written content
 
-export function WrittenSections({
+export const WrittenSections = ({
   payload: p,
   plus,
   names,
   related,
   worldId,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const author = num(p.author_hfid) ?? num(plus.author)
   const styles = Array.isArray(plus.style)
     ? plus.style.map((s) => words(String(s)))
@@ -1507,13 +1507,13 @@ function squads(p: LegendsPayload, side: 'attacking' | 'defending'): Squad[] {
   }))
 }
 
-function SquadTable({
+const SquadTable = ({
   title,
   list,
   leaders,
   names,
   worldId,
-}: { title: string; list: Squad[]; leaders: number[]; names: NameIndex; worldId: number }) {
+}: { title: string; list: Squad[]; leaders: number[]; names: NameIndex; worldId: number }) => {
   const total = list.reduce((a, s) => a + s.number, 0)
   const dead = list.reduce((a, s) => a + s.deaths, 0)
   return (
@@ -1567,14 +1567,14 @@ function SquadTable({
   )
 }
 
-export function CollectionSections({
+export const CollectionSections = ({
   payload: p,
   names,
   related,
   worldId,
   map,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const type = str(p.type) ?? 'chapter'
   const at = parseCoord(p.coords)
   const attackers = squads(p, 'attacking')
@@ -1743,7 +1743,7 @@ export function CollectionSections({
 // ---------------------------------------------------------------------------
 // Region and other geography
 
-export function RegionSections({
+export const RegionSections = ({
   record,
   payload: p,
   plus,
@@ -1751,7 +1751,7 @@ export function RegionSections({
   worldId,
   map,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const sitesInRegion = React.useMemo(() => {
     if (!map) return []
     const index = map.regions.findIndex((r) => r.id === record.id)
@@ -1817,7 +1817,7 @@ export function RegionSections({
   )
 }
 
-export function PlaceSections({ payload: p, plus, map, worldId, timeline }: SectionProps) {
+export const PlaceSections = ({ payload: p, plus, map, worldId, timeline }: SectionProps) => {
   const at = parseCoord(plus.coords)
   const end = parseCoord(plus.end_pos)
   const pathTiles = str(plus.path)?.split('|').filter(Boolean).length ?? 0
@@ -1860,14 +1860,14 @@ export function PlaceSections({ payload: p, plus, map, worldId, timeline }: Sect
 // ---------------------------------------------------------------------------
 // Art forms, creatures, identities, and anything else with prose
 
-export function ProseSections({
+export const ProseSections = ({
   record,
   payload: p,
   plus,
   names,
   worldId,
   timeline,
-}: SectionProps) {
+}: SectionProps) => {
   const description = str(p.description)
   const paragraphs = description
     ? description

@@ -17,7 +17,7 @@ import type { ListedName } from '../-server'
 import { statusOf } from './NameList'
 
 /** Lets the player put any name from their list in one dwarf's box. */
-export function NamePicker({
+export const NamePicker = ({
   target,
   list,
   calledBy,
@@ -29,7 +29,7 @@ export function NamePicker({
   calledBy: Map<number, string>
   onPick: (unitId: number, name: string) => void
   onClose: () => void
-}) {
+}) => {
   // Kept while the dialog animates out, after `target` is already null.
   const last = React.useRef(target)
   if (target) last.current = target

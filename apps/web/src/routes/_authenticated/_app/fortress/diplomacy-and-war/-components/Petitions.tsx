@@ -57,7 +57,7 @@ function collapse(agreements: FortAgreement[]): PetitionRow[] {
 }
 
 /** Temple and guildhall petitions, the agreed ones still to build first. */
-export function Petitions({ d, onOpen }: { d: FortDiplomacy; onOpen: OpenPower }) {
+export const Petitions = ({ d, onOpen }: { d: FortDiplomacy; onOpen: OpenPower }) => {
   const [all, setAll] = React.useState(false)
   const sorted = [...d.agreements].sort(
     (a, b) =>

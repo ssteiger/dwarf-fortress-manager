@@ -8,7 +8,7 @@ import { LegendsSprite } from '~/lib/df-assets/legends'
 import { type TrailEntry, clearTrail, useTrail } from '~/lib/legends/client/trail'
 import { kindLabel } from '~/lib/legends/model'
 
-function TrailLink({
+const TrailLink = ({
   entry,
   worldId,
   className,
@@ -18,7 +18,7 @@ function TrailLink({
   worldId: number
   className?: string
   children: React.ReactNode
-}) {
+}) => {
   return (
     <Link
       to="/legends/$kind/$id"
@@ -32,13 +32,13 @@ function TrailLink({
 }
 
 /** A row of the records opened before this one, for hopping back along a thread. */
-export function TrailBar({
+export const TrailBar = ({
   worldId,
   current,
 }: {
   worldId: number
   current: { kind: string; id: number }
-}) {
+}) => {
   const trail = useTrail(worldId).filter((e) => !(e.kind === current.kind && e.id === current.id))
   if (!trail.length) return null
   return (
@@ -66,7 +66,7 @@ export function TrailBar({
 }
 
 /** The trail as a list, for the overview page. */
-export function TrailList({
+export const TrailList = ({
   worldId,
   limit = 8,
   className,
@@ -74,7 +74,7 @@ export function TrailList({
   worldId: number
   limit?: number
   className?: string
-}) {
+}) => {
   const trail = useTrail(worldId)
   if (!trail.length) {
     return (

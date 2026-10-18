@@ -28,7 +28,7 @@ const TILE_TONE: Record<AdviceStatus, string> = {
 }
 
 /** The stores at a glance; each tile opens the advice behind it. */
-export function StoreTiles({ tiles, advice }: { tiles: StoreTile[]; advice: Advice[] }) {
+export const StoreTiles = ({ tiles, advice }: { tiles: StoreTile[]; advice: Advice[] }) => {
   const open = useOpenGuide()
   return (
     <SectionGrid className="grid-cols-2 border-b sm:grid-cols-4 xl:grid-cols-8">
@@ -71,7 +71,7 @@ const BAR_TONE: Record<AdviceStatus, string> = {
 }
 
 /** What the fortress is short of, where to make it, and who can. */
-export function ProductionPlan({ rows, max = 8 }: { rows: PlanRow[]; max?: number }) {
+export const ProductionPlan = ({ rows, max = 8 }: { rows: PlanRow[]; max?: number }) => {
   const open = useOpenGuide()
   const [all, setAll] = React.useState(false)
   const short = rows.filter((r) => r.status !== 'good')
@@ -142,7 +142,7 @@ const WEALTH_PARTS: { key: keyof NonNullable<FortSummary['wealth']>; label: stri
   { key: 'other', label: 'Other goods' },
 ]
 
-export function WealthBreakdown({ wealth }: { wealth: FortSummary['wealth'] }) {
+export const WealthBreakdown = ({ wealth }: { wealth: FortSummary['wealth'] }) => {
   if (!wealth) return <p className="text-sm text-muted-foreground">No wealth reported yet.</p>
   const parts = WEALTH_PARTS.map((p) => ({ ...p, value: wealth[p.key] })).sort(
     (a, b) => b.value - a.value,
@@ -177,7 +177,7 @@ export function WealthBreakdown({ wealth }: { wealth: FortSummary['wealth'] }) {
 }
 
 /** The views of the item list, with how many items each holds. */
-export function ViewChips({
+export const ViewChips = ({
   view,
   counts,
   onChange,
@@ -185,7 +185,7 @@ export function ViewChips({
   view: ItemView
   counts: Record<ItemView, number> | undefined
   onChange: (view: ItemView) => void
-}) {
+}) => {
   return (
     <div className="flex flex-wrap gap-2">
       {ITEM_VIEWS.filter((v) => v === 'fortress' || v === view || (counts?.[v] ?? 0) > 0).map(
@@ -209,7 +209,11 @@ export function ViewChips({
 }
 
 /** What the chosen view shows, and what to do about it. */
-export function ViewHint({ view, count, value }: { view: ItemView; count: number; value: number }) {
+export const ViewHint = ({
+  view,
+  count,
+  value,
+}: { view: ItemView; count: number; value: number }) => {
   const info = ITEM_VIEW_INFO[view]
   const guide = viewGuide(view, count)
   return (
@@ -223,7 +227,7 @@ export function ViewHint({ view, count, value }: { view: ItemView; count: number
 }
 
 /** Item types in the view, each drawn with its most valuable example. */
-export function TypeChips({
+export const TypeChips = ({
   types,
   valueByType,
   samples,
@@ -237,7 +241,7 @@ export function TypeChips({
   selected: string | null
   onSelect: (type: string | null) => void
   max?: number
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const sorted = Object.entries(types).sort((a, b) => b[1] - a[1])
   const shown = all ? sorted : sorted.slice(0, max)

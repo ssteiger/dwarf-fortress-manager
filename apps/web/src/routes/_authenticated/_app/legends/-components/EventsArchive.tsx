@@ -41,7 +41,7 @@ const INVOLVEMENT: {
   { key: 'artifact', kind: 'artifact', kinds: ['artifact'], placeholder: 'An artifact' },
 ]
 
-export function YearInput({
+export const YearInput = ({
   value,
   placeholder,
   onCommit,
@@ -51,7 +51,7 @@ export function YearInput({
   placeholder: string
   onCommit: (next: number | undefined) => void
   label: string
-}) {
+}) => {
   const [text, setText] = React.useState(value === undefined ? '' : String(value))
   React.useEffect(() => setText(value === undefined ? '' : String(value)), [value])
   const commit = () => {
@@ -80,7 +80,7 @@ export function YearInput({
  * happening, and by who or where was involved. The rows are the same
  * sentences the record pages use, so every name is a link onward.
  */
-export function EventsArchive({
+export const EventsArchive = ({
   worldId,
   years,
   filters,
@@ -90,7 +90,7 @@ export function EventsArchive({
   years: { min: number; max: number } | null
   filters: EventFilters
   onChange: (patch: Partial<EventFilters>) => void
-}) {
+}) => {
   const query: EventSearchQuery = {
     worldId,
     from: filters.from,

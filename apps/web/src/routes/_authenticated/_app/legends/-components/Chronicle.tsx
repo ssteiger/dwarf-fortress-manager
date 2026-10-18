@@ -29,7 +29,7 @@ export function useSpanDigest(worldId: number, span: YearSpan | null) {
  * moments worth reading, the battles, the wars under way and the people
  * whose names fill the records.
  */
-export function ChroniclePanel({
+export const ChroniclePanel = ({
   worldId,
   span,
   years,
@@ -45,7 +45,7 @@ export function ChroniclePanel({
   /** Extra controls in the header (narration, pinning). */
   actions?: React.ReactNode
   compact?: boolean
-}) {
+}) => {
   const digest = useSpanDigest(worldId, span)
   const length = span.to - span.from + 1
   const shift = (direction: -1 | 1) => {
@@ -154,7 +154,7 @@ export function ChroniclePanel({
 /** Defining moments shown before "Show all". */
 const MOMENTS_PREVIEW = 12
 
-function ChronicleBody({
+const ChronicleBody = ({
   worldId,
   digest,
   compact,
@@ -166,7 +166,7 @@ function ChronicleBody({
   compact: boolean
   onSpan: (span: YearSpan) => void
   stale: boolean
-}) {
+}) => {
   const [showAll, setShowAll] = React.useState(false)
   const moments = showAll ? digest.moments : digest.moments.slice(0, MOMENTS_PREVIEW)
   const told = React.useMemo(() => tellSpan(digest), [digest])

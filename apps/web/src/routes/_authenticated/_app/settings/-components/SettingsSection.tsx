@@ -12,7 +12,7 @@ import {
 } from '@fortress/ui'
 import type * as React from 'react'
 
-export function SettingsSection({
+export const SettingsSection = ({
   id,
   title,
   description,
@@ -24,7 +24,7 @@ export function SettingsSection({
   description?: React.ReactNode
   action?: React.ReactNode
   children: React.ReactNode
-}) {
+}) => {
   return (
     <Card id={id} className={id ? 'scroll-mt-20' : undefined}>
       <CardHeader>
@@ -38,7 +38,7 @@ export function SettingsSection({
 }
 
 /** One setting: what it is on the left, its control on the right. */
-export function SettingRow({
+export const SettingRow = ({
   id,
   label,
   description,
@@ -48,7 +48,7 @@ export function SettingRow({
   label: string
   description?: React.ReactNode
   children: React.ReactNode
-}) {
+}) => {
   return (
     <div className="flex items-start justify-between gap-6">
       <div className="flex flex-col gap-1">
@@ -70,7 +70,7 @@ export interface Choice<T extends string> {
 }
 
 /** A handful of options side by side, each with a line saying what it means. */
-export function ChoiceGroup<T extends string>({
+export const ChoiceGroup = <T extends string>({
   name,
   label,
   value,
@@ -84,7 +84,7 @@ export function ChoiceGroup<T extends string>({
   choices: Choice<T>[]
   onChange: (value: T) => void
   columns?: 2 | 3
-}) {
+}) => {
   return (
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-sm font-medium">{label}</legend>

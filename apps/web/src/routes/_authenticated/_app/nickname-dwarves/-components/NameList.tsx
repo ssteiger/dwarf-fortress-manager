@@ -30,7 +30,7 @@ export function statusOf(entry: ListedName, called: string): string {
   return 'no dwarf free'
 }
 
-export function NameList({
+export const NameList = ({
   list,
   calledBy,
   onChanged,
@@ -53,7 +53,7 @@ export function NameList({
     onApply: () => void
   }
   className?: string
-}) {
+}) => {
   const [editing, setEditing] = React.useState(false)
   const [text, setText] = React.useState('')
   const entering = editing || list.length === 0

@@ -84,7 +84,7 @@ const TIMELINE_KINDS = new Set([
   'dance_form',
 ])
 
-function RecordPage() {
+const RecordPage = () => {
   const { kind, id } = Route.useParams()
   const { world } = Route.useSearch()
   const legends = useLegendsWorlds()
@@ -311,7 +311,7 @@ function RecordPage() {
   )
 }
 
-function KindSections(props: SectionProps) {
+const KindSections = (props: SectionProps) => {
   switch (props.record.kind) {
     case 'historical_figure':
       return <FigureSections {...props} />

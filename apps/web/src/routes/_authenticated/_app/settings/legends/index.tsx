@@ -10,7 +10,7 @@ import { getNarratorStatus } from '~/lib/legends/server/narrator'
 import { type LegendsLibraryWorld, getLegendsLibrary } from '~/lib/settings/server'
 import { SettingsSection } from '../-components/SettingsSection'
 
-function WorldRow({ world, live }: { world: LegendsLibraryWorld; live: boolean }) {
+const WorldRow = ({ world, live }: { world: LegendsLibraryWorld; live: boolean }) => {
   const trail = useTrail(world.id)
   const name = world.name ?? 'Unnamed world'
   return (
@@ -63,7 +63,7 @@ function WorldRow({ world, live }: { world: LegendsLibraryWorld; live: boolean }
   )
 }
 
-function LegendsSettingsPage() {
+const LegendsSettingsPage = () => {
   const library = useQuery({
     queryKey: ['settings', 'legends-library'],
     queryFn: () => getLegendsLibrary(),

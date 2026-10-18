@@ -45,7 +45,7 @@ export function siegeText(forecast: PowerForecast, atWar: boolean): string {
 }
 
 /** How close the fortress is to drawing caravans, thieves and sieges. */
-export function Forecast({
+export const Forecast = ({
   d,
   powers,
   stances,
@@ -57,7 +57,7 @@ export function Forecast({
   stances: Map<number, Stance>
   values: FortProgressValues
   onOpen: OpenPower
-}) {
+}) => {
   const groups = new Map<string, FortPower[]>()
   for (const power of powers) {
     if (power.own || !power.triggers) continue
@@ -142,7 +142,7 @@ export function Forecast({
   )
 }
 
-function MeasureBar({
+const MeasureBar = ({
   d,
   measure,
   label,
@@ -152,7 +152,7 @@ function MeasureBar({
   measure: Measure
   label: string
   values: FortProgressValues
-}) {
+}) => {
   const level = d.progress[measure]
   const value = measureValue(measure, values)
   const thresholds = LEVELS.map((l) => thresholdOf(d, measure, l))

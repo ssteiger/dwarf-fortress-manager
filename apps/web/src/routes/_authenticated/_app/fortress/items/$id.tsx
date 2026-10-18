@@ -5,7 +5,7 @@ import { useFortItem, useFortOverview } from '~/lib/fortress/client/queries'
 import { FortBreadcrumbs, PageHeader, StatusBand } from '../-components/FortChrome'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
 
-function ItemPage() {
+const ItemPage = () => {
   const { id } = Route.useParams()
   const numericId = Number.parseInt(id, 10)
   const overview = useFortOverview()

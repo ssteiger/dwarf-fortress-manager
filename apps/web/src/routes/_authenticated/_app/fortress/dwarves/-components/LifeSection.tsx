@@ -79,7 +79,7 @@ function lifeLines(
  * Their life in the fortress: what the worker's daily snapshots saw change,
  * what the world's history records of them, and their mood by day.
  */
-export function LifeSection({
+export const LifeSection = ({
   unit,
   units,
   compact,
@@ -87,7 +87,7 @@ export function LifeSection({
   unit: FortUnit
   units: Map<number, FortUnit>
   compact?: boolean
-}) {
+}) => {
   const history = useQuery({
     queryKey: ['fort', 'unit-history', unit.id],
     queryFn: () => getUnitHistory({ data: { unitId: unit.id } }),

@@ -15,7 +15,7 @@ export interface DiplomacyCommand {
 }
 
 /** A DFHack command with what it does; cheats say so before anything else. */
-export function CommandItem({ command, what, cheat }: DiplomacyCommand) {
+export const CommandItem = ({ command, what, cheat }: DiplomacyCommand) => {
   return (
     <div className="flex flex-col gap-1.5">
       <p className="text-sm">
@@ -36,7 +36,7 @@ export function CommandItem({ command, what, cheat }: DiplomacyCommand) {
 
 export type OpenPower = (id: number) => void
 
-export function StanceBadge({ stance, className }: { stance: Stance; className?: string }) {
+export const StanceBadge = ({ stance, className }: { stance: Stance; className?: string }) => {
   return (
     <Badge
       variant="outline"
@@ -49,7 +49,7 @@ export function StanceBadge({ stance, className }: { stance: Stance; className?:
 }
 
 /** A group's name: opens its power when the page lists it, plain text otherwise. */
-export function EntityName({
+export const EntityName = ({
   d,
   id,
   onOpen,
@@ -59,7 +59,7 @@ export function EntityName({
   id: number | null | undefined
   onOpen: OpenPower
   className?: string
-}) {
+}) => {
   const name = entityName(d, id)
   const powerId =
     id === null || id === undefined
@@ -86,7 +86,7 @@ export function EntityName({
 }
 
 /** The record in the legends export, when the export is of this world. */
-export function LegendsLink({
+export const LegendsLink = ({
   worldId,
   kind,
   id,
@@ -96,7 +96,7 @@ export function LegendsLink({
   kind: 'entity' | 'site' | 'historical_event_collection' | 'historical_figure'
   id: number
   label?: string
-}) {
+}) => {
   if (worldId === null) return null
   return (
     <Link
@@ -113,6 +113,6 @@ export function LegendsLink({
 }
 
 /** Small uppercase heading inside a card or the drawer. */
-export function SectionLabel({ children }: { children: React.ReactNode }) {
+export const SectionLabel = ({ children }: { children: React.ReactNode }) => {
   return <h3 className="text-sm font-medium text-muted-foreground">{children}</h3>
 }

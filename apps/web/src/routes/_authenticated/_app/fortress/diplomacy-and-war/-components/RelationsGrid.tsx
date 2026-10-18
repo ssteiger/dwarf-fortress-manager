@@ -33,7 +33,7 @@ const LEGEND: { relation: DiplomacyRelation; label: string }[] = [
 ]
 
 /** How the nearest powers stand with each other, as either side records it. */
-export function RelationsGrid({ powers, onOpen }: { powers: FortPower[]; onOpen: OpenPower }) {
+export const RelationsGrid = ({ powers, onOpen }: { powers: FortPower[]; onOpen: OpenPower }) => {
   const [allWars, setAllWars] = React.useState(false)
   const shown = powers.filter((p) => p.own || p.site_count > 0).slice(0, GRID_SIZE)
   const wars: [FortPower, FortPower][] = []

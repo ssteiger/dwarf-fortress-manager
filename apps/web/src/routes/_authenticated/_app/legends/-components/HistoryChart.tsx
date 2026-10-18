@@ -13,7 +13,7 @@ export interface YearSpan {
  * deaths. Eras are marked along the top. Click a bar, drag across several,
  * or click an era's name to pick the years the chronicle below should tell.
  */
-export function HistoryChart({
+export const HistoryChart = ({
   bins,
   binYears,
   eras,
@@ -25,7 +25,7 @@ export function HistoryChart({
   eras: { name: string; startYear: number }[]
   selection?: YearSpan | null
   onSelect?: (span: YearSpan) => void
-}) {
+}) => {
   const [active, setActive] = React.useState<number | null>(null)
   const [brush, setBrush] = React.useState<{ start: number; end: number } | null>(null)
   const svgRef = React.useRef<SVGSVGElement>(null)

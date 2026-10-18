@@ -333,7 +333,7 @@ function boundsView(
  * site as its marker or a dot in its civilization's colour. Scroll or pinch
  * to zoom, drag to pan; click a site or region for details.
  */
-export function WorldMap({
+export const WorldMap = ({
   data,
   highlightSites,
   highlightRegion,
@@ -345,7 +345,7 @@ export function WorldMap({
   className,
   year = null,
   history = null,
-}: WorldMapProps) {
+}: WorldMapProps) => {
   const inset = (variant ?? (showLegend ? 'full' : 'inset')) === 'inset'
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
   const assets = useDfAssets()
@@ -975,7 +975,7 @@ export function WorldMap({
   )
 }
 
-function SelectionCard({
+const SelectionCard = ({
   selection,
   data,
   compact,
@@ -989,7 +989,7 @@ function SelectionCard({
   onClose: () => void
   onOpenSite?: (site: MapSite) => void
   onOpenRegion?: (region: MapRegion) => void
-}) {
+}) => {
   let title: string
   let detail: string
   let open: (() => void) | null = null

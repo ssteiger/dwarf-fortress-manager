@@ -34,7 +34,7 @@ import { usePreferences, usePreferencesSync } from '~/lib/preferences'
 const EDGE_DWARF_COUNT = 12
 
 /** A dozen of the fortress's living citizens, the same dozen from one dump to the next. */
-function FortressEdgeDwarves() {
+const FortressEdgeDwarves = () => {
   const { data } = useQuery({
     queryKey: ['fort', 'units'],
     queryFn: () => getFortUnits(),

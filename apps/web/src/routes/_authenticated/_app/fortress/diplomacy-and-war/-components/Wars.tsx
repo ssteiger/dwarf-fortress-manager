@@ -11,7 +11,7 @@ import { EntityName, LegendsLink, type OpenPower } from './shared'
 const EVENTS_SHOWN = 3
 
 /** Your civilization's wars, then the wars your neighbours fight among themselves. */
-export function Wars({
+export const Wars = ({
   d,
   nearIds,
   worldId,
@@ -22,7 +22,7 @@ export function Wars({
   nearIds: Set<number>
   worldId: number | null
   onOpen: OpenPower
-}) {
+}) => {
   const [others, setOthers] = React.useState(false)
   const powerOf = (id: number) => d.entities[String(id)]?.power_id ?? id
   const ours = d.wars.filter((w) => w.ours)
@@ -70,7 +70,7 @@ export function Wars({
   )
 }
 
-function Side({ d, ids, onOpen }: { d: FortDiplomacy; ids: number[]; onOpen: OpenPower }) {
+const Side = ({ d, ids, onOpen }: { d: FortDiplomacy; ids: number[]; onOpen: OpenPower }) => {
   if (!ids.length) return <span>someone unknown</span>
   return (
     <>
@@ -87,7 +87,7 @@ function Side({ d, ids, onOpen }: { d: FortDiplomacy; ids: number[]; onOpen: Ope
   )
 }
 
-export function WarItem({
+export const WarItem = ({
   d,
   war,
   worldId,
@@ -97,7 +97,7 @@ export function WarItem({
   war: FortWar
   worldId: number | null
   onOpen: OpenPower
-}) {
+}) => {
   const [all, setAll] = React.useState(false)
   const events = all ? war.events : war.events.slice(0, EVENTS_SHOWN)
   return (
@@ -155,7 +155,7 @@ export function WarItem({
   )
 }
 
-export function WarEventText({
+export const WarEventText = ({
   d,
   event,
   onOpen,
@@ -163,7 +163,7 @@ export function WarEventText({
   d: FortDiplomacy
   event: FortWarEvent
   onOpen: OpenPower
-}) {
+}) => {
   const attacker = <EntityName d={d} id={event.attacker} onOpen={onOpen} />
   const defender = <EntityName d={d} id={event.defender} onOpen={onOpen} />
   const site = event.site ?? 'an unknown place'

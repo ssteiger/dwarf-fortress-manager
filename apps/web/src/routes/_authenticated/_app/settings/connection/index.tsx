@@ -89,7 +89,7 @@ const STATUS: Record<
   },
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+const Fact = ({ label, children }: { label: string; children: React.ReactNode }) => {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
@@ -98,7 +98,7 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function StatusSection({ data, dump }: { data: ConnectionStatus; dump: DumpState | undefined }) {
+const StatusSection = ({ data, dump }: { data: ConnectionStatus; dump: DumpState | undefined }) => {
   useTick(5000)
   const status = STATUS[data.status ?? 'none']
   const lastSign = dump?.workerSeenAt ?? data.reportedAt
@@ -211,7 +211,7 @@ function everyLabel(ms: number): string {
   return `Every ${Number.isInteger(minutes) ? minutes : minutes.toFixed(1)} minutes`
 }
 
-function ReadingSection({ dump }: { dump: DumpState }) {
+const ReadingSection = ({ dump }: { dump: DumpState }) => {
   const client = useQueryClient()
   const save = useMutation({
     mutationFn: (next: { auto?: boolean; intervalMs?: number }) => setDumpSchedule({ data: next }),
@@ -290,7 +290,7 @@ function ReadingSection({ dump }: { dump: DumpState }) {
   )
 }
 
-function AutomationSection() {
+const AutomationSection = () => {
   const query = useFortAutomation()
   const automation = query.data?.automation ?? null
   const others = automation
@@ -430,7 +430,7 @@ const COMMAND_STATUS: Record<
   failed: { label: 'Failed', variant: 'destructive' },
 }
 
-function CommandsSection({ commands }: { commands: WorkerCommand[] }) {
+const CommandsSection = ({ commands }: { commands: WorkerCommand[] }) => {
   const client = useQueryClient()
   const units = useFortUnits()
   const names = React.useMemo(
@@ -559,7 +559,7 @@ const WORKER_ENV: { name: string; fallback: string; what: string }[] = [
   },
 ]
 
-function ConnectionSettingsPage() {
+const ConnectionSettingsPage = () => {
   const { oneClickActions } = usePreferences()
   const query = useQuery({
     queryKey: QUERY_KEY,

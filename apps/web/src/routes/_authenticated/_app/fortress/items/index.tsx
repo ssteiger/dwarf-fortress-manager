@@ -176,7 +176,7 @@ function useDebounced<T>(value: T, delayMs: number): T {
   return debounced
 }
 
-function ItemsPage() {
+const ItemsPage = () => {
   return (
     <GuideProvider>
       <ItemsBody />
@@ -184,7 +184,7 @@ function ItemsPage() {
   )
 }
 
-function ItemsBody() {
+const ItemsBody = () => {
   const overview = useFortOverview()
   const units = useFortUnits()
   const concerns = useFortConcerns()
@@ -303,7 +303,7 @@ function ItemsBody() {
 const ALL_TYPES = null
 
 /** Every item in one view of the list, filterable by type and searchable. */
-function ItemList() {
+const ItemList = () => {
   const { view: urlView } = Route.useSearch()
   const navigate = Route.useNavigate()
   const view: ItemView = urlView ?? 'fortress'

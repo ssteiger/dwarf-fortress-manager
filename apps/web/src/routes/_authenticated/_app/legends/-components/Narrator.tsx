@@ -46,7 +46,7 @@ function subjectId(subject: NarratorSubject): string {
  * "Narrate" for a span, a record or a story. Renders nothing unless the
  * server has a narrator configured, so pages look the same without one.
  */
-export function NarrateButton({
+export const NarrateButton = ({
   worldId,
   subject,
   title,
@@ -61,7 +61,7 @@ export function NarrateButton({
   size?: 'sm' | 'icon'
   label?: string
   className?: string
-}) {
+}) => {
   const status = useNarratorStatus()
   const [open, setOpen] = React.useState(false)
   if (!status.data?.enabled) return null
@@ -92,7 +92,7 @@ export function NarrateButton({
   )
 }
 
-function NarrationDialog({
+const NarrationDialog = ({
   worldId,
   subject,
   title,
@@ -104,7 +104,7 @@ function NarrationDialog({
   title: string
   model: string | null
   onClose: () => void
-}) {
+}) => {
   const [style, setStyle] = React.useState<NarratorStyle>('chronicle')
   // Each retelling gets a new nonce; the first asks the memo, the rest ask the model.
   const [attempt, setAttempt] = React.useState(0)

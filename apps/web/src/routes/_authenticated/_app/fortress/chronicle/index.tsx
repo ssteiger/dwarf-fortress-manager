@@ -124,7 +124,7 @@ const VIEWS: Record<View, string> = {
   seasons: 'By season',
 }
 
-function ViewSwitch({ current }: { current: View }) {
+const ViewSwitch = ({ current }: { current: View }) => {
   return (
     <nav aria-label="How to read the chronicle" className="flex w-fit rounded-lg border p-0.5">
       {(Object.keys(VIEWS) as View[]).map((key) => (
@@ -147,13 +147,13 @@ function ViewSwitch({ current }: { current: View }) {
   )
 }
 
-function ChroniclePage() {
+const ChroniclePage = () => {
   const { view } = Route.useSearch()
   return view === 'seasons' ? <BySeason /> : <EveryEntry />
 }
 
 /** The fortress's book: a recap of each season. */
-function BySeason() {
+const BySeason = () => {
   const overview = useFortOverview()
   const seasons = useFortSeasons()
   return (
@@ -175,7 +175,7 @@ function BySeason() {
   )
 }
 
-function EveryEntry() {
+const EveryEntry = () => {
   const overview = useFortOverview()
   const everyone = useFortUnits()
   const params = Route.useSearch()

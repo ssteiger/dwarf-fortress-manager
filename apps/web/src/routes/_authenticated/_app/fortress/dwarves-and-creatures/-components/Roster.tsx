@@ -70,7 +70,7 @@ function useView(): [View, (view: View) => void] {
 }
 
 /** Everyone in the dump by group, as cards or as a sortable table. */
-export function Roster({
+export const Roster = ({
   units,
   now,
   onOpen,
@@ -78,7 +78,7 @@ export function Roster({
   units: FortUnit[]
   now: GameTime | null
   onOpen: (unit: FortUnit) => void
-}) {
+}) => {
   const [group, setGroup] = React.useState<Group>('citizen')
   const [showDead, setShowDead] = React.useState(false)
   const [view, setView] = useView()
@@ -369,7 +369,7 @@ export function Roster({
 }
 
 /** Their newest thought worth a line, coloured by how it made them feel. */
-function LatelyText({ unit, now }: { unit: FortUnit; now: GameTime | null }) {
+const LatelyText = ({ unit, now }: { unit: FortUnit; now: GameTime | null }) => {
   const t = notableThought(unit, now)
   if (!t) return null
   const tone = emotionTone(t[1])
@@ -392,7 +392,7 @@ function LatelyText({ unit, now }: { unit: FortUnit; now: GameTime | null }) {
 }
 
 /** Everyone as a card: portrait, what they are doing, what is on their mind, what they need. */
-function Grid({
+const Grid = ({
   units,
   now,
   onOpen,
@@ -400,7 +400,7 @@ function Grid({
   units: FortUnit[]
   now: GameTime | null
   onOpen: (unit: FortUnit) => void
-}) {
+}) => {
   const [q, setQ] = React.useState('')
   const entries = React.useMemo(() => {
     const needle = q.trim().toLowerCase()
