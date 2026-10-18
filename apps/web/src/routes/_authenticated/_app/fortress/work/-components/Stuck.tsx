@@ -1,18 +1,10 @@
 import type { FortAlert, FortJob, FortUnit } from '@fortress/db-drizzle/fortress-types'
-import {
-  Badge,
-  Button,
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  cn,
-} from '@fortress/ui'
+import { Badge, Button, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import { ArrowRightIcon, CirclePauseIcon, CoffeeIcon, RepeatIcon, WrenchIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { adviceGuide, workshopGuide } from '~/lib/fortress/advice/guides'
 import { cancellationHint } from '~/lib/fortress/advice/notices'
 import type { Advice } from '~/lib/fortress/advice/types'
@@ -53,7 +45,7 @@ export function StuckFixes({ suspended, failing }: { suspended: number; failing:
     .filter(Boolean)
     .join(' and ')
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-muted/30 px-4 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 bg-muted/30 px-4 py-3">
       <p className="text-sm">
         <span className="font-medium">{what.charAt(0).toUpperCase() + what.slice(1)}.</span>{' '}
         <span className="text-muted-foreground">
@@ -96,26 +88,23 @@ export function SuspendedJobs({
   const total = groups.reduce((sum, [, group]) => sum + group.jobs.length, 0)
 
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <CirclePauseIcon className="size-4 text-primary" />
+    <Section
+      icon={<CirclePauseIcon className="size-4 text-primary" />}
+      title={
+        <>
           Suspended jobs
           <Count n={total} />
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {total
-            ? 'A job suspends when its site is blocked by an item, a creature or water, or its materials cannot be reached.'
-            : 'Nothing is suspended.'}
-        </p>
-        {total ? (
-          <CardAction>
-            <GuideButton advice={advice} label="Unsuspend" />
-          </CardAction>
-        ) : null}
-      </CardHeader>
+        </>
+      }
+      description={
+        total
+          ? 'A job suspends when its site is blocked by an item, a creature or water, or its materials cannot be reached.'
+          : 'Nothing is suspended.'
+      }
+      action={total ? <GuideButton advice={advice} label="Unsuspend" /> : null}
+    >
       {total ? (
-        <CardContent>
+        <>
           <ul className="flex flex-col divide-y">
             {groups.map(([key, group]) => (
               <li key={key} className="flex flex-col gap-0.5 py-2 first:pt-0 last:pb-0">
@@ -145,9 +134,9 @@ export function SuspendedJobs({
               </li>
             ))}
           </ul>
-        </CardContent>
+        </>
       ) : null}
-    </Card>
+    </Section>
   )
 }
 
@@ -161,26 +150,23 @@ export function FailingJobs({
 }) {
   const failing = alerts.filter((alert) => alert.kind === 'cancellation')
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <RepeatIcon className="size-4 text-primary" />
+    <Section
+      icon={<RepeatIcon className="size-4 text-primary" />}
+      title={
+        <>
           Jobs that keep failing
           <Count n={failing.length} />
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {failing.length
-            ? 'Cancelled over and over, with the reason the game gives.'
-            : 'No job keeps getting cancelled.'}
-        </p>
-        {failing.length ? (
-          <CardAction>
-            <GuideButton advice={advice} label="How to fix it" />
-          </CardAction>
-        ) : null}
-      </CardHeader>
+        </>
+      }
+      description={
+        failing.length
+          ? 'Cancelled over and over, with the reason the game gives.'
+          : 'No job keeps getting cancelled.'
+      }
+      action={failing.length ? <GuideButton advice={advice} label="How to fix it" /> : null}
+    >
       {failing.length ? (
-        <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <ul className="flex flex-col divide-y">
             {failing.map((alert) => {
               const hint = cancellationHint(alert.detail)
@@ -213,9 +199,9 @@ export function FailingJobs({
             See the cancellations in the chronicle
             <ArrowRightIcon className="size-3.5" />
           </Link>
-        </CardContent>
+        </div>
       ) : null}
-    </Card>
+    </Section>
   )
 }
 
@@ -228,21 +214,22 @@ export function UnworkableWork({ rows, idle }: { rows: WorkshopRow[]; idle: Fort
       (row.count > 0 && row.info.skills.length > 0 && row.skilled.length === 0),
   )
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <WrenchIcon className="size-4 text-primary" />
+    <Section
+      icon={<WrenchIcon className="size-4 text-primary" />}
+      title={
+        <>
           Work nobody can do
           <Count n={blocked.length} />
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {blocked.length
-            ? 'Workshops every fortress wants but this one lacks, and workshops nobody has the skill to work. Open one for what to do.'
-            : 'Every workshop is built, and someone can work each one.'}
-        </p>
-      </CardHeader>
+        </>
+      }
+      description={
+        blocked.length
+          ? 'Workshops every fortress wants but this one lacks, and workshops nobody has the skill to work. Open one for what to do.'
+          : 'Every workshop is built, and someone can work each one.'
+      }
+    >
       {blocked.length ? (
-        <CardContent>
+        <>
           <ul className="grid gap-x-6 sm:grid-cols-2">
             {blocked.map((row) => {
               const missing = row.count === 0
@@ -280,36 +267,37 @@ export function UnworkableWork({ rows, idle }: { rows: WorkshopRow[]; idle: Fort
               )
             })}
           </ul>
-        </CardContent>
+        </>
       ) : null}
-    </Card>
+    </Section>
   )
 }
 
 /** Grown citizens with no job, no squad and no mood. */
 export function IdleHands({ idle, advice }: { idle: FortUnit[]; advice: Advice | undefined }) {
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <CoffeeIcon className="size-4 text-primary" />
+    <Section
+      icon={<CoffeeIcon className="size-4 text-primary" />}
+      title={
+        <>
           Nothing to do
           <Count n={idle.length} />
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {idle.length
-            ? 'Grown citizens with no job, no squad and no strange mood.'
-            : 'Every grown citizen has work.'}
-        </p>
-      </CardHeader>
+        </>
+      }
+      description={
+        idle.length
+          ? 'Grown citizens with no job, no squad and no strange mood.'
+          : 'Every grown citizen has work.'
+      }
+    >
       {idle.length ? (
-        <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3">
           <UnitChips units={idle} max={12} />
           <span>
             <GuideButton advice={advice} label="Find them work" />
           </span>
-        </CardContent>
+        </div>
       ) : null}
-    </Card>
+    </Section>
   )
 }

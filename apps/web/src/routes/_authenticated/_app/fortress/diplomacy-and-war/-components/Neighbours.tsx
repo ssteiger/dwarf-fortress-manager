@@ -1,19 +1,9 @@
 import type { FortCaravan, FortDiplomacy, FortPower, FortUnit } from '@fortress/db-drizzle'
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  cn,
-} from '@fortress/ui'
+import { Badge, Tabs, TabsList, TabsTrigger, cn } from '@fortress/ui'
 import { UsersRoundIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
 import {
   BEHAVIOUR,
@@ -91,20 +81,20 @@ export function Neighbours({
   })
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <UsersRoundIcon className="size-4 text-primary" />
-          Neighbours
-        </CardTitle>
-        <CardDescription>
+    <Section
+      icon={<UsersRoundIcon className="size-4 text-primary" />}
+      title="Neighbours"
+      bleed
+      description={
+        <>
           Civilizations and groups with settlements within {NEAR_TILES} world tiles, and any farther
           off that your civilization deals with. Select one for its leaders, wars and how to handle
           it.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4">
           <Tabs value={filter} onValueChange={(v) => setFilter(v as Filter)}>
             <TabsList className="flex-wrap">
               {(Object.keys(FILTERS) as Filter[]).map((key) => (
@@ -128,9 +118,11 @@ export function Neighbours({
         </div>
 
         {shown.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None of your neighbours fit this filter.</p>
+          <p className="px-4 pb-4 text-sm text-muted-foreground">
+            None of your neighbours fit this filter.
+          </p>
         ) : (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col divide-y border-t">
             {shown.map((power) => {
               const stance = stances.get(power.id)
               if (!stance) return null
@@ -149,8 +141,8 @@ export function Neighbours({
             })}
           </ul>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }
 
@@ -177,7 +169,7 @@ function NeighbourRow({
     <button
       type="button"
       onClick={() => onOpen(power.id)}
-      className="flex w-full flex-col gap-2 rounded-lg border p-3 text-left transition-colors hover:bg-accent/50 sm:flex-row sm:items-start sm:gap-4"
+      className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-accent/50 sm:flex-row sm:items-start sm:gap-4"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">

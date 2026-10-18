@@ -204,7 +204,7 @@ export function StoryCard({
     />
   )
   return (
-    <div className={cn('flex gap-3', featured && 'rounded-lg border bg-muted/30 p-4')}>
+    <div className={cn('flex gap-3', featured && 'rounded-lg bg-muted/30 p-4')}>
       {sprite ? (
         <LegendsSprite subject={sprite} size={featured ? 48 : 32} className="mt-0.5 shrink-0" />
       ) : null}

@@ -25,6 +25,7 @@ import {
   type LiveFortress,
   RecordLink,
   Section,
+  SectionStack,
   parseWorldParam,
 } from './-components/LegendsChrome'
 import { FeaturedStory, featuredStories, useStories } from './-components/Stories'
@@ -80,7 +81,7 @@ function OverviewBody({
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <SectionStack className="border-b">
       <Section title="Other ways in">
         <WaysIn worldId={worldId} />
       </Section>
@@ -92,8 +93,8 @@ function OverviewBody({
         <AtAGlance worldId={worldId} counts={counts} summary={summary} />
       </Section>
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="xl:col-start-1 xl:row-start-1">
+      <div className="grid xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="flex min-w-0 flex-col divide-y">
           {featured.length ? (
             <FeaturedStory
               worldId={worldId}
@@ -115,10 +116,10 @@ function OverviewBody({
               </p>
             </Section>
           )}
+          {live ? <PickUp worldId={worldId} /> : null}
         </div>
-
-        {live ? (
-          <div className="xl:col-start-2 xl:row-span-2 xl:row-start-1">
+        <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
+          {live ? (
             <YourFortress
               worldId={worldId}
               worldName={worldName}
@@ -126,10 +127,9 @@ function OverviewBody({
               matchesLive={matchesLive}
               summary={summary}
             />
-          </div>
-        ) : null}
-        <div className={live ? 'xl:col-start-1 xl:row-start-2' : 'xl:col-start-2 xl:row-start-1'}>
-          <PickUp worldId={worldId} />
+          ) : (
+            <PickUp worldId={worldId} />
+          )}
         </div>
       </div>
 
@@ -155,7 +155,7 @@ function OverviewBody({
           />
         </Section>
       ) : null}
-    </div>
+    </SectionStack>
   )
 }
 

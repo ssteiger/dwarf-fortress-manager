@@ -1,18 +1,5 @@
 import type { FortUnit } from '@fortress/db-drizzle/fortress-types'
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Input,
-  Label,
-  Skeleton,
-  Switch,
-  cn,
-} from '@fortress/ui'
+import { Badge, Button, Input, Label, Skeleton, Switch, cn } from '@fortress/ui'
 import {
   BookmarkIcon,
   CheckIcon,
@@ -27,6 +14,7 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { CreatureSprite } from '~/lib/df-assets/components'
 import type { DwarfName } from '~/lib/fortress/people/dossier'
 import {
@@ -103,108 +91,109 @@ export function Citizens({
   const canAsk = Boolean(writer?.enabled)
   const waiting = rows.filter((row) => changeOf(row.unit, row.draft) !== 'none').length
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Living citizens</CardTitle>
-        <CardDescription className="max-w-3xl">
+    <Section
+      bleed
+      title="Living citizens"
+      description={
+        <span className="block max-w-3xl">
           Each idea rests on something real: a favourite food that is somebody's brain, a missing
           toe, a parent's nickname, a job they are hopeless at, a mishap from the chronicle. Pick
           one, edit it or type your own, then queue it.{' '}
           {writer?.enabled
             ? `${writer.model} can write more from the same facts.`
             : 'Set LEGENDS_NARRATOR_PROVIDER and LEGENDS_NARRATOR_API_KEY to have a language model write them too.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-            <div className="relative w-full max-w-md">
-              <SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => onSearch(event.target.value)}
-                placeholder="Search by name, nickname or job"
-                aria-label="Search citizens"
-                className="pl-9"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="nickname-unnamed" checked={unnamedOnly} onCheckedChange={onUnnamedOnly} />
-              <Label htmlFor="nickname-unnamed" className="font-normal">
-                No nickname yet
-                <span className="text-muted-foreground tabular-nums">({withoutNickname})</span>
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="nickname-alliterate"
-                checked={alliterative}
-                onCheckedChange={onAlliterative}
-              />
-              <Label htmlFor="nickname-alliterate" className="font-normal">
-                Alliterate
-                <span className="text-muted-foreground">(Bad Bargain → Bob the Bad Bargain)</span>
-              </Label>
-            </div>
+        </span>
+      }
+    >
+      <div className="space-y-3 px-4">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="relative w-full max-w-md">
+            <SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => onSearch(event.target.value)}
+              placeholder="Search by name, nickname or job"
+              aria-label="Search citizens"
+              className="pl-9"
+            />
           </div>
-          {rows.length ? (
-            <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className={cn('tabular-nums', waiting && 'font-medium text-foreground')}>
-                {waiting
-                  ? `${waiting} of ${rows.length} shown would change when queued.`
-                  : 'Every box shown matches the game.'}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <BookmarkIcon className="size-3.5" aria-hidden />
-                from your names
-              </span>
-              {canAsk ? (
-                <span className="inline-flex items-center gap-1">
-                  <SparklesIcon className="size-3.5" aria-hidden />
-                  written by the AI
-                </span>
-              ) : null}
-              <span>unmarked ideas come from their story</span>
-            </p>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <Switch id="nickname-unnamed" checked={unnamedOnly} onCheckedChange={onUnnamedOnly} />
+            <Label htmlFor="nickname-unnamed" className="font-normal">
+              No nickname yet
+              <span className="text-muted-foreground tabular-nums">({withoutNickname})</span>
+            </Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch
+              id="nickname-alliterate"
+              checked={alliterative}
+              onCheckedChange={onAlliterative}
+            />
+            <Label htmlFor="nickname-alliterate" className="font-normal">
+              Alliterate
+              <span className="text-muted-foreground">(Bad Bargain → Bob the Bad Bargain)</span>
+            </Label>
+          </div>
         </div>
+        {rows.length ? (
+          <p className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className={cn('tabular-nums', waiting && 'font-medium text-foreground')}>
+              {waiting
+                ? `${waiting} of ${rows.length} shown would change when queued.`
+                : 'Every box shown matches the game.'}
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <BookmarkIcon className="size-3.5" aria-hidden />
+              from your names
+            </span>
+            {canAsk ? (
+              <span className="inline-flex items-center gap-1">
+                <SparklesIcon className="size-3.5" aria-hidden />
+                written by the AI
+              </span>
+            ) : null}
+            <span>unmarked ideas come from their story</span>
+          </p>
+        ) : null}
+      </div>
 
-        {rows.length === 0 ? (
-          <EmptyState
-            title={
-              total === 0
-                ? 'No living citizens found'
-                : unnamedOnly && !query
-                  ? 'Everyone has a nickname'
-                  : 'No matches'
-            }
-          >
-            {total === 0
-              ? 'Wait for the worker to capture a loaded fortress.'
+      {rows.length === 0 ? (
+        <EmptyState
+          className="mx-4 mb-4"
+          title={
+            total === 0
+              ? 'No living citizens found'
               : unnamedOnly && !query
-                ? 'Turn off "No nickname yet" to rename someone.'
-                : 'Try a different search.'}
-          </EmptyState>
-        ) : (
-          <div className="@container divide-y rounded-lg border">
-            {rows.map((row) => (
-              <NicknameRow
-                key={row.unit.id}
-                {...row}
-                loadingIdeas={loadingIdeas}
-                disabled={disabled}
-                canAsk={canAsk}
-                onType={(typed) => onType(row.unit.id, typed)}
-                onPick={(idea) => onPick(row.unit.id, idea)}
-                onBrowse={onBrowse ? () => onBrowse(row.unit.id) : null}
-                onQueue={() => onQueue(row.unit)}
-                onAsk={() => onAsk(row.unit)}
-              />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                ? 'Everyone has a nickname'
+                : 'No matches'
+          }
+        >
+          {total === 0
+            ? 'Wait for the worker to capture a loaded fortress.'
+            : unnamedOnly && !query
+              ? 'Turn off "No nickname yet" to rename someone.'
+              : 'Try a different search.'}
+        </EmptyState>
+      ) : (
+        <div className="@container divide-y border-t">
+          {rows.map((row) => (
+            <NicknameRow
+              key={row.unit.id}
+              {...row}
+              loadingIdeas={loadingIdeas}
+              disabled={disabled}
+              canAsk={canAsk}
+              onType={(typed) => onType(row.unit.id, typed)}
+              onPick={(idea) => onPick(row.unit.id, idea)}
+              onBrowse={onBrowse ? () => onBrowse(row.unit.id) : null}
+              onQueue={() => onQueue(row.unit)}
+              onAsk={() => onAsk(row.unit)}
+            />
+          ))}
+        </div>
+      )}
+    </Section>
   )
 }
 

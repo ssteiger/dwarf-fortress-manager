@@ -8,7 +8,13 @@ import { useFortOverview, useFortPeople, useFortUnits } from '~/lib/fortress/cli
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { concernScore, unitConcerns } from '~/lib/fortress/people/troubles'
 import { gameTimeOf } from '~/lib/fortress/time'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import {
+  EmptyState,
+  PageHeader,
+  SectionGrid,
+  SectionStack,
+  StatusBand,
+} from '../-components/FortChrome'
 import { Bonds, HelpList, SkillCoverage, Squads, WorkGroups } from './-components/PeoplePanels'
 import { UnitDrawer } from './-components/UnitDrawer'
 
@@ -39,8 +45,9 @@ function DwarvesPage() {
   const summary = overview.data?.state?.summary ?? null
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="Dwarves"
         description={
           summary ? (
@@ -70,12 +77,12 @@ function DwarvesPage() {
           </Button>
         }
       />
-      <StatusBanner state={overview.data?.state} />
+      <StatusBand state={overview.data?.state} />
 
       {citizens.length ? (
-        <>
+        <SectionStack className="border-b">
           <HelpList entries={helpWanted} onOpen={setSelected} />
-          <div className="grid items-start gap-4 xl:grid-cols-2">
+          <SectionGrid className="xl:grid-cols-2">
             <WorkGroups citizens={citizens} onOpen={setSelected} />
             <SkillCoverage
               citizens={citizens}
@@ -83,7 +90,7 @@ function DwarvesPage() {
               loading={people.isPending}
               onOpen={setSelected}
             />
-          </div>
+          </SectionGrid>
           <Squads squads={people.data?.squads ?? []} units={units} onOpen={setSelected} />
           <Bonds
             citizens={citizens}
@@ -91,9 +98,9 @@ function DwarvesPage() {
             loading={people.isPending}
             onOpen={setSelected}
           />
-        </>
+        </SectionStack>
       ) : (
-        <EmptyState title="No citizens yet">
+        <EmptyState title="No citizens yet" className="m-4">
           {units.length
             ? 'Nobody on the map is a citizen of the fortress. Everyone else is under Everyone on the map.'
             : 'No dump has been taken yet.'}

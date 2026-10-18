@@ -4,7 +4,6 @@ import {
   AlertTitle,
   Badge,
   Button,
-  Card,
   Input,
   Skeleton,
   cn,
@@ -283,8 +282,9 @@ function WorkerLogsPage() {
     : null
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="Worker logs"
         description={
           <>
@@ -304,10 +304,14 @@ function WorkerLogsPage() {
         onRefresh={() => void query.refetch()}
       />
 
-      {open ? <OpenProblem entry={open} /> : null}
+      {open ? (
+        <div className="border-b p-4">
+          <OpenProblem entry={open} />
+        </div>
+      ) : null}
 
       {query.isError && !query.data ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="m-4 w-auto">
           <CircleAlertIcon className="size-4" />
           <AlertTitle>Could not read the worker logs</AlertTitle>
           <AlertDescription>
@@ -324,16 +328,16 @@ function WorkerLogsPage() {
           </AlertDescription>
         </Alert>
       ) : !query.data ? (
-        <Skeleton className="h-96 rounded-xl" />
+        <Skeleton className="m-4 h-96 rounded-xl" />
       ) : !entries.length ? (
-        <EmptyState title="The worker has not written anything yet">
+        <EmptyState title="The worker has not written anything yet" className="m-4">
           Start it with{' '}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">bun run dev:worker</code> while
           Dwarf Fortress runs with DFHack. It notes here when it connects.
         </EmptyState>
       ) : (
         <>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <FilterChips current={show} counts={counts} />
             <div className="relative w-full lg:max-w-xs">
               <SearchIcon className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
@@ -348,22 +352,29 @@ function WorkerLogsPage() {
           </div>
 
           {days.length ? (
-            <Card className="gap-0 px-4 py-2">
+            <div className="flex flex-col border-b">
               {days.map((day) => (
-                <section key={day.key} aria-labelledby={`day-${day.key}`} className="py-2">
-                  <h2 id={`day-${day.key}`} className="text-sm font-semibold text-muted-foreground">
+                <section
+                  key={day.key}
+                  aria-labelledby={`day-${day.key}`}
+                  className="not-last:border-b"
+                >
+                  <h2
+                    id={`day-${day.key}`}
+                    className="border-b bg-muted/30 px-4 py-2 text-sm font-semibold text-muted-foreground"
+                  >
                     {day.label}
                   </h2>
-                  <ul className="flex flex-col divide-y">
+                  <ul className="flex flex-col divide-y px-4">
                     {day.entries.map((entry) => (
                       <EntryRow key={entry.id} entry={entry} />
                     ))}
                   </ul>
                 </section>
               ))}
-            </Card>
+            </div>
           ) : (
-            <EmptyState title="Nothing matches">
+            <EmptyState title="Nothing matches" className="m-4">
               {q.trim()
                 ? `No entry mentions “${q.trim()}”${show === 'all' ? '' : ` under ${LOG_FILTERS[show]}`}.`
                 : `Nothing under ${LOG_FILTERS[show]} in the newest ${limit.toLocaleString()} lines.`}
@@ -371,7 +382,7 @@ function WorkerLogsPage() {
           )}
 
           {query.data.hasMore ? (
-            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap items-center gap-3 p-4 text-sm text-muted-foreground">
               <span>Showing the newest {limit.toLocaleString()} lines.</span>
               <Button
                 size="sm"

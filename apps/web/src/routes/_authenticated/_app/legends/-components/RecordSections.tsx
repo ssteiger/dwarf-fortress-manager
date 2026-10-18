@@ -461,7 +461,7 @@ export function FigureSections({
 
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y">
         <Section title="Who they are">
           <Facts
             items={[
@@ -588,7 +588,7 @@ export function FigureSections({
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="flex flex-col divide-y lg:col-span-2">
         {skills.length ? (
           <Section title="Skills" count={skills.length}>
             <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
@@ -909,7 +909,7 @@ export function SiteSections({
 
       <TimelineRow timeline={timeline} />
 
-      <div className="flex flex-col gap-4 lg:col-span-3">
+      <div className="flex flex-col divide-y lg:col-span-3">
         {structures.length ? (
           <Section title="Structures" count={structures.length}>
             <div className="flex flex-col gap-4">
@@ -1287,7 +1287,7 @@ export function ArtifactSections({
   const creator = num(firstPayload.hist_figure_id) ?? num(plusOf(firstPayload).creator_hfid)
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y">
         <Section title="The object">
           <Facts
             items={[
@@ -1356,7 +1356,7 @@ export function ArtifactSections({
           />
         </Section>
       </div>
-      <div className="flex flex-col gap-4 lg:col-span-2">{timeline}</div>
+      <div className="flex flex-col divide-y lg:col-span-2">{timeline}</div>
     </>
   )
 }
@@ -1395,7 +1395,7 @@ export function WrittenSections({
   }
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y">
         <Section title="The work">
           <Facts
             items={[
@@ -1455,7 +1455,7 @@ export function WrittenSections({
           </Section>
         ) : null}
       </div>
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="flex flex-col divide-y lg:col-span-2">
         {related.referencedEvents?.length ? (
           <Section
             title="Events it recounts"
@@ -1689,7 +1689,7 @@ export function CollectionSections({
 
       <TimelineRow timeline={timeline} />
 
-      <div className="flex flex-col gap-4 lg:col-span-3">
+      <div className="flex flex-col divide-y lg:col-span-3">
         {isBattle ? (
           <Section
             title="The forces"
@@ -1806,7 +1806,7 @@ export function RegionSections({
         </Section>
       </div>
       <TimelineRow timeline={timeline} />
-      <div className="flex flex-col gap-4 lg:col-span-3">
+      <div className="flex flex-col divide-y lg:col-span-3">
         {hits.length ? (
           <Section title="Sites in this region" count={hits.length}>
             <HitRows hits={hits} worldId={worldId} />
@@ -1883,7 +1883,7 @@ export function ProseSections({
     .map((k) => words(k.replace('biome_pool_', '')))
   return (
     <>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col divide-y">
         <Section title="Details">
           <Facts
             items={[
@@ -1940,7 +1940,7 @@ export function ProseSections({
           />
         </Section>
       </div>
-      <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="flex flex-col divide-y lg:col-span-2">
         {paragraphs.length ? (
           <Section title="As it is described">
             <div className="flex max-w-[70ch] flex-col gap-3 text-base">

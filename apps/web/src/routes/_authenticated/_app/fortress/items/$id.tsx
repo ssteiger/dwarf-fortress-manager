@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { ItemSprite } from '~/lib/df-assets/components'
 import { useFortItem, useFortOverview } from '~/lib/fortress/client/queries'
-import { FortBreadcrumbs, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { FortBreadcrumbs, PageHeader, StatusBand } from '../-components/FortChrome'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
 
 function ItemPage() {
@@ -14,36 +14,40 @@ function ItemPage() {
   const title = item?.description ?? `Item #${id}`
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <FortBreadcrumbs
-        items={[
-          { label: 'Fortress', to: '/fortress' },
-          { label: 'Items', to: '/fortress/items' },
-          { label: title },
-        ]}
-      />
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-col gap-4 border-b p-4">
+        <FortBreadcrumbs
+          items={[
+            { label: 'Fortress', to: '/fortress' },
+            { label: 'Items', to: '/fortress/items' },
+            { label: title },
+          ]}
+        />
 
-      <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            {item ? (
-              <ItemSprite
-                item={item}
-                size={96}
-                className="rounded-md border bg-muted/40"
-                title={`${title} as drawn in the game`}
-              />
-            ) : null}
-            {title}
-            {item ? <ItemStatusBadges flags={item.flags} className="text-sm font-normal" /> : null}
-          </span>
-        }
-        description={item ? itemSubtitle(item) : undefined}
-        updatedAt={data?.capturedAt}
-        isFetching={isFetching}
-        onRefresh={() => refetch()}
-      />
-      <StatusBanner state={overview.data?.state} />
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              {item ? (
+                <ItemSprite
+                  item={item}
+                  size={96}
+                  className="rounded-md border bg-muted/40"
+                  title={`${title} as drawn in the game`}
+                />
+              ) : null}
+              {title}
+              {item ? (
+                <ItemStatusBadges flags={item.flags} className="text-sm font-normal" />
+              ) : null}
+            </span>
+          }
+          description={item ? itemSubtitle(item) : undefined}
+          updatedAt={data?.capturedAt}
+          isFetching={isFetching}
+          onRefresh={() => refetch()}
+        />
+      </div>
+      <StatusBand state={overview.data?.state} />
       <ItemDetails itemId={numericId} />
     </div>
   )

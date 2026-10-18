@@ -97,6 +97,7 @@ function JournalBody({ worldId, worldName }: { worldId: number; worldName: strin
 
   return (
     <Section
+      className="border-b"
       title="Your journal"
       count={notes.length || null}
       description="What you have pinned in this world: figures, places, years, stories and the notes you left on them. Only you can see it."

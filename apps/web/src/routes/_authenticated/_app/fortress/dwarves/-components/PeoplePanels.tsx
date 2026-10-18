@@ -1,5 +1,5 @@
 import type { FortSquad, FortUnit } from '@fortress/db-drizzle'
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '@fortress/ui'
+import { Badge, Button, Skeleton, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import {
   BriefcaseIcon,
@@ -16,6 +16,7 @@ import { skillLabel } from '~/lib/fortress/people/dossier'
 import type { Concern } from '~/lib/fortress/people/troubles'
 import { firstName, isGrownCitizen } from '~/lib/fortress/people/units'
 import type { FortBond, FortWastedTalent } from '~/lib/fortress/server/units'
+import { Section } from '../../-components/FortChrome'
 import { ConcernBadges, type OpenUnit, UnitChip } from '../../-components/Insights'
 
 const SEVERITY_ORDER: Record<Concern['severity'], number> = { danger: 0, warning: 1, info: 2 }
@@ -59,25 +60,27 @@ export function HelpList({ entries, onOpen }: { entries: HelpEntry[]; onOpen: Op
   const [all, setAll] = React.useState(false)
   const shown = capped(entries, HELP_SHOWN, all)
   return (
-    <Card className="gap-3">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <HandHelpingIcon className="size-4 text-primary" />
+    <Section
+      className="gap-3"
+      icon={<HandHelpingIcon className="size-4 text-primary" />}
+      title={
+        <>
           Could use your help
           {entries.length ? (
             <span className="text-sm font-normal text-muted-foreground tabular-nums">
               {entries.length}
             </span>
           ) : null}
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {entries.length
-            ? 'A need, a wound, a dark mood or nothing to do, the worst first. Open someone for what would help.'
-            : 'Nobody needs you right now.'}
-        </p>
-      </CardHeader>
+        </>
+      }
+      description={
+        entries.length
+          ? 'A need, a wound, a dark mood or nothing to do, the worst first. Open someone for what would help.'
+          : 'Nobody needs you right now.'
+      }
+    >
       {entries.length ? (
-        <CardContent className="flex flex-col">
+        <div className="flex flex-col">
           <ul className="grid gap-x-6 gap-y-0.5 lg:grid-cols-2">
             {shown.map(({ unit, concerns }) => {
               const worst = [...concerns].sort(
@@ -111,27 +114,30 @@ export function HelpList({ entries, onOpen }: { entries: HelpEntry[]; onOpen: Op
             })}
           </ul>
           <ShowAll hidden={entries.length - shown.length} onClick={() => setAll(true)} />
-        </CardContent>
+        </div>
       ) : null}
-    </Card>
+    </Section>
   )
 }
 
 const STRIP_SHOWN = 5
 
 /** The worst few of `HelpList`, in a row, for the overview; each opens the dwarf's page. */
-export function HelpStrip({ entries }: { entries: HelpEntry[] }) {
+export function HelpStrip({ entries, className }: { entries: HelpEntry[]; className?: string }) {
   const shown = entries.slice(0, STRIP_SHOWN)
   return (
-    <Card className="gap-3">
-      <CardHeader className="flex flex-row flex-wrap items-baseline justify-between gap-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <HandHelpingIcon className="size-4 text-primary" />
+    <Section
+      className={cn('gap-3', className)}
+      icon={<HandHelpingIcon className="size-4 text-primary" />}
+      title={
+        <>
           Could use your help
           <span className="text-sm font-normal text-muted-foreground tabular-nums">
             {entries.length}
           </span>
-        </CardTitle>
+        </>
+      }
+      action={
         <Link
           to="/fortress/dwarves"
           className="text-sm text-primary underline-offset-4 hover:underline"
@@ -140,37 +146,36 @@ export function HelpStrip({ entries }: { entries: HelpEntry[] }) {
             ? `All ${entries.length} on the Dwarves page`
             : 'More on the Dwarves page'}
         </Link>
-      </CardHeader>
-      <CardContent>
-        <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-5">
-          {shown.map(({ unit, concerns }) => {
-            const worst = [...concerns].sort(
-              (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
-            )
-            return (
-              <li key={unit.id} className="min-w-0">
-                <Link
-                  to="/fortress/dwarves/$id"
-                  params={{ id: String(unit.id) }}
-                  className="-mx-2 flex h-full flex-col gap-1.5 rounded-md px-2 py-2 transition-colors hover:bg-accent"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <CreatureSprite unit={unit} size={24} className="shrink-0" />
-                    <span className="truncate font-medium">{firstName(unit)}</span>
+      }
+    >
+      <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2 lg:grid-cols-5">
+        {shown.map(({ unit, concerns }) => {
+          const worst = [...concerns].sort(
+            (a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity],
+          )
+          return (
+            <li key={unit.id} className="min-w-0">
+              <Link
+                to="/fortress/dwarves/$id"
+                params={{ id: String(unit.id) }}
+                className="-mx-2 flex h-full flex-col gap-1.5 rounded-md px-2 py-2 transition-colors hover:bg-accent"
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <CreatureSprite unit={unit} size={24} className="shrink-0" />
+                  <span className="truncate font-medium">{firstName(unit)}</span>
+                </span>
+                <ConcernBadges concerns={worst.slice(0, 2)} />
+                {worst[0]?.hint ? (
+                  <span className="line-clamp-2 text-sm text-muted-foreground">
+                    {firstSentence(worst[0].hint)}
                   </span>
-                  <ConcernBadges concerns={worst.slice(0, 2)} />
-                  {worst[0]?.hint ? (
-                    <span className="line-clamp-2 text-sm text-muted-foreground">
-                      {firstSentence(worst[0].hint)}
-                    </span>
-                  ) : null}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </CardContent>
-    </Card>
+                ) : null}
+              </Link>
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
   )
 }
 
@@ -263,13 +268,11 @@ export function WorkGroups({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
   const groups = React.useMemo(() => workGroups(citizens), [citizens])
   const idle = citizens.filter(isIdle).length
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <BriefcaseIcon className="size-4 text-primary" />
-          Who does what
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
+    <Section
+      icon={<BriefcaseIcon className="size-4 text-primary" />}
+      title="Who does what"
+      description={
+        <>
           By office, squad and trade.
           {idle ? (
             <>
@@ -281,43 +284,42 @@ export function WorkGroups({ citizens, onOpen }: { citizens: FortUnit[]; onOpen:
               , outlined in amber.
             </>
           ) : null}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <dl className="flex flex-col divide-y">
-          {groups.map((group) => (
-            <div
-              key={group.key}
-              className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[9.5rem_1fr]"
-            >
-              <dt className="flex items-baseline gap-2 pt-0.5 text-sm text-muted-foreground">
-                <span className="truncate">{group.label}</span>
-                <span className="tabular-nums">{group.units.length}</span>
-              </dt>
-              <dd className="flex flex-wrap items-center gap-1.5">
-                {group.units.map((unit) =>
-                  group.offices ? (
-                    <span key={unit.id} className="inline-flex items-center gap-1.5 pr-2">
-                      <UnitChip unit={unit} onOpen={onOpen} />
-                      <span className="text-sm text-muted-foreground">
-                        {(group.offices.get(unit.id) ?? []).map(capitalize).join(', ')}
-                      </span>
+        </>
+      }
+    >
+      <dl className="flex flex-col divide-y">
+        {groups.map((group) => (
+          <div
+            key={group.key}
+            className="grid gap-2 py-3 first:pt-0 last:pb-0 sm:grid-cols-[9.5rem_1fr]"
+          >
+            <dt className="flex items-baseline gap-2 pt-0.5 text-sm text-muted-foreground">
+              <span className="truncate">{group.label}</span>
+              <span className="tabular-nums">{group.units.length}</span>
+            </dt>
+            <dd className="flex flex-wrap items-center gap-1.5">
+              {group.units.map((unit) =>
+                group.offices ? (
+                  <span key={unit.id} className="inline-flex items-center gap-1.5 pr-2">
+                    <UnitChip unit={unit} onOpen={onOpen} />
+                    <span className="text-sm text-muted-foreground">
+                      {(group.offices.get(unit.id) ?? []).map(capitalize).join(', ')}
                     </span>
-                  ) : (
-                    <UnitChip
-                      key={unit.id}
-                      unit={unit}
-                      onOpen={onOpen}
-                      className={cn(isIdle(unit) && 'border-amber-500/70')}
-                    />
-                  ),
-                )}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </CardContent>
-    </Card>
+                  </span>
+                ) : (
+                  <UnitChip
+                    key={unit.id}
+                    unit={unit}
+                    onOpen={onOpen}
+                    className={cn(isIdle(unit) && 'border-amber-500/70')}
+                  />
+                ),
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Section>
   )
 }
 
@@ -337,85 +339,86 @@ export function Squads({
   const byId = React.useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units])
   if (!squads.length) return null
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ShieldIcon className="size-4 text-primary" />
+    <Section
+      icon={<ShieldIcon className="size-4 text-primary" />}
+      title={
+        <>
           Squads
           <span className="text-sm font-normal text-muted-foreground tabular-nums">
             {squads.length}
           </span>
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
+        </>
+      }
+      description={
+        <>
           What each squad is doing, what it wears, and who serves. Soldiers with no equipment
           assigned are outlined in amber.
-        </p>
-      </CardHeader>
-      <CardContent>
-        <ul className="flex flex-col divide-y">
-          {squads.map((squad) => {
-            const uniforms = [...new Set(squad.members.map((m) => m.uniform).filter(Boolean))]
-            const unequipped = squad.members.filter((m) => m.assigned_items === 0).length
-            return (
-              <li key={squad.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                  <span className="font-medium">
-                    {squad.alias || squad.name || `Squad ${squad.id}`}
+        </>
+      }
+    >
+      <ul className="flex flex-col divide-y">
+        {squads.map((squad) => {
+          const uniforms = [...new Set(squad.members.map((m) => m.uniform).filter(Boolean))]
+          const unequipped = squad.members.filter((m) => m.assigned_items === 0).length
+          return (
+            <li key={squad.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-medium">
+                  {squad.alias || squad.name || `Squad ${squad.id}`}
+                </span>
+                {squad.alias && squad.name ? (
+                  <span className="text-sm text-muted-foreground">{squad.name}</span>
+                ) : null}
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {squad.members.length} of {squad.positions} filled
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 text-sm">
+                {squad.routine ? <Badge variant="secondary">{squad.routine}</Badge> : null}
+                {squad.orders.length ? (
+                  squad.orders.map((order) => (
+                    <Badge key={order} variant="outline">
+                      {order}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-muted-foreground">no orders</span>
+                )}
+                {uniforms.length ? (
+                  <span className="text-muted-foreground">· {uniforms.join(', ')}</span>
+                ) : null}
+                {unequipped ? (
+                  <span className="text-amber-700 dark:text-amber-300">
+                    · {unequipped} without equipment
                   </span>
-                  {squad.alias && squad.name ? (
-                    <span className="text-sm text-muted-foreground">{squad.name}</span>
-                  ) : null}
-                  <span className="text-sm text-muted-foreground tabular-nums">
-                    {squad.members.length} of {squad.positions} filled
-                  </span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 text-sm">
-                  {squad.routine ? <Badge variant="secondary">{squad.routine}</Badge> : null}
-                  {squad.orders.length ? (
-                    squad.orders.map((order) => (
-                      <Badge key={order} variant="outline">
-                        {order}
-                      </Badge>
-                    ))
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {squad.members.map((member) => {
+                  const unit = member.unit !== null ? byId.get(member.unit) : undefined
+                  return unit ? (
+                    <UnitChip
+                      key={member.position}
+                      unit={unit}
+                      onOpen={onOpen}
+                      className={cn(member.assigned_items === 0 && 'border-amber-500/70')}
+                    />
                   ) : (
-                    <span className="text-muted-foreground">no orders</span>
-                  )}
-                  {uniforms.length ? (
-                    <span className="text-muted-foreground">· {uniforms.join(', ')}</span>
-                  ) : null}
-                  {unequipped ? (
-                    <span className="text-amber-700 dark:text-amber-300">
-                      · {unequipped} without equipment
+                    <span
+                      key={member.position}
+                      className="rounded-full border border-dashed px-2 py-0.5 text-sm text-muted-foreground"
+                      title="Not on the map"
+                    >
+                      {member.name ?? `Position ${member.position + 1}`}
                     </span>
-                  ) : null}
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {squad.members.map((member) => {
-                    const unit = member.unit !== null ? byId.get(member.unit) : undefined
-                    return unit ? (
-                      <UnitChip
-                        key={member.position}
-                        unit={unit}
-                        onOpen={onOpen}
-                        className={cn(member.assigned_items === 0 && 'border-amber-500/70')}
-                      />
-                    ) : (
-                      <span
-                        key={member.position}
-                        className="rounded-full border border-dashed px-2 py-0.5 text-sm text-muted-foreground"
-                        title="Not on the map"
-                      >
-                        {member.name ?? `Position ${member.position + 1}`}
-                      </span>
-                    )
-                  })}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </CardContent>
-    </Card>
+                  )
+                })}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+    </Section>
   )
 }
 
@@ -492,17 +495,12 @@ export function SkillCoverage({
   const shownWasted = capped(wastedRows, WASTED_SHOWN, allWasted)
 
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <GraduationCapIcon className="size-4 text-primary" />
-          Who is good at what
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          The best hand at each skill a fortress leans on, and how many others are competent.
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+    <Section
+      icon={<GraduationCapIcon className="size-4 text-primary" />}
+      title="Who is good at what"
+      description="The best hand at each skill a fortress leans on, and how many others are competent."
+    >
+      <div className="flex flex-col gap-5">
         {KEY_SKILLS.map(({ area, skills }) => (
           <section key={area} className="flex flex-col">
             <h3 className="pb-1 text-xs font-medium text-muted-foreground">{area}</h3>
@@ -586,8 +584,8 @@ export function SkillCoverage({
             />
           </section>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }
 
@@ -742,81 +740,78 @@ export function Bonds({
   const cap = <T,>(list: T[], all: boolean) => capped(list, BONDS_SHOWN, all)
 
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <HeartHandshakeIcon className="size-4 text-primary" />
-          Who they are to each other
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
+    <Section
+      icon={<HeartHandshakeIcon className="size-4 text-primary" />}
+      title="Who they are to each other"
+      description={
+        <>
           Families, friendships and grudges between citizens, as each one's own memory has them.
           Grudges are where fights and tantrums start.
-        </p>
-      </CardHeader>
-      <CardContent>
-        {loading ? (
-          <Skeleton className="h-32 rounded-lg" />
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-3">
-            <BondColumn
-              title="Families"
-              count={families.length}
-              empty="No two citizens are related."
-              hidden={families.length - cap(families, open.family).length}
-              onShowAll={() => setOpen((o) => ({ ...o, family: true }))}
-            >
-              {cap(families, open.family).map((members) => (
-                <li key={members[0].id} className="flex flex-wrap gap-1.5 py-2 first:pt-0">
-                  {members.map((unit) => (
-                    <UnitChip key={unit.id} unit={unit} onOpen={onOpen} />
-                  ))}
-                </li>
-              ))}
-            </BondColumn>
-            <BondColumn
-              title="Close friends"
-              count={close.length}
-              empty="No close friendships yet. Taverns, temples and shared work bring them."
-              note={
-                friends.length > close.length
-                  ? `And ${friends.length - close.length} more pairs who call each other friends.`
-                  : null
-              }
-              hidden={close.length - cap(close, open.friends).length}
-              onShowAll={() => setOpen((o) => ({ ...o, friends: true }))}
-            >
-              {cap(close, open.friends).map((row) => (
-                <li key={row.key} className="flex flex-col gap-1 py-2 first:pt-0">
-                  <span className="text-xs text-muted-foreground">{row.words}</span>
-                  <span className="flex flex-wrap gap-1.5">
-                    <UnitChip unit={row.a} onOpen={onOpen} />
-                    <UnitChip unit={row.b} onOpen={onOpen} />
-                  </span>
-                </li>
-              ))}
-            </BondColumn>
-            <BondColumn
-              title="Grudges"
-              count={foes.length}
-              empty="No grudges between citizens."
-              hidden={foes.length - cap(foes, open.foes).length}
-              onShowAll={() => setOpen((o) => ({ ...o, foes: true }))}
-            >
-              {cap(foes, open.foes).map((row) => (
-                <li
-                  key={row.key}
-                  className="flex flex-wrap items-center gap-1.5 py-2 text-sm first:pt-0"
-                >
+        </>
+      }
+    >
+      {loading ? (
+        <Skeleton className="h-32 rounded-lg" />
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-3">
+          <BondColumn
+            title="Families"
+            count={families.length}
+            empty="No two citizens are related."
+            hidden={families.length - cap(families, open.family).length}
+            onShowAll={() => setOpen((o) => ({ ...o, family: true }))}
+          >
+            {cap(families, open.family).map((members) => (
+              <li key={members[0].id} className="flex flex-wrap gap-1.5 py-2 first:pt-0">
+                {members.map((unit) => (
+                  <UnitChip key={unit.id} unit={unit} onOpen={onOpen} />
+                ))}
+              </li>
+            ))}
+          </BondColumn>
+          <BondColumn
+            title="Close friends"
+            count={close.length}
+            empty="No close friendships yet. Taverns, temples and shared work bring them."
+            note={
+              friends.length > close.length
+                ? `And ${friends.length - close.length} more pairs who call each other friends.`
+                : null
+            }
+            hidden={close.length - cap(close, open.friends).length}
+            onShowAll={() => setOpen((o) => ({ ...o, friends: true }))}
+          >
+            {cap(close, open.friends).map((row) => (
+              <li key={row.key} className="flex flex-col gap-1 py-2 first:pt-0">
+                <span className="text-xs text-muted-foreground">{row.words}</span>
+                <span className="flex flex-wrap gap-1.5">
                   <UnitChip unit={row.a} onOpen={onOpen} />
-                  <span className="text-muted-foreground">{row.words}</span>
                   <UnitChip unit={row.b} onOpen={onOpen} />
-                  {row.both ? <span className="text-muted-foreground">and back</span> : null}
-                </li>
-              ))}
-            </BondColumn>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+                </span>
+              </li>
+            ))}
+          </BondColumn>
+          <BondColumn
+            title="Grudges"
+            count={foes.length}
+            empty="No grudges between citizens."
+            hidden={foes.length - cap(foes, open.foes).length}
+            onShowAll={() => setOpen((o) => ({ ...o, foes: true }))}
+          >
+            {cap(foes, open.foes).map((row) => (
+              <li
+                key={row.key}
+                className="flex flex-wrap items-center gap-1.5 py-2 text-sm first:pt-0"
+              >
+                <UnitChip unit={row.a} onOpen={onOpen} />
+                <span className="text-muted-foreground">{row.words}</span>
+                <UnitChip unit={row.b} onOpen={onOpen} />
+                {row.both ? <span className="text-muted-foreground">and back</span> : null}
+              </li>
+            ))}
+          </BondColumn>
+        </div>
+      )}
+    </Section>
   )
 }

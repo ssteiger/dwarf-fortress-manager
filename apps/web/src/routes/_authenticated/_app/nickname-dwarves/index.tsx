@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { useFortOverview } from '~/lib/fortress/client/queries'
 import { alliterate, alliterateAll, alliterationKey } from '~/lib/fortress/nicknames/alliteration'
 import { getFortUnits } from '~/lib/fortress/server/units'
-import { PageHeader, StatusBanner } from '../fortress/-components/FortChrome'
+import { PageHeader, StatusBand } from '../fortress/-components/FortChrome'
 import { Citizens } from './-components/Citizens'
 import { NameList } from './-components/NameList'
 import { NamePicker } from './-components/NamePicker'
@@ -319,8 +319,9 @@ function RouteComponent() {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title={<span className="flex flex-wrap items-center gap-3">Nickname dwarves</span>}
         description="Names worth shouting across the dining hall, each pinned on something only that dwarf has eaten, lost, loved, botched or survived. The worker applies queued names to the running game through DFHack on its next poll."
         updatedAt={data?.capturedAt}
@@ -376,7 +377,7 @@ function RouteComponent() {
           </div>
         }
       />
-      <StatusBanner state={overview.data?.state} />
+      <StatusBand state={overview.data?.state} />
 
       <NamePicker
         target={
@@ -390,23 +391,25 @@ function RouteComponent() {
         onClose={() => setPicking(null)}
       />
 
-      <div className="grid gap-6 xl:grid-cols-2 xl:items-start">
+      <div className="grid border-b xl:grid-cols-2">
         {ideasQuery.data ? (
-          <div className="xl:sticky xl:top-6 xl:order-last xl:h-[calc(100svh-6rem)]">
-            <NameList
-              className="h-full"
-              list={list}
-              calledBy={calledBy}
-              onChanged={() => void ideasQuery.refetch()}
-              onShow={show}
-              apply={{
-                count: Math.min(fromList.length, MAX_QUEUE),
-                replacing: fromList.filter(({ unit }) => unit.nickname?.trim()).length,
-                pending: mutation.isPending,
-                disabled: !isLive,
-                onApply: applyList,
-              }}
-            />
+          <div className="min-w-0 border-b xl:order-last xl:border-b-0 xl:border-l">
+            <div className="xl:sticky xl:top-0 xl:h-[calc(100svh-3rem)]">
+              <NameList
+                className="h-full"
+                list={list}
+                calledBy={calledBy}
+                onChanged={() => void ideasQuery.refetch()}
+                onShow={show}
+                apply={{
+                  count: Math.min(fromList.length, MAX_QUEUE),
+                  replacing: fromList.filter(({ unit }) => unit.nickname?.trim()).length,
+                  pending: mutation.isPending,
+                  disabled: !isLive,
+                  onApply: applyList,
+                }}
+              />
+            </div>
           </div>
         ) : null}
         <Citizens

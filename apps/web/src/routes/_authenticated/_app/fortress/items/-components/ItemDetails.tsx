@@ -1,14 +1,5 @@
 import type { FortBuilding, FortItem } from '@fortress/db-drizzle'
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  DataTable,
-  Skeleton,
-  cn,
-} from '@fortress/ui'
+import { Badge, DataTable, Skeleton, Stats, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { LightbulbIcon, MapIcon, TriangleAlertIcon } from 'lucide-react'
@@ -19,7 +10,13 @@ import { type ItemHint, itemHints } from '~/lib/fortress/advice/stores'
 import { useFortItem } from '~/lib/fortress/client/queries'
 import { formatValue, humanize, splitPascal, unitDisplayName } from '~/lib/fortress/format'
 import type { ItemPerson } from '~/lib/fortress/server/items'
-import { EmptyState, StatCard } from '../../-components/FortChrome'
+import {
+  EmptyState,
+  Reading,
+  Section,
+  SectionGrid,
+  SectionStack,
+} from '../../-components/FortChrome'
 
 const PROMINENT_FLAGS = [
   'artifact',
@@ -168,7 +165,9 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
 
   if (isLoading) {
     return (
-      <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
+      <div
+        className={cn('grid gap-4 p-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}
+      >
         <Skeleton className="h-24" />
         <Skeleton className="h-24" />
         <Skeleton className="h-24" />
@@ -180,7 +179,7 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
   const item = data?.item ?? null
   if (!item) {
     return (
-      <EmptyState title="Not in the last dump">
+      <EmptyState title="Not in the last dump" className="m-4">
         There is no item with id {itemId} in the fortress dump. It may have been used up, or no dump
         has been taken yet.
       </EmptyState>
@@ -192,21 +191,26 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
   const hints = itemHints(item)
 
   return (
-    <div className="flex flex-col gap-4">
+    <SectionStack>
       {hints.length ? <ItemHints hints={hints} /> : null}
-      <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
-        <StatCard title="Value" value={formatValue(item.value)} />
-        <StatCard
+      <Stats
+        className={cn(
+          'border-b-0',
+          compact && 'grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2',
+        )}
+      >
+        <Reading title="Value" value={formatValue(item.value)} />
+        <Reading
           title="Quantity"
           value={item.stack.toLocaleString()}
           hint={item.stack === 1 ? 'a single item' : 'stacked together'}
         />
-        <StatCard
+        <Reading
           title="Quality"
           value={item.quality === 'Ordinary' ? 'Ordinary' : splitPascal(item.quality)}
           hint={item.wear > 0 ? `worn ${item.wear}` : undefined}
         />
-        <StatCard
+        <Reading
           title="Where"
           value={
             item.x !== null ? (
@@ -253,169 +257,151 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
             ) : undefined
           }
         />
-      </div>
+      </Stats>
 
-      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between gap-3 text-base">
-              The object
-              <ItemSprite
-                item={item}
-                size={48}
-                title={`${item.description} as drawn in the game`}
-              />
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Facts
-              items={[
-                { label: 'Type', value: humanize(item.type) },
-                { label: 'Subtype', value: item.subtype },
-                { label: 'Material', value: item.material },
-                { label: 'Class', value: item.mat_class ? humanize(item.mat_class) : null },
-                { label: 'Color', value: item.color ? humanize(item.color) : null },
-                { label: 'Creature', value: item.race_id ? humanize(item.race_id) : null },
-                { label: 'Caste', value: item.caste_id ? humanize(item.caste_id) : null },
-                { label: 'Plant', value: item.plant_id ? humanize(item.plant_id) : null },
-                {
-                  label: 'Remains',
-                  value: item.corpse_flags?.length
-                    ? item.corpse_flags.map((flag) => humanize(flag)).join(', ')
-                    : null,
-                },
-                {
-                  label: 'Made by',
-                  value: data?.maker ? <PersonLink person={data.maker} /> : null,
-                },
-                {
-                  label: 'Owned by',
-                  value: data?.owner ? (
-                    <Link
-                      to="/fortress/dwarves/$id"
-                      params={{ id: String(data.owner.id) }}
-                      className="text-primary underline-offset-4 hover:underline"
-                    >
-                      {unitDisplayName(data.owner)}
-                    </Link>
-                  ) : null,
-                },
-              ]}
-            />
-            {otherFlags.length ? (
-              <div className="mt-4 flex flex-wrap gap-1.5">
-                {otherFlags.map((flag) => (
-                  <Badge key={flag} variant="outline">
-                    {humanize(flag)}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
+      <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
+        <Section
+          title="The object"
+          action={
+            <ItemSprite item={item} size={48} title={`${item.description} as drawn in the game`} />
+          }
+        >
+          <Facts
+            items={[
+              { label: 'Type', value: humanize(item.type) },
+              { label: 'Subtype', value: item.subtype },
+              { label: 'Material', value: item.material },
+              { label: 'Class', value: item.mat_class ? humanize(item.mat_class) : null },
+              { label: 'Color', value: item.color ? humanize(item.color) : null },
+              { label: 'Creature', value: item.race_id ? humanize(item.race_id) : null },
+              { label: 'Caste', value: item.caste_id ? humanize(item.caste_id) : null },
+              { label: 'Plant', value: item.plant_id ? humanize(item.plant_id) : null },
+              {
+                label: 'Remains',
+                value: item.corpse_flags?.length
+                  ? item.corpse_flags.map((flag) => humanize(flag)).join(', ')
+                  : null,
+              },
+              {
+                label: 'Made by',
+                value: data?.maker ? <PersonLink person={data.maker} /> : null,
+              },
+              {
+                label: 'Owned by',
+                value: data?.owner ? (
+                  <Link
+                    to="/fortress/dwarves/$id"
+                    params={{ id: String(data.owner.id) }}
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    {unitDisplayName(data.owner)}
+                  </Link>
+                ) : null,
+              },
+            ]}
+          />
+          {otherFlags.length ? (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {otherFlags.map((flag) => (
+                <Badge key={flag} variant="outline">
+                  {humanize(flag)}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
+        </Section>
 
         {data?.artifact ? (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">
+          <Section
+            title={
+              <span>
                 {data.artifact.name ?? 'An unnamed artifact'}
                 {data.artifact.name_english && data.artifact.name_english !== data.artifact.name ? (
                   <span className="ml-2 font-normal text-muted-foreground">
                     {data.artifact.name_english}
                   </span>
                 ) : null}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Facts
-                items={[
-                  {
-                    label: 'Made by',
-                    value: data.maker ? <PersonLink person={data.maker} /> : null,
-                  },
-                  {
-                    label: 'Made in',
-                    value: data.artifact.year !== null ? `the year ${data.artifact.year}` : null,
-                  },
-                  {
-                    label: 'Held by',
-                    value: data.artifact.holder ? (
-                      <PersonLink person={data.artifact.holder} />
-                    ) : null,
-                  },
-                  {
-                    label: 'Claimed by',
-                    value: data.artifact.owner ? <PersonLink person={data.artifact.owner} /> : null,
-                  },
-                  {
-                    label: 'Where',
-                    value: data.artifact.on_map ? 'in the fortress' : 'elsewhere in the world',
-                  },
-                ]}
-              />
-            </CardContent>
-          </Card>
+              </span>
+            }
+          >
+            <Facts
+              items={[
+                {
+                  label: 'Made by',
+                  value: data.maker ? <PersonLink person={data.maker} /> : null,
+                },
+                {
+                  label: 'Made in',
+                  value: data.artifact.year !== null ? `the year ${data.artifact.year}` : null,
+                },
+                {
+                  label: 'Held by',
+                  value: data.artifact.holder ? <PersonLink person={data.artifact.holder} /> : null,
+                },
+                {
+                  label: 'Claimed by',
+                  value: data.artifact.owner ? <PersonLink person={data.artifact.owner} /> : null,
+                },
+                {
+                  label: 'Where',
+                  value: data.artifact.on_map ? 'in the fortress' : 'elsewhere in the world',
+                },
+              ]}
+            />
+          </Section>
         ) : null}
 
         {data?.holder || data?.building || data?.container ? (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Kept</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Facts
-                items={[
-                  {
-                    label: 'Held by',
-                    value: data.holder ? (
-                      <Link
-                        to="/fortress/dwarves/$id"
-                        params={{ id: String(data.holder.id) }}
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        {unitDisplayName(data.holder)}
-                      </Link>
-                    ) : null,
-                  },
-                  {
-                    label: 'Building',
-                    value: data.building ? (
-                      <span>
-                        {buildingLabel(data.building)}
-                        <span className="ml-2 font-mono text-xs text-muted-foreground">
-                          {data.building.cx},{data.building.cy} z{data.building.z}
-                        </span>
+          <Section title="Kept">
+            <Facts
+              items={[
+                {
+                  label: 'Held by',
+                  value: data.holder ? (
+                    <Link
+                      to="/fortress/dwarves/$id"
+                      params={{ id: String(data.holder.id) }}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {unitDisplayName(data.holder)}
+                    </Link>
+                  ) : null,
+                },
+                {
+                  label: 'Building',
+                  value: data.building ? (
+                    <span>
+                      {buildingLabel(data.building)}
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">
+                        {data.building.cx},{data.building.cy} z{data.building.z}
                       </span>
-                    ) : null,
-                  },
-                  {
-                    label: 'Inside',
-                    value: data.container ? (
-                      <Link
-                        to="/fortress/items/$id"
-                        params={{ id: String(data.container.id) }}
-                        className="text-primary underline-offset-4 hover:underline"
-                      >
-                        {data.container.description}
-                      </Link>
-                    ) : null,
-                  },
-                ]}
-              />
-            </CardContent>
-          </Card>
+                    </span>
+                  ) : null,
+                },
+                {
+                  label: 'Inside',
+                  value: data.container ? (
+                    <Link
+                      to="/fortress/items/$id"
+                      params={{ id: String(data.container.id) }}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {data.container.description}
+                    </Link>
+                  ) : null,
+                },
+              ]}
+            />
+          </Section>
         ) : null}
-      </div>
+      </SectionGrid>
 
       {data?.contents.length ? (
-        <Card className="overflow-hidden p-0">
-          <div className="border-b px-5 py-4">
-            <div className="text-base font-semibold">Contents</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {data.contents.length} item{data.contents.length === 1 ? '' : 's'} ·{' '}
-              {formatValue(contentsValue)}
-            </p>
-          </div>
+        <Section
+          bleed
+          title="Contents"
+          description={`${data.contents.length} item${data.contents.length === 1 ? '' : 's'} · ${formatValue(contentsValue)}`}
+        >
           <DataTable
             data={data.contents}
             columns={CONTENT_COLUMNS}
@@ -427,9 +413,9 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
             getRowId={(row) => String(row.id)}
             pageSize={compact ? 25 : 50}
           />
-        </Card>
+        </Section>
       ) : null}
-    </div>
+    </SectionStack>
   )
 }
 
@@ -437,12 +423,7 @@ export function ItemDetails({ itemId, compact }: { itemId: number; compact?: boo
 function ItemHints({ hints }: { hints: ItemHint[] }) {
   const trouble = hints.some((h) => h.problem)
   return (
-    <div
-      className={cn(
-        'rounded-xl border p-4',
-        trouble ? 'border-amber-500/40 bg-amber-500/5' : 'bg-muted/30',
-      )}
-    >
+    <div className={cn('p-4', trouble ? 'bg-amber-500/5' : 'bg-muted/30')}>
       <div className="mb-2 text-sm font-medium">What to do with it</div>
       <ul className="flex flex-col gap-2">
         {hints.map((hint) => {

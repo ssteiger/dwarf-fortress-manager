@@ -23,13 +23,7 @@ import {
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import type { LegendsHit } from '~/lib/legends/types'
 import { EventsArchive, YearInput } from '../-components/EventsArchive'
-import {
-  LegendsShell,
-  RecordLink,
-  Section,
-  parseWorldParam,
-  recordName,
-} from '../-components/LegendsChrome'
+import { LegendsShell, RecordLink, parseWorldParam, recordName } from '../-components/LegendsChrome'
 import { FilterChip } from '../-components/Timeline'
 
 interface ArchiveSearch {
@@ -155,13 +149,14 @@ function ArchivePage() {
     navigate({ search: (prev) => ({ ...prev, ...patch }), replace })
 
   return (
-    <LegendsShell section="archive" world={search.world}>
+    <LegendsShell section="archive" world={search.world} fill={search.archive !== EVENTS_TAB.key}>
       {({ worldId, counts, summary }) => (
-        <Section
-          title="The archive"
-          description="Every record in the export, and every recorded event. Search by name or race, narrow by what matters, sort by any column."
-        >
-          <div className="flex flex-col gap-4">
+        <>
+          <div className="flex shrink-0 flex-col gap-2 border-b px-4 py-3">
+            <p className="text-sm text-muted-foreground">
+              Every record in the export, and every recorded event. Search by name or race, narrow
+              by what matters, sort by any column.
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               {[...BROWSE_TABS.slice(0, -1), EVENTS_TAB, BROWSE_TABS[BROWSE_TABS.length - 1]].map(
                 (t) => {
@@ -187,53 +182,53 @@ function ArchivePage() {
                 },
               )}
             </div>
-            {search.archive === EVENTS_TAB.key ? (
-              <EventsArchive
-                worldId={worldId}
-                years={summary?.years ?? null}
-                filters={{
-                  from: search.from,
-                  to: search.to,
-                  categories: parseList(search.cat),
-                  hf: search.hf,
-                  civ: search.civ,
-                  site: search.site,
-                  artifact: search.artifact,
-                  order: search.order ?? 'asc',
-                  page: search.page ?? 0,
-                }}
-                onChange={(patch) => {
-                  const { categories, page, ...rest } = patch
-                  setSearch({
-                    ...rest,
-                    ...(categories !== undefined
-                      ? { cat: categories.length ? categories.join(',') : undefined }
-                      : {}),
-                    ...(page !== undefined ? { page: page || undefined } : {}),
-                  })
-                }}
-              />
-            ) : (
-              <RecordsArchive
-                worldId={worldId}
-                summary={summary}
-                archive={search.archive ?? 'figures'}
-                q={search.q ?? ''}
-                type={parseList(search.type)}
-                facets={{
-                  alive: search.alive,
-                  nature: search.nature,
-                  civ: search.civ,
-                  from: search.from,
-                  to: search.to,
-                }}
-                onQuery={(q) => setSearch({ q: q || undefined }, true)}
-                onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
-                onFacets={(patch) => setSearch(patch)}
-              />
-            )}
           </div>
-        </Section>
+          {search.archive === EVENTS_TAB.key ? (
+            <EventsArchive
+              worldId={worldId}
+              years={summary?.years ?? null}
+              filters={{
+                from: search.from,
+                to: search.to,
+                categories: parseList(search.cat),
+                hf: search.hf,
+                civ: search.civ,
+                site: search.site,
+                artifact: search.artifact,
+                order: search.order ?? 'asc',
+                page: search.page ?? 0,
+              }}
+              onChange={(patch) => {
+                const { categories, page, ...rest } = patch
+                setSearch({
+                  ...rest,
+                  ...(categories !== undefined
+                    ? { cat: categories.length ? categories.join(',') : undefined }
+                    : {}),
+                  ...(page !== undefined ? { page: page || undefined } : {}),
+                })
+              }}
+            />
+          ) : (
+            <RecordsArchive
+              worldId={worldId}
+              summary={summary}
+              archive={search.archive ?? 'figures'}
+              q={search.q ?? ''}
+              type={parseList(search.type)}
+              facets={{
+                alive: search.alive,
+                nature: search.nature,
+                civ: search.civ,
+                from: search.from,
+                to: search.to,
+              }}
+              onQuery={(q) => setSearch({ q: q || undefined }, true)}
+              onType={(type) => setSearch({ type: type.length ? type.join(',') : undefined })}
+              onFacets={(patch) => setSearch(patch)}
+            />
+          )}
+        </>
       )}
     </LegendsShell>
   )
@@ -347,7 +342,7 @@ function RecordsArchive({
   return (
     <>
       {isFigures || isSites ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b bg-muted/30 px-4 py-3">
           {isFigures ? (
             <>
               <div className="flex items-center gap-1">
@@ -430,6 +425,7 @@ function RecordsArchive({
         </div>
       ) : null}
       <DataTable
+        fill
         data={results.data?.rows ?? []}
         columns={columns}
         isLoading={results.isLoading}

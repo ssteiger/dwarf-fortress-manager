@@ -1,4 +1,4 @@
-import { Card, Tabs, TabsContent, TabsList, TabsTrigger, cn } from '@fortress/ui'
+import { Tabs, TabsContent, TabsList, TabsTrigger, cn } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowDownRightIcon, ArrowUpRightIcon } from 'lucide-react'
@@ -224,8 +224,9 @@ function WorldBody({
   const lit = civ !== null ? (civs.find((c) => c.id === civ) ?? null) : null
 
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+    <div className="grid border-b xl:grid-cols-[minmax(0,1fr)_380px]">
       <Section
+        bleed
         title={inThePast ? `The world in ${year}` : 'The known world'}
         description={
           map.data
@@ -235,20 +236,22 @@ function WorldBody({
       >
         <div className="flex flex-col gap-4">
           {years ? (
-            <TimeSlider
-              min={years.min}
-              max={years.max}
-              year={year}
-              eras={summary?.eras ?? []}
-              playing={playing}
-              speed={speed}
-              onYear={commitYear}
-              onPlaying={stopPlaying}
-              onSpeed={setSpeed}
-            />
+            <div className="px-4">
+              <TimeSlider
+                min={years.min}
+                max={years.max}
+                year={year}
+                eras={summary?.eras ?? []}
+                playing={playing}
+                speed={speed}
+                onYear={commitYear}
+                onPlaying={stopPlaying}
+                onSpeed={setSpeed}
+              />
+            </div>
           ) : null}
           {civ !== null ? (
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border bg-muted/40 px-3 py-1.5 text-sm">
+            <div className="mx-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md bg-muted/40 px-3 py-1.5 text-sm">
               <span
                 className="inline-block size-2.5 shrink-0 rounded-full border border-black/30"
                 style={{ backgroundColor: raceColor(lit?.race) }}
@@ -278,231 +281,235 @@ function WorldBody({
               onSelectRegion={(region) => openRecord('region', region.id)}
             />
           ) : (
-            <div className="aspect-square w-full animate-pulse rounded-lg bg-muted" />
+            <div className="aspect-square w-full animate-pulse bg-muted" />
           )}
         </div>
       </Section>
 
-      <Card className="gap-0 overflow-hidden py-0 xl:sticky xl:top-4 xl:max-h-[calc(100svh-5rem)]">
-        <Tabs
-          value={panel}
-          onValueChange={(value) => setPanel(value as Panel)}
-          className="min-h-0 flex-1 gap-0"
-        >
-          <div className="border-b p-3">
-            <TabsList className="w-full">
-              <TabsTrigger value="year" className="tabular-nums">
-                {inThePast ? `Year ${year}` : 'The present'}
-              </TabsTrigger>
-              <TabsTrigger value="civs">
-                Civilizations
-                {living.length ? (
-                  <span className="tabular-nums text-muted-foreground">{living.length}</span>
-                ) : null}
-              </TabsTrigger>
-              <TabsTrigger value="land">The land</TabsTrigger>
-            </TabsList>
-          </div>
-          <TabsContent value="year" className="min-h-0 overflow-y-auto px-5 py-4">
-            <PanelHeading
-              title={inThePast ? `The year ${year}` : `The present, ${present}`}
-              description={
-                playing
-                  ? 'Pause to read the year.'
-                  : digest.data
-                    ? 'What the records say about this year.'
-                    : 'Reading the records…'
-              }
-              action={
-                <Link
-                  to="/legends/history"
-                  search={{ world: worldId, from: Math.max(0, year - 24), to: year }}
-                  className="shrink-0 text-sm text-primary underline-offset-4 hover:underline"
+      <div className="min-w-0 border-t xl:border-t-0 xl:border-l">
+        <div className="flex flex-col overflow-hidden xl:sticky xl:top-0 xl:max-h-[calc(100svh-3rem)]">
+          <Tabs
+            value={panel}
+            onValueChange={(value) => setPanel(value as Panel)}
+            className="min-h-0 flex-1 gap-0"
+          >
+            <div className="border-b px-4 py-3">
+              <TabsList className="w-full">
+                <TabsTrigger value="year" className="tabular-nums">
+                  {inThePast ? `Year ${year}` : 'The present'}
+                </TabsTrigger>
+                <TabsTrigger value="civs">
+                  Civilizations
+                  {living.length ? (
+                    <span className="tabular-nums text-muted-foreground">{living.length}</span>
+                  ) : null}
+                </TabsTrigger>
+                <TabsTrigger value="land">The land</TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="year" className="min-h-0 overflow-y-auto p-4">
+              <PanelHeading
+                title={inThePast ? `The year ${year}` : `The present, ${present}`}
+                description={
+                  playing
+                    ? 'Pause to read the year.'
+                    : digest.data
+                      ? 'What the records say about this year.'
+                      : 'Reading the records…'
+                }
+                action={
+                  <Link
+                    to="/legends/history"
+                    search={{ world: worldId, from: Math.max(0, year - 24), to: year }}
+                    className="shrink-0 text-sm text-primary underline-offset-4 hover:underline"
+                  >
+                    Read the age
+                  </Link>
+                }
+              />
+              {digest.data && !playing ? (
+                <div
+                  className={cn('flex flex-col gap-3', digest.isPlaceholderData && 'opacity-60')}
                 >
-                  Read the age
-                </Link>
-              }
-            />
-            {digest.data && !playing ? (
-              <div className={cn('flex flex-col gap-3', digest.isPlaceholderData && 'opacity-60')}>
-                <p className="text-sm">{summarizeSpan(digest.data)}</p>
-                {digest.data.moments.length ? (
-                  <ol className="divide-y text-sm">
-                    {digest.data.moments.slice(0, 8).map((event) => (
-                      <EventLine
-                        key={event.id}
-                        event={event}
-                        names={digest.data.names}
-                        worldId={worldId}
-                        showDate={false}
-                      />
-                    ))}
-                  </ol>
-                ) : null}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {playing ? `Rolling forward at ${speed} years a second.` : 'Reading the records…'}
-              </p>
-            )}
-          </TabsContent>
+                  <p className="text-sm">{summarizeSpan(digest.data)}</p>
+                  {digest.data.moments.length ? (
+                    <ol className="divide-y text-sm">
+                      {digest.data.moments.slice(0, 8).map((event) => (
+                        <EventLine
+                          key={event.id}
+                          event={event}
+                          names={digest.data.names}
+                          worldId={worldId}
+                          showDate={false}
+                        />
+                      ))}
+                    </ol>
+                  ) : null}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {playing ? `Rolling forward at ${speed} years a second.` : 'Reading the records…'}
+                </p>
+              )}
+            </TabsContent>
 
-          <TabsContent value="civs" className="min-h-0 overflow-y-auto px-5 py-4">
-            <PanelHeading
-              description={
-                inThePast
-                  ? `Sites held in ${year}, and how that compares with fifty years before. Pick one to light its sites on the map.`
-                  : 'Pick one to light its sites on the map.'
-              }
-            />
-            {summary ? (
-              <ul className="flex flex-col divide-y">
-                {living.map((c) => {
-                  const delta = c.before !== null ? c.held - c.before : 0
-                  return (
-                    <li key={c.id}>
-                      <div
-                        className={cn(
-                          'flex items-center gap-3 rounded-md px-1 py-2 transition-colors',
-                          civ === c.id && 'bg-accent',
-                        )}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => toggleCiv(c.id)}
-                          className="inline-block size-3 shrink-0 rounded-full border border-black/30"
-                          style={{ backgroundColor: raceColor(c.race) }}
-                          aria-label={`Show sites of ${c.name ?? 'this civilization'}`}
-                        />
-                        <LegendsSprite
-                          subject={{ kind: 'entity', id: c.id, race: raceToken(c.race) }}
-                          size={28}
-                          className="-my-1"
-                        />
-                        <div className="min-w-0 flex-1">
+            <TabsContent value="civs" className="min-h-0 overflow-y-auto p-4">
+              <PanelHeading
+                description={
+                  inThePast
+                    ? `Sites held in ${year}, and how that compares with fifty years before. Pick one to light its sites on the map.`
+                    : 'Pick one to light its sites on the map.'
+                }
+              />
+              {summary ? (
+                <ul className="flex flex-col divide-y">
+                  {living.map((c) => {
+                    const delta = c.before !== null ? c.held - c.before : 0
+                    return (
+                      <li key={c.id}>
+                        <div
+                          className={cn(
+                            'flex items-center gap-3 rounded-md px-1 py-2 transition-colors',
+                            civ === c.id && 'bg-accent',
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleCiv(c.id)}
+                            className="inline-block size-3 shrink-0 rounded-full border border-black/30"
+                            style={{ backgroundColor: raceColor(c.race) }}
+                            aria-label={`Show sites of ${c.name ?? 'this civilization'}`}
+                          />
+                          <LegendsSprite
+                            subject={{ kind: 'entity', id: c.id, race: raceToken(c.race) }}
+                            size={28}
+                            className="-my-1"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <RecordLink
+                              kind="entity"
+                              id={c.id}
+                              name={c.name}
+                              worldId={worldId}
+                              className="block truncate"
+                            />
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              {c.race ? racePlural(c.race) : 'unknown race'} · {c.held} site
+                              {c.held === 1 ? '' : 's'}
+                              {inThePast && delta !== 0 ? (
+                                <span
+                                  className={cn(
+                                    'inline-flex items-center gap-0.5 tabular-nums',
+                                    delta > 0
+                                      ? 'text-emerald-600 dark:text-emerald-400'
+                                      : 'text-red-600 dark:text-red-400',
+                                  )}
+                                  title="Change over the previous fifty years"
+                                >
+                                  {delta > 0 ? (
+                                    <ArrowUpRightIcon className="size-3.5" />
+                                  ) : (
+                                    <ArrowDownRightIcon className="size-3.5" />
+                                  )}
+                                  {Math.abs(delta)}
+                                </span>
+                              ) : null}
+                              {!inThePast && c.wars
+                                ? ` · ${c.wars} war${c.wars === 1 ? '' : 's'}`
+                                : ''}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggleCiv(c.id)}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            {civ === c.id ? 'clear' : 'show'}
+                          </button>
+                        </div>
+                      </li>
+                    )
+                  })}
+                  {fallen.length ? (
+                    <li className="pt-2 text-sm text-muted-foreground">
+                      {fallen.length} civilization{fallen.length === 1 ? '' : 's'} hold no sites
+                      {inThePast ? ` in ${year}` : ''}:{' '}
+                      {fallen.slice(0, 8).map((c, i) => (
+                        <span key={c.id}>
+                          {i > 0 ? ', ' : ''}
                           <RecordLink
                             kind="entity"
                             id={c.id}
                             name={c.name}
                             worldId={worldId}
-                            className="block truncate"
+                            className="font-normal"
                           />
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                            {c.race ? racePlural(c.race) : 'unknown race'} · {c.held} site
-                            {c.held === 1 ? '' : 's'}
-                            {inThePast && delta !== 0 ? (
-                              <span
-                                className={cn(
-                                  'inline-flex items-center gap-0.5 tabular-nums',
-                                  delta > 0
-                                    ? 'text-emerald-600 dark:text-emerald-400'
-                                    : 'text-red-600 dark:text-red-400',
-                                )}
-                                title="Change over the previous fifty years"
-                              >
-                                {delta > 0 ? (
-                                  <ArrowUpRightIcon className="size-3.5" />
-                                ) : (
-                                  <ArrowDownRightIcon className="size-3.5" />
-                                )}
-                                {Math.abs(delta)}
-                              </span>
-                            ) : null}
-                            {!inThePast && c.wars
-                              ? ` · ${c.wars} war${c.wars === 1 ? '' : 's'}`
-                              : ''}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => toggleCiv(c.id)}
-                          className="text-xs text-muted-foreground hover:text-foreground"
-                        >
-                          {civ === c.id ? 'clear' : 'show'}
-                        </button>
-                      </div>
+                        </span>
+                      ))}
+                      {fallen.length > 8 ? ` and ${fallen.length - 8} more` : ''}
                     </li>
-                  )
-                })}
-                {fallen.length ? (
-                  <li className="pt-2 text-sm text-muted-foreground">
-                    {fallen.length} civilization{fallen.length === 1 ? '' : 's'} hold no sites
-                    {inThePast ? ` in ${year}` : ''}:{' '}
-                    {fallen.slice(0, 8).map((c, i) => (
-                      <span key={c.id}>
-                        {i > 0 ? ', ' : ''}
-                        <RecordLink
-                          kind="entity"
-                          id={c.id}
-                          name={c.name}
-                          worldId={worldId}
-                          className="font-normal"
-                        />
-                      </span>
-                    ))}
-                    {fallen.length > 8 ? ` and ${fallen.length - 8} more` : ''}
-                  </li>
-                ) : null}
-              </ul>
-            ) : (
-              <p className="text-sm text-muted-foreground">Counting banners…</p>
-            )}
-          </TabsContent>
+                  ) : null}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Counting banners…</p>
+              )}
+            </TabsContent>
 
-          <TabsContent value="land" className="min-h-0 overflow-y-auto px-5 py-4">
-            <div className="flex flex-col gap-4 text-sm">
-              <div>
-                <div className="mb-1.5 font-medium">Regions</div>
-                <ul className="flex flex-col gap-1">
-                  {Object.entries(summary?.regionTypes ?? {})
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([type, n]) => (
-                      <li key={type} className="flex items-center gap-2">
-                        {assets ? (
-                          <TerrainChip index={assets} type={type} />
-                        ) : (
-                          <span
-                            className="inline-block size-3 rounded-sm border border-black/20"
-                            style={{ backgroundColor: regionColor(type) }}
-                          />
-                        )}
-                        <span className="flex-1">{type}</span>
-                        <span className="tabular-nums text-muted-foreground">{n}</span>
-                      </li>
-                    ))}
-                </ul>
+            <TabsContent value="land" className="min-h-0 overflow-y-auto p-4">
+              <div className="flex flex-col gap-4 text-sm">
+                <div>
+                  <div className="mb-1.5 font-medium">Regions</div>
+                  <ul className="flex flex-col gap-1">
+                    {Object.entries(summary?.regionTypes ?? {})
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, n]) => (
+                        <li key={type} className="flex items-center gap-2">
+                          {assets ? (
+                            <TerrainChip index={assets} type={type} />
+                          ) : (
+                            <span
+                              className="inline-block size-3 rounded-sm border border-black/20"
+                              style={{ backgroundColor: regionColor(type) }}
+                            />
+                          )}
+                          <span className="flex-1">{type}</span>
+                          <span className="tabular-nums text-muted-foreground">{n}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="mb-1.5 font-medium">Sites</div>
+                  <ul className="flex flex-col gap-1">
+                    {Object.entries(summary?.siteTypes ?? {})
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([type, n]) => (
+                        <li key={type} className="flex items-center gap-2">
+                          {assets ? (
+                            <span className="inline-flex w-4 justify-center">
+                              {siteSpriteNameFor(type, 0, false) ? (
+                                <TileChip
+                                  index={assets}
+                                  name={siteSpriteNameFor(type, 0, false) ?? ''}
+                                />
+                              ) : null}
+                            </span>
+                          ) : null}
+                          <span className="flex-1">{titleCase(type)}s</span>
+                          <span className="tabular-nums text-muted-foreground">{n}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+                <div className="text-muted-foreground">
+                  {formatNumber(counts.mountain_peak)} mountain peaks, {formatNumber(counts.river)}{' '}
+                  rivers, {formatNumber(counts.underground_region)} cavern layers below.
+                </div>
               </div>
-              <div>
-                <div className="mb-1.5 font-medium">Sites</div>
-                <ul className="flex flex-col gap-1">
-                  {Object.entries(summary?.siteTypes ?? {})
-                    .sort((a, b) => b[1] - a[1])
-                    .map(([type, n]) => (
-                      <li key={type} className="flex items-center gap-2">
-                        {assets ? (
-                          <span className="inline-flex w-4 justify-center">
-                            {siteSpriteNameFor(type, 0, false) ? (
-                              <TileChip
-                                index={assets}
-                                name={siteSpriteNameFor(type, 0, false) ?? ''}
-                              />
-                            ) : null}
-                          </span>
-                        ) : null}
-                        <span className="flex-1">{titleCase(type)}s</span>
-                        <span className="tabular-nums text-muted-foreground">{n}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-              <div className="text-muted-foreground">
-                {formatNumber(counts.mountain_peak)} mountain peaks, {formatNumber(counts.river)}{' '}
-                rivers, {formatNumber(counts.underground_region)} cavern layers below.
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-      </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </div>
     </div>
   )
 }

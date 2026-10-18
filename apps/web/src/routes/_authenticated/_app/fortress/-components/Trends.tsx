@@ -1,10 +1,11 @@
 import type { SnapshotTotals } from '@fortress/db-drizzle'
-import { Card, CardContent, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { TrendingUpIcon } from 'lucide-react'
 
 import { formatGameTick, formatNumber, formatValue } from '~/lib/fortress/format'
 import { type TrendPoint, getFortTrends } from '~/lib/fortress/server/history'
+import { Section, SectionBoundary } from './FortChrome'
 
 /** A small line over evenly spaced readings; `min` and `max` fix the scale when given. */
 export function Sparkline({
@@ -128,31 +129,28 @@ function changeText(
 }
 
 /** Population, wealth, drink, food and unhappiness from the worker's daily snapshots. */
-export function TrendsCard() {
+export function Trends() {
   const trends = useQuery({
     queryKey: ['fort', 'trends'],
     queryFn: () => getFortTrends(),
   })
   const points = trends.data ?? []
   return (
-    <Card className="gap-4">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <TrendingUpIcon className="size-4 text-primary" />
-          Over time
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {points.length >= 2
-            ? `One reading a day, since ${formatGameTick(points[0].year, points[0].tick)}.`
-            : 'The worker keeps one reading a day. The lines show once there are two days to compare.'}
-        </p>
-      </CardHeader>
+    <Section
+      title="Over time"
+      icon={<TrendingUpIcon className="size-4 text-primary" />}
+      description={
+        points.length >= 2
+          ? `One reading a day, since ${formatGameTick(points[0].year, points[0].tick)}.`
+          : 'The worker keeps one reading a day. The lines show once there are two days to compare.'
+      }
+    >
       {points.length >= 2 ? (
-        <CardContent>
+        <SectionBoundary name="The trends">
           <TrendRows points={points} />
-        </CardContent>
+        </SectionBoundary>
       ) : null}
-    </Card>
+    </Section>
   )
 }
 

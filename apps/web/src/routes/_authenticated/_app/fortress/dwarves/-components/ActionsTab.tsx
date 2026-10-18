@@ -32,6 +32,7 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
+import { SectionGrid } from '~/lib/components/Section'
 import { concernGuide } from '~/lib/fortress/advice/guides'
 import { isLiving } from '~/lib/fortress/format'
 import { careTips, preferenceGroups } from '~/lib/fortress/people/character'
@@ -269,7 +270,7 @@ function CheatButton({ unit, action }: { unit: FortUnit; action: 'calm' | 'filln
   const busy = queue.isPending || run?.status === 'pending' || run?.status === 'processing'
   const Icon = CHEAT_ICONS[action]
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+    <div className="flex flex-col gap-1.5">
       {oneClickActions ? (
         <Button
           size="sm"
@@ -317,9 +318,9 @@ export function ConcernRow({ concern, unit }: { concern: Concern; unit: FortUnit
   return (
     <li
       className={cn(
-        'rounded-lg border px-3 py-2 text-sm',
-        concern.severity === 'danger' && 'border-red-500/40 bg-red-500/10',
-        concern.severity === 'warning' && 'border-amber-500/40 bg-amber-500/5',
+        'border-l-2 py-1 pl-3 text-sm',
+        concern.severity === 'danger' && 'border-red-500',
+        concern.severity === 'warning' && 'border-amber-500',
       )}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
@@ -363,7 +364,7 @@ export function ActionsTab({ unit, compact }: { unit: FortUnit; compact?: boolea
   const [cheats, setCheats] = React.useState(false)
   const history = (runs.data ?? []).slice(0, 6)
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+    <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
       <Section
         title="In the game"
         description="Queued for the worker, which carries it out in the running game through DFHack."
@@ -423,9 +424,9 @@ export function ActionsTab({ unit, compact }: { unit: FortUnit; compact?: boolea
         }
       >
         {tips.length ? (
-          <ul className="flex flex-col gap-2">
+          <ul className="flex flex-col divide-y">
             {tips.map((tip) => (
-              <li key={tip.key} className="rounded-lg border px-3 py-2 text-sm">
+              <li key={tip.key} className="py-2 text-sm first:pt-0 last:pb-0">
                 <div className={cn('font-medium', STANDING_TEXT[tip.standing])}>{tip.title}</div>
                 <div className="mt-0.5 flex gap-1.5 text-muted-foreground">
                   <LightbulbIcon className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
@@ -517,6 +518,6 @@ export function ActionsTab({ unit, compact }: { unit: FortUnit; compact?: boolea
           </ul>
         </Section>
       ) : null}
-    </div>
+    </SectionGrid>
   )
 }

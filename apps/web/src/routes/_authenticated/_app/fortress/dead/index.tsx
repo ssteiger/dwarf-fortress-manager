@@ -9,7 +9,7 @@ import { formatGameTick } from '~/lib/fortress/format'
 import { deathPhrase } from '~/lib/fortress/people/death'
 import { pronouns } from '~/lib/fortress/people/units'
 import type { FortDead, FortDeparted, FortFallen } from '~/lib/fortress/server/history'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { EmptyState, PageHeader, SectionStack, StatusBand } from '../-components/FortChrome'
 import { RunActionButton } from '../-components/Guide'
 import { Section, SheetMissing, capitalize } from '../dwarves/-components/SheetParts'
 import { useFortLegendsWorldId, useKnownHistFigures } from '../dwarves/-components/UnitLinks'
@@ -242,55 +242,60 @@ function DeadPage() {
   }, [dead])
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="The dead"
         description={headline(data)}
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
       />
-      <StatusBanner state={overview.data?.state} />
-      {data && !data.complete ? (
-        <SheetMissing what="Causes of death, and the deaths from before the worker started watching," />
-      ) : null}
+      <StatusBand state={overview.data?.state} />
+      <SectionStack className="border-b empty:hidden">
+        {data && !data.complete ? (
+          <SheetMissing what="Causes of death, and the deaths from before the worker started watching," />
+        ) : null}
 
-      {ghosts.length ? <Restless ghosts={ghosts} worldId={linkable} /> : null}
-      {unburied.length ? <Unburied dead={unburied} worldId={linkable} /> : null}
+        {ghosts.length ? <Restless ghosts={ghosts} worldId={linkable} /> : null}
+        {unburied.length ? <Unburied dead={unburied} worldId={linkable} /> : null}
 
-      {data && !dead.length && !data.departed.length ? (
-        <EmptyState title="No one has died">
-          When one of your people dies, they are listed here with how and when it happened, and
-          where their remains lie.
-        </EmptyState>
-      ) : null}
+        {data && !dead.length && !data.departed.length ? (
+          <EmptyState title="No one has died" className="m-4">
+            When one of your people dies, they are listed here with how and when it happened, and
+            where their remains lie.
+          </EmptyState>
+        ) : null}
+      </SectionStack>
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        {byYear.length ? (
-          <Section title="The roll of the dead" count={dead.length}>
-            <div className="flex flex-col gap-4">
-              {byYear.map(([year, list]) => (
-                <div key={year ?? 'unknown'}>
-                  <h3 className="text-sm font-semibold text-muted-foreground">
-                    {year !== null ? `Year ${year}` : 'When is not known'}
-                  </h3>
-                  <ul className="flex flex-col">
-                    {list.map((d) => (
-                      <FallenRow key={d.id} fallen={withLegends(d)} worldId={linkable} />
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </Section>
-        ) : (
-          <div />
-        )}
-        <div className="flex flex-col gap-6">
-          <Causes dead={dead} />
-          <Departed departed={data?.departed ?? []} />
+      {dead.length || data?.departed.length ? (
+        <div className="grid border-b lg:grid-cols-[minmax(0,1fr)_20rem]">
+          {byYear.length ? (
+            <Section title="The roll of the dead" count={dead.length}>
+              <div className="flex flex-col gap-4">
+                {byYear.map(([year, list]) => (
+                  <div key={year ?? 'unknown'}>
+                    <h3 className="text-sm font-semibold text-muted-foreground">
+                      {year !== null ? `Year ${year}` : 'When is not known'}
+                    </h3>
+                    <ul className="flex flex-col">
+                      {list.map((d) => (
+                        <FallenRow key={d.id} fallen={withLegends(d)} worldId={linkable} />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </Section>
+          ) : (
+            <div />
+          )}
+          <div className="flex flex-col divide-y border-t lg:border-t-0 lg:border-l">
+            <Causes dead={dead} />
+            <Departed departed={data?.departed ?? []} />
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

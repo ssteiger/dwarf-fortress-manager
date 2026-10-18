@@ -138,8 +138,8 @@ export function EventsArchive({
     filters.artifact !== undefined
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-3">
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-3 border-b bg-muted/30 px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm text-muted-foreground">Years</span>
           <YearInput
@@ -224,22 +224,22 @@ export function EventsArchive({
       </div>
 
       {results.isLoading ? (
-        <p className="text-sm text-muted-foreground">Reading the chronicles…</p>
+        <p className="p-4 text-sm text-muted-foreground">Reading the chronicles…</p>
       ) : !data?.events.length ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="p-4 text-sm text-muted-foreground">
           {anyFilter
             ? 'Nothing recorded matches all of these. Loosen a filter.'
             : 'No events are recorded.'}
         </p>
       ) : (
-        <ol className={cn('divide-y', results.isFetching && 'opacity-70')}>
+        <ol className={cn('divide-y border-b px-4', results.isFetching && 'opacity-70')}>
           {data.events.map((event) => (
             <EventLine key={event.id} event={event} names={data.names} worldId={worldId} />
           ))}
         </ol>
       )}
 
-      <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
+      <div className="flex items-center justify-between gap-3 p-4 text-sm text-muted-foreground">
         <span className="tabular-nums">
           {total
             ? `Showing ${(filters.page * PAGE_SIZE + 1).toLocaleString()}–${Math.min(

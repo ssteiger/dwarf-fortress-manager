@@ -1,8 +1,9 @@
 import type { DiplomacyRelation, FortPower } from '@fortress/db-drizzle'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { NetworkIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import {
   isWarRelation,
   peopleOf,
@@ -41,18 +42,17 @@ export function RelationsGrid({ powers, onOpen }: { powers: FortPower[]; onOpen:
       if (isWarRelation(relationBetween(powers[i], powers[j]))) wars.push([powers[i], powers[j]])
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <NetworkIcon className="size-4 text-primary" />
-          Between your neighbours
-        </CardTitle>
-        <CardDescription>
+    <Section
+      icon={<NetworkIcon className="size-4 text-primary" />}
+      title="Between your neighbours"
+      description={
+        <>
           How the {shown.length} nearest stand with each other. A war next door can spill onto your
           map when armies march past.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
         <div className="overflow-x-auto">
           <table className="text-sm">
             <thead>
@@ -147,7 +147,7 @@ export function RelationsGrid({ powers, onOpen }: { powers: FortPower[]; onOpen:
             ) : null}
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }

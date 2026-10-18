@@ -1,7 +1,8 @@
 import type { FortDiplomacy, FortPower } from '@fortress/db-drizzle'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { TrendingUpIcon } from 'lucide-react'
 
+import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
 import {
   type FortProgressValues,
@@ -75,19 +76,18 @@ export function Forecast({
   const rules = d.invasion_rules
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <TrendingUpIcon className="size-4 text-primary" />
-          What draws them
-        </CardTitle>
-        <CardDescription>
+    <Section
+      icon={<TrendingUpIcon className="size-4 text-primary" />}
+      title="What draws them"
+      description={
+        <>
           Caravans, thieves and sieges come as your fortress grows. The game rates three things from
           level 0 to 5, and each people has its own levels at which it takes notice and at which it
           can lay siege.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-5">
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-4">
           {MEASURES.map((m) => (
             <MeasureBar key={m.key} d={d} measure={m.key} label={m.label} values={values} />
@@ -137,8 +137,8 @@ export function Forecast({
               : ''}
           </p>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }
 

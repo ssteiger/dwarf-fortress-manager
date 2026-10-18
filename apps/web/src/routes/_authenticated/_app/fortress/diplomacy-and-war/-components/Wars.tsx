@@ -1,8 +1,9 @@
 import type { FortDiplomacy, FortWar, FortWarEvent } from '@fortress/db-drizzle'
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fortress/ui'
+import { Badge } from '@fortress/ui'
 import { SwordsIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
 import { isOngoing, warSpan, warTally } from '~/lib/fortress/diplomacy'
 import { EntityName, LegendsLink, type OpenPower } from './shared'
@@ -34,19 +35,16 @@ export function Wars({
   const ongoing = ours.filter(isOngoing).length
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <SwordsIcon className="size-4 text-primary" />
-          Wars
-        </CardTitle>
-        <CardDescription>
-          {ours.length === 0
-            ? 'Your civilization fights in no war the histories record.'
-            : `Your civilization has fought ${plural(ours.length, 'war')}${ongoing ? `, ${ongoing} still going` : ''}. Its enemies can raid and besiege your fortress even if the war began far away.`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+    <Section
+      icon={<SwordsIcon className="size-4 text-primary" />}
+      title="Wars"
+      description={
+        ours.length === 0
+          ? 'Your civilization fights in no war the histories record.'
+          : `Your civilization has fought ${plural(ours.length, 'war')}${ongoing ? `, ${ongoing} still going` : ''}. Its enemies can raid and besiege your fortress even if the war began far away.`
+      }
+    >
+      <div className="flex flex-col gap-3">
         {ours.map((war) => (
           <WarItem key={war.id} d={d} war={war} worldId={worldId} onOpen={onOpen} />
         ))}
@@ -67,8 +65,8 @@ export function Wars({
               : null}
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }
 
@@ -103,7 +101,7 @@ export function WarItem({
   const [all, setAll] = React.useState(false)
   const events = all ? war.events : war.events.slice(0, EVENTS_SHOWN)
   return (
-    <div className="flex flex-col gap-2 rounded-lg border p-3">
+    <div className="flex flex-col gap-2 border-l-2 py-1 pl-3">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{war.name ?? 'An unnamed war'}</span>
         {isOngoing(war) ? (

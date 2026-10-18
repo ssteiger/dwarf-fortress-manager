@@ -1,7 +1,8 @@
 import type { FortPower } from '@fortress/db-drizzle'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { MapIcon } from 'lucide-react'
 
+import { Section } from '~/lib/components/Section'
 import {
   STANCE_FILL,
   type Stance,
@@ -57,18 +58,17 @@ export function NeighbourMap({
     )
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <MapIcon className="size-4 text-primary" />
-          The neighbourhood
-        </CardTitle>
-        <CardDescription>
+    <Section
+      icon={<MapIcon className="size-4 text-primary" />}
+      title="The neighbourhood"
+      description={
+        <>
           Your fortress in the middle, north up. Large dots are settlements, small ones tombs, lairs
           and camps, coloured by how their owner stands with you.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
         <div className="relative mx-auto aspect-square w-full max-w-[30rem]">
           <svg
             viewBox={`${-R - pad} ${-R - pad} ${span} ${span}`}
@@ -190,7 +190,7 @@ export function NeighbourMap({
             </li>
           ))}
         </ul>
-      </CardContent>
-    </Card>
+      </div>
+    </Section>
   )
 }

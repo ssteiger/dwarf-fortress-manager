@@ -1,10 +1,11 @@
 import type { FortUnit } from '@fortress/db-drizzle'
-import { Badge, Card, DataTable, Input, Tabs, TabsList, TabsTrigger, cn } from '@fortress/ui'
+import { Badge, DataTable, Input, Tabs, TabsList, TabsTrigger, cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
 import { LayoutGridIcon, TableIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { SECTION_GRID } from '~/lib/components/Section'
 import { CreatureSprite, UnitPortrait } from '~/lib/df-assets/components'
 import {
   humanize,
@@ -19,6 +20,7 @@ import { emotionTone, notableThought, thoughtPhrase } from '~/lib/fortress/peopl
 import { concernScore, unitConcerns } from '~/lib/fortress/people/troubles'
 import { isCitizenish } from '~/lib/fortress/people/units'
 import { type GameTime, gameAgo } from '~/lib/fortress/time'
+
 import { EmptyState, MoodBadge, UnitConditionBadges } from '../../-components/FortChrome'
 import { ConcernBadges } from '../../-components/Insights'
 import {
@@ -302,8 +304,11 @@ export function Roster({
   )
 
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
+    <div
+      data-fill={view === 'table' && rows.length > 0 ? '' : undefined}
+      className="flex flex-col data-fill:min-h-0 data-fill:flex-1"
+    >
+      <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
         <Tabs value={group} onValueChange={(v) => setGroup(v as Group)}>
           <TabsList className="flex-wrap">
             {(Object.keys(GROUP_LABELS) as Group[]).map((key) => (
@@ -339,15 +344,14 @@ export function Roster({
       </div>
 
       {rows.length === 0 ? (
-        <div className="p-6">
-          <EmptyState title="Nobody here">
-            {units.length === 0 ? 'No dump has been taken yet.' : 'No unit matches this filter.'}
-          </EmptyState>
-        </div>
+        <EmptyState title="Nobody here" className="m-4">
+          {units.length === 0 ? 'No dump has been taken yet.' : 'No unit matches this filter.'}
+        </EmptyState>
       ) : view === 'grid' ? (
         <Grid units={rows} now={now} onOpen={onOpen} />
       ) : (
         <DataTable
+          fill
           data={rows}
           columns={columns}
           showSelectColumn={false}
@@ -360,7 +364,7 @@ export function Roster({
           onRowClick={onOpen}
         />
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -418,16 +422,18 @@ function Grid({
       )
   }, [units, q, now])
   return (
-    <div className="flex flex-col gap-3 p-4">
-      <Input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search by name, profession, job or squad…"
-        className="max-w-sm"
-        aria-label="Search the grid"
-      />
+    <div className="flex flex-col">
+      <div className="border-b px-4 py-3">
+        <Input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search by name, profession, job or squad…"
+          className="max-w-sm"
+          aria-label="Search the grid"
+        />
+      </div>
       {entries.length ? (
-        <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <ul className={cn(SECTION_GRID, 'sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4')}>
           {entries.map(({ unit, concerns }) => {
             const living = isLiving(unit)
             const activity = activityOf(unit)
@@ -437,7 +443,7 @@ function Grid({
                   type="button"
                   onClick={() => onOpen(unit)}
                   className={cn(
-                    'flex h-full w-full gap-3 rounded-lg border bg-card p-2.5 text-left transition-colors hover:bg-accent/40',
+                    'flex h-full w-full gap-3 p-3 text-left transition-colors hover:bg-accent/40',
                     !living && 'opacity-60',
                   )}
                 >
@@ -477,7 +483,7 @@ function Grid({
           })}
         </ul>
       ) : (
-        <EmptyState title="Nobody by that name">
+        <EmptyState title="Nobody by that name" className="m-4">
           Try a profession, a job, or part of a name.
         </EmptyState>
       )}

@@ -3,7 +3,13 @@ import { createFileRoute } from '@tanstack/react-router'
 import * as React from 'react'
 
 import type { Stories, StoryGroup } from '~/lib/legends/server/chronicle'
-import { LegendsShell, Section, parseWorldSearch } from '../-components/LegendsChrome'
+import {
+  LegendsShell,
+  Section,
+  SectionGrid,
+  SectionStack,
+  parseWorldSearch,
+} from '../-components/LegendsChrome'
 import { FeaturedStory, StoryCard, featuredStories, useStories } from '../-components/Stories'
 
 function StoriesPage() {
@@ -23,17 +29,17 @@ function StoriesBody({ worldId, civId }: { worldId: number; civId: number | null
 
   if (!stories.data) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="p-4 text-sm text-muted-foreground">
         {stories.isLoading ? 'Sifting the chronicles for stories…' : 'No stories yet.'}
       </p>
     )
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <SectionStack className="border-b">
       <FeaturedStory worldId={worldId} candidates={featured} />
 
-      <nav aria-label="Story groups" className="flex flex-wrap gap-2">
+      <nav aria-label="Story groups" className="flex flex-wrap gap-2 px-4 py-3">
         {stories.data.groups.map((group) => (
           <a
             key={group.key}
@@ -46,7 +52,7 @@ function StoriesBody({ worldId, civId }: { worldId: number; civId: number | null
         ))}
       </nav>
 
-      <div className="gap-4 lg:columns-2">
+      <SectionGrid className="lg:grid-cols-2">
         {stories.data.groups.map((group) => (
           <StoryGroupSection
             key={group.key}
@@ -55,8 +61,8 @@ function StoriesBody({ worldId, civId }: { worldId: number; civId: number | null
             worldId={worldId}
           />
         ))}
-      </div>
-    </div>
+      </SectionGrid>
+    </SectionStack>
   )
 }
 
@@ -74,7 +80,7 @@ function StoryGroupSection({
   const [all, setAll] = React.useState(false)
   const shown = all ? group.stories : group.stories.slice(0, GROUP_PREVIEW)
   return (
-    <div id={`stories-${group.key}`} className="mb-4 scroll-mt-4 break-inside-avoid">
+    <div id={`stories-${group.key}`} className="scroll-mt-4">
       <Section title={group.title} description={group.description} count={group.stories.length}>
         <ul className="flex flex-col divide-y">
           {shown.map((story) => (

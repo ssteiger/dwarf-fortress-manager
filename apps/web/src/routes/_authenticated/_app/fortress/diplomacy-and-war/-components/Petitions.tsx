@@ -1,8 +1,9 @@
 import type { FortAgreement, FortDiplomacy } from '@fortress/db-drizzle'
-import { Badge, Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { Badge, cn } from '@fortress/ui'
 import { ScrollTextIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
 import { humanize } from '~/lib/fortress/format'
 import { EntityName, type OpenPower } from './shared'
@@ -70,56 +71,51 @@ export function Petitions({ d, onOpen }: { d: FortDiplomacy; onOpen: OpenPower }
   ]
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <ScrollTextIcon className="size-4 text-primary" />
-          Petitions
-        </CardTitle>
-        <CardDescription>
-          {open.length
-            ? `You agreed to ${plural(open.length, 'petition')} and have not built ${open.length === 1 ? 'it' : 'them'} yet. Zone the temple or guildhall at the size asked for; an agreement left too long runs out and upsets those who asked.`
-            : 'Guilds and congregations ask for halls and temples once your fortress grows. Agreeing and building them keeps them content.'}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {shown.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No petitions yet.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {shown.map(({ agreement: a, count }) => (
-              <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
-                <span className="text-muted-foreground tabular-nums">Year {a.year}</span>
-                <span className="min-w-0 flex-1">
-                  {a.parties.length ? (
-                    a.parties.map((id, i) => (
-                      <React.Fragment key={id}>
-                        {i > 0 ? ' and ' : null}
-                        <EntityName d={d} id={id} onOpen={onOpen} />
-                      </React.Fragment>
-                    ))
-                  ) : (
-                    <span>Someone</span>
-                  )}{' '}
-                  asked for {wish(a)}.
-                </span>
-                <Badge variant="outline" className={cn('font-normal', STATUS[a.status].className)}>
-                  {count > 1 ? `${STATUS[a.status].label}, ${count} times` : STATUS[a.status].label}
-                </Badge>
-              </li>
-            ))}
-          </ul>
-        )}
-        {rest.length > OLDER_SHOWN ? (
-          <button
-            type="button"
-            className="mt-3 text-sm text-muted-foreground hover:text-foreground hover:underline"
-            onClick={() => setAll(!all)}
-          >
-            {all ? 'Fewer' : 'All older petitions'}
-          </button>
-        ) : null}
-      </CardContent>
-    </Card>
+    <Section
+      icon={<ScrollTextIcon className="size-4 text-primary" />}
+      title="Petitions"
+      description={
+        open.length
+          ? `You agreed to ${plural(open.length, 'petition')} and have not built ${open.length === 1 ? 'it' : 'them'} yet. Zone the temple or guildhall at the size asked for; an agreement left too long runs out and upsets those who asked.`
+          : 'Guilds and congregations ask for halls and temples once your fortress grows. Agreeing and building them keeps them content.'
+      }
+    >
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No petitions yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {shown.map(({ agreement: a, count }) => (
+            <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm">
+              <span className="text-muted-foreground tabular-nums">Year {a.year}</span>
+              <span className="min-w-0 flex-1">
+                {a.parties.length ? (
+                  a.parties.map((id, i) => (
+                    <React.Fragment key={id}>
+                      {i > 0 ? ' and ' : null}
+                      <EntityName d={d} id={id} onOpen={onOpen} />
+                    </React.Fragment>
+                  ))
+                ) : (
+                  <span>Someone</span>
+                )}{' '}
+                asked for {wish(a)}.
+              </span>
+              <Badge variant="outline" className={cn('font-normal', STATUS[a.status].className)}>
+                {count > 1 ? `${STATUS[a.status].label}, ${count} times` : STATUS[a.status].label}
+              </Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+      {rest.length > OLDER_SHOWN ? (
+        <button
+          type="button"
+          className="mt-3 text-sm text-muted-foreground hover:text-foreground hover:underline"
+          onClick={() => setAll(!all)}
+        >
+          {all ? 'Fewer' : 'All older petitions'}
+        </button>
+      ) : null}
+    </Section>
   )
 }

@@ -229,7 +229,7 @@ function RunAction({ action }: { action: DfhackAction }) {
   const start = () => (spec.confirm ? setConfirming(true) : queue.mutate())
   const command = [spec.command, ...spec.args].join(' ')
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+    <div className="flex flex-col gap-1.5 rounded-lg bg-muted/40 p-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="sm"

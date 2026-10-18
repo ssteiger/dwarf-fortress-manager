@@ -8,7 +8,7 @@ import {
   FortBreadcrumbs,
   MoodBadge,
   PageHeader,
-  StatusBanner,
+  StatusBand,
   WatchButton,
 } from '../-components/FortChrome'
 import { ShowInGameButton } from './-components/ActionsTab'
@@ -67,53 +67,55 @@ function DwarfPage() {
     : undefined
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <FortBreadcrumbs
-        items={[
-          { label: 'Fortress', to: '/fortress' },
-          { label: 'Dwarves', to: '/fortress/dwarves' },
-          { label: title },
-        ]}
-      />
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-col gap-4 border-b p-4">
+        <FortBreadcrumbs
+          items={[
+            { label: 'Fortress', to: '/fortress' },
+            { label: 'Dwarves', to: '/fortress/dwarves' },
+            { label: title },
+          ]}
+        />
 
-      <PageHeader
-        title={
-          <span className="flex flex-wrap items-center gap-3">
-            {unit ? (
-              <UnitPortrait
-                unit={unit}
-                size={96}
-                fallbackToSprite
-                className="rounded-md border bg-muted/40"
-                title={`${unit.race} as drawn in the game`}
-              />
-            ) : null}
-            {title}
-            {unit && onMap && (group === 'citizen' || group === 'resident') ? (
-              <MoodBadge category={unit.stress_category} className="text-sm font-normal" />
-            ) : null}
-            {unit?.mood ? (
-              <Badge variant="outline" className="text-sm font-normal">
-                {humanize(unit.mood)} mood
-              </Badge>
-            ) : null}
-          </span>
-        }
-        description={subtitle}
-        updatedAt={data?.capturedAt}
-        isFetching={isFetching}
-        onRefresh={() => refetch()}
-        actions={
-          unit ? (
-            <>
-              {living && !archived ? <WatchButton unit={unit} /> : null}
-              {onMap ? <ShowInGameButton unit={unit} /> : null}
-              <UnitLinks unit={unit} legends={legends} variant="button" />
-            </>
-          ) : null
-        }
-      />
-      <StatusBanner state={overview.data?.state} />
+        <PageHeader
+          title={
+            <span className="flex flex-wrap items-center gap-3">
+              {unit ? (
+                <UnitPortrait
+                  unit={unit}
+                  size={96}
+                  fallbackToSprite
+                  className="rounded-md border bg-muted/40"
+                  title={`${unit.race} as drawn in the game`}
+                />
+              ) : null}
+              {title}
+              {unit && onMap && (group === 'citizen' || group === 'resident') ? (
+                <MoodBadge category={unit.stress_category} className="text-sm font-normal" />
+              ) : null}
+              {unit?.mood ? (
+                <Badge variant="outline" className="text-sm font-normal">
+                  {humanize(unit.mood)} mood
+                </Badge>
+              ) : null}
+            </span>
+          }
+          description={subtitle}
+          updatedAt={data?.capturedAt}
+          isFetching={isFetching}
+          onRefresh={() => refetch()}
+          actions={
+            unit ? (
+              <>
+                {living && !archived ? <WatchButton unit={unit} /> : null}
+                {onMap ? <ShowInGameButton unit={unit} /> : null}
+                <UnitLinks unit={unit} legends={legends} variant="button" />
+              </>
+            ) : null
+          }
+        />
+      </div>
+      <StatusBand state={overview.data?.state} />
       <DwarfDetails
         unitId={numericId}
         legends={legends}

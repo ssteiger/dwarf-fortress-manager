@@ -47,7 +47,7 @@ function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string })
 
   if (story.isLoading)
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-4">
         <Skeleton className="h-8 w-80" />
         <div className="grid gap-4 lg:grid-cols-3">
           <Skeleton className="h-72 lg:col-span-2" />
@@ -58,7 +58,7 @@ function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string })
   const told = story.data
   if (!told)
     return (
-      <EmptyState title="That story is not in this world's record">
+      <EmptyState title="That story is not in this world's record" className="m-4">
         The stories are drawn afresh when legends are imported, so this one may have moved on.{' '}
         <Link to="/legends/stories" search={{ world: worldId }} className="text-primary underline">
           See the stories there are now
@@ -69,40 +69,42 @@ function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string })
 
   const shown = allEvents ? told.events : told.events.slice(0, RECORD_PREVIEW)
   return (
-    <div className="flex flex-col gap-4">
-      <Breadcrumbs
-        items={[
-          { label: 'Stories', to: '/legends/stories', search: { world: worldId } },
-          { label: told.group.title },
-          { label: told.title },
-        ]}
-      />
-      <header className="flex flex-wrap items-start gap-4">
-        <div className="min-w-0 flex-1 basis-64">
-          <h2 className="text-2xl font-medium">{told.title}</h2>
-          <p className="mt-1 text-base text-muted-foreground">
-            {told.group.title}
-            {told.year !== null ? ` · from ${told.year}` : null}
-          </p>
-        </div>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <NarrateButton
-            worldId={worldId}
-            subject={{ kind: 'story', key: told.key }}
-            title={told.title}
-            label="Tell it another way"
-          />
-          <PinButton
-            worldId={worldId}
-            target={{ kind: 'story', id: told.key, title: told.title }}
-            size="sm"
-            label="Pin to journal"
-          />
-        </div>
-      </header>
+    <div className="flex flex-col">
+      <div className="flex flex-col gap-4 border-b p-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Stories', to: '/legends/stories', search: { world: worldId } },
+            { label: told.group.title },
+            { label: told.title },
+          ]}
+        />
+        <header className="flex flex-wrap items-start gap-4">
+          <div className="min-w-0 flex-1 basis-64">
+            <h2 className="text-2xl font-medium">{told.title}</h2>
+            <p className="mt-1 text-base text-muted-foreground">
+              {told.group.title}
+              {told.year !== null ? ` · from ${told.year}` : null}
+            </p>
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <NarrateButton
+              worldId={worldId}
+              subject={{ kind: 'story', key: told.key }}
+              title={told.title}
+              label="Tell it another way"
+            />
+            <PinButton
+              worldId={worldId}
+              target={{ kind: 'story', id: told.key, title: told.title }}
+              size="sm"
+              label="Pin to journal"
+            />
+          </div>
+        </header>
+      </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
+      <div className="grid border-b lg:grid-cols-3">
+        <div className="flex min-w-0 flex-col divide-y lg:col-span-2">
           <Section title="The story">
             <Telling paragraphs={told.paragraphs} worldId={worldId} />
           </Section>
@@ -137,7 +139,7 @@ function StoryBody({ worldId, storyKey }: { worldId: number; storyKey: string })
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex min-w-0 flex-col divide-y border-t lg:border-t-0 lg:border-l">
           {told.cast.length ? (
             <Section title="Who and where">
               <CastList cast={told.cast} worldId={worldId} />

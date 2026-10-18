@@ -1,10 +1,6 @@
 import type { FortItem } from '@fortress/db-drizzle'
 import {
   Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   DataTable,
   Drawer,
   DrawerClose,
@@ -27,6 +23,7 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { Section } from '~/lib/components/Section'
 import { ItemSprite } from '~/lib/df-assets/components'
 import {
   type ItemView,
@@ -47,7 +44,7 @@ import { type ItemSortKey, getFortItems } from '~/lib/fortress/server/items'
 import { getFortWork } from '~/lib/fortress/server/work'
 import { gameTimeOf } from '~/lib/fortress/time'
 import { NextSteps, SituationList } from '../-components/Advice'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { EmptyState, PageHeader, StatusBand } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
 import { ItemDetails, ItemStatusBadges, itemSubtitle } from './-components/ItemDetails'
 import {
@@ -222,8 +219,9 @@ function ItemsBody() {
   const attention = advice.filter((a) => a.status === 'attention').length
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="Stores and items"
         description="What the fortress keeps, what it is running short of, and what to do about it in the game. Every item on the map is listed below."
         updatedAt={supplies.data?.capturedAt}
@@ -233,81 +231,68 @@ function ItemsBody() {
           void work.refetch()
         }}
       />
-      <StatusBanner state={state} />
+      <StatusBand state={state} />
 
       {ready ? (
         <>
           <StoreTiles tiles={tiles} advice={advice} />
 
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <ListChecksIcon className="size-4 text-primary" />
-                    What the stores need
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
+          <div className="grid border-b xl:grid-cols-[minmax(0,1fr)_400px]">
+            <div className="flex min-w-0 flex-col divide-y">
+              <Section
+                icon={<ListChecksIcon className="size-4 text-primary" />}
+                title="What the stores need"
+                description={
+                  <>
                     {problems ? `${problems} problem${problems === 1 ? '' : 's'} and ` : ''}
                     {attention} thing{attention === 1 ? '' : 's'} to see to in what the fortress
                     keeps. Open one for the steps in the game.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <NextSteps advice={advice} max={6} />
-                </CardContent>
-              </Card>
+                  </>
+                }
+              >
+                <NextSteps advice={advice} max={6} />
+              </Section>
 
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <HammerIcon className="size-4 text-primary" />
-                    Worth making next
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
+              <Section
+                icon={<HammerIcon className="size-4 text-primary" />}
+                title="Worth making next"
+                description={
+                  <>
                     What a fortress this size should keep in store, against what it has. Open one to
                     see where to make it and who can.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <ProductionPlan rows={plan} />
-                </CardContent>
-              </Card>
+                  </>
+                }
+              >
+                <ProductionPlan rows={plan} />
+              </Section>
             </div>
 
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card className="gap-3">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <PiggyBankIcon className="size-4 text-primary" />
-                    Where the wealth is
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <WealthBreakdown wealth={summary?.wealth ?? null} />
-                </CardContent>
-              </Card>
+            <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
+              <Section
+                className="gap-3"
+                icon={<PiggyBankIcon className="size-4 text-primary" />}
+                title="Where the wealth is"
+              >
+                <WealthBreakdown wealth={summary?.wealth ?? null} />
+              </Section>
 
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <LifeBuoyIcon className="size-4 text-primary" />
-                    When things go wrong
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
+              <Section
+                icon={<LifeBuoyIcon className="size-4 text-primary" />}
+                title="When things go wrong"
+                description={
+                  <>
                     Trouble with the stores, and how to get through it. What seems to be happening
                     now is on top.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SituationList situations={playbook} />
-                </CardContent>
-              </Card>
+                  </>
+                }
+              >
+                <SituationList situations={playbook} />
+              </Section>
             </div>
           </div>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">Reading the stores…</p>
+        <p className="border-b p-4 text-sm text-muted-foreground">Reading the stores…</p>
       )}
 
       <ItemList />
@@ -362,34 +347,36 @@ function ItemList() {
   const current = data?.view === view ? data : undefined
 
   return (
-    <section id="items-list" className="flex scroll-mt-4 flex-col gap-4">
-      <div>
-        <h2 className="text-lg font-medium">Every item</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {data
-            ? `${formatNumber(data.views.fortress)} items in the fortress${data.views.elsewhere ? `, and ${formatNumber(data.views.elsewhere)} artifacts and books the game knows of elsewhere` : ''}. Click one to see what to do with it.`
-            : 'Everything the fortress owns, once a dump has been taken.'}
-          {isFetching ? ' Updating…' : ''}
-        </p>
+    <section id="items-list" className="flex scroll-mt-4 flex-col gap-4 pt-4">
+      <div className="flex flex-col gap-4 px-4">
+        <div>
+          <h2 className="text-base leading-none font-medium">Every item</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {data
+              ? `${formatNumber(data.views.fortress)} items in the fortress${data.views.elsewhere ? `, and ${formatNumber(data.views.elsewhere)} artifacts and books the game knows of elsewhere` : ''}. Click one to see what to do with it.`
+              : 'Everything the fortress owns, once a dump has been taken.'}
+            {isFetching ? ' Updating…' : ''}
+          </p>
+        </div>
+
+        <ViewChips view={view} counts={data?.views} onChange={setView} />
+        {current ? <ViewHint view={view} count={current.inView} value={current.viewValue} /> : null}
+        {current ? (
+          <TypeChips
+            types={current.types}
+            valueByType={current.valueByType}
+            samples={current.samples}
+            selected={type}
+            onSelect={setType}
+          />
+        ) : null}
       </div>
 
-      <ViewChips view={view} counts={data?.views} onChange={setView} />
-      {current ? <ViewHint view={view} count={current.inView} value={current.viewValue} /> : null}
-      {current ? (
-        <TypeChips
-          types={current.types}
-          valueByType={current.valueByType}
-          samples={current.samples}
-          selected={type}
-          onSelect={setType}
-        />
-      ) : null}
-
-      <Card className="overflow-hidden p-0">
+      <div className="border-t">
         {!data || data.total === 0 ? (
-          <div className="p-6">
-            <EmptyState title="No items">No dump has been taken yet.</EmptyState>
-          </div>
+          <EmptyState title="No items" className="m-4">
+            No dump has been taken yet.
+          </EmptyState>
         ) : (
           <DataTable
             data={data.items}
@@ -422,7 +409,7 @@ function ItemList() {
             }}
           />
         )}
-      </Card>
+      </div>
 
       <Drawer
         direction="right"
@@ -460,7 +447,7 @@ function ItemList() {
                   </DrawerClose>
                 </div>
               </DrawerHeader>
-              <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <div className="min-h-0 flex-1 overflow-y-auto">
                 <ItemDetails itemId={selected.id} compact />
               </div>
               <DrawerFooter className="border-t">

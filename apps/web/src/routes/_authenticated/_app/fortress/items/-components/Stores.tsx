@@ -3,6 +3,7 @@ import { Button, cn } from '@fortress/ui'
 import { ChevronRightIcon } from 'lucide-react'
 import * as React from 'react'
 
+import { SectionGrid } from '~/lib/components/Section'
 import { ItemSprite } from '~/lib/df-assets/components'
 import { adviceGuide, planGuide, viewGuide } from '~/lib/fortress/advice/guides'
 import {
@@ -16,12 +17,13 @@ import type { Advice, AdviceStatus } from '~/lib/fortress/advice/types'
 import { WORKSHOPS } from '~/lib/fortress/advice/workshops'
 import { formatNumber, formatValue, humanize, splitPascal } from '~/lib/fortress/format'
 import { firstName } from '~/lib/fortress/people/units'
+
 import { StatusIcon } from '../../-components/Advice'
 import { GuideButton, OneClickMark, useOpenGuide } from '../../-components/Guide'
 
 const TILE_TONE: Record<AdviceStatus, string> = {
-  problem: 'border-red-500/40 bg-red-500/5',
-  attention: 'border-amber-500/40 bg-amber-500/5',
+  problem: 'bg-red-500/5',
+  attention: 'bg-amber-500/5',
   good: '',
 }
 
@@ -29,7 +31,7 @@ const TILE_TONE: Record<AdviceStatus, string> = {
 export function StoreTiles({ tiles, advice }: { tiles: StoreTile[]; advice: Advice[] }) {
   const open = useOpenGuide()
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
+    <SectionGrid className="grid-cols-2 border-b sm:grid-cols-4 xl:grid-cols-8">
       {tiles.map((tile) => {
         const match = advice.find((a) => a.key === tile.advice)
         return (
@@ -40,7 +42,7 @@ export function StoreTiles({ tiles, advice }: { tiles: StoreTile[]; advice: Advi
             onClick={() => match && open(adviceGuide(match))}
             title={match ? `${match.title}: ${match.why}` : undefined}
             className={cn(
-              'flex flex-col gap-1 rounded-xl border px-3 py-2.5 text-left transition-colors enabled:hover:bg-accent/40',
+              'flex flex-col gap-1 p-4 text-left transition-colors enabled:hover:bg-accent/40',
               match && TILE_TONE[match.status],
             )}
           >
@@ -54,7 +56,7 @@ export function StoreTiles({ tiles, advice }: { tiles: StoreTile[]; advice: Advi
           </button>
         )
       })}
-    </div>
+    </SectionGrid>
   )
 }
 

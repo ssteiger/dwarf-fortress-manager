@@ -10,12 +10,6 @@ import {
   AlertDialogTrigger,
   Badge,
   Button,
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Textarea,
   cn,
 } from '@fortress/ui'
@@ -97,23 +91,25 @@ export function NameList({
   const fits = list.filter((entry) => entry.state === 'fits').length
 
   return (
-    <Card className={className}>
-      <CardHeader className="max-sm:has-data-[slot=card-action]:grid-cols-1">
-        <CardTitle className="flex items-center gap-2">
-          Your names
-          {list.length ? (
-            <Badge variant="secondary" className="tabular-nums">
-              {list.length}
-            </Badge>
-          ) : null}
-        </CardTitle>
-        <CardDescription className="max-w-2xl">
-          {list.length
-            ? `Names you love, waiting for the right dwarf. ${fits ? `${fits} found a dwarf they fit and show up first in that dwarf's ideas.` : 'None fit anyone yet.'} The rest go to dwarves without a nickname as wild cards.`
-            : 'Keep names you love here, from streams, friends or your own head. Each one goes to the dwarf whose story it fits best, and the AI may hand them out too.'}
-        </CardDescription>
+    <section className={cn('flex flex-col', className)}>
+      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-base leading-none font-medium">
+            Your names
+            {list.length ? (
+              <Badge variant="secondary" className="tabular-nums">
+                {list.length}
+              </Badge>
+            ) : null}
+          </h2>
+          <p className="mt-1.5 max-w-2xl text-sm text-muted-foreground">
+            {list.length
+              ? `Names you love, waiting for the right dwarf. ${fits ? `${fits} found a dwarf they fit and show up first in that dwarf's ideas.` : 'None fit anyone yet.'} The rest go to dwarves without a nickname as wild cards.`
+              : 'Keep names you love here, from streams, friends or your own head. Each one goes to the dwarf whose story it fits best, and the AI may hand them out too.'}
+          </p>
+        </div>
         {list.length ? (
-          <CardAction className="flex items-center gap-2 max-sm:col-start-1 max-sm:row-span-1 max-sm:row-start-3 max-sm:mt-2 max-sm:justify-self-start">
+          <div className="flex flex-wrap items-center gap-2">
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
@@ -178,10 +174,10 @@ export function NameList({
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-          </CardAction>
+          </div>
         ) : null}
-      </CardHeader>
-      <CardContent className="min-h-0 flex-1 space-y-4 overflow-y-auto">
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-4">
         {entering ? (
           <form
             className="flex max-w-2xl flex-col gap-2"
@@ -284,7 +280,7 @@ export function NameList({
             })}
           </ul>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   )
 }

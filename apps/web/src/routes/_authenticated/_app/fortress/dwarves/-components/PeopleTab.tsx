@@ -2,6 +2,7 @@ import type { FortUnit } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 import * as React from 'react'
 
+import { SectionGrid } from '~/lib/components/Section'
 import { humanize, splitPascal } from '~/lib/fortress/format'
 import { type PeopleGroup, type Relation, relations } from '~/lib/fortress/people/character'
 import { Muted, PersonName, Section, SheetMissing, TONE_TEXT, capitalize } from './SheetParts'
@@ -41,7 +42,7 @@ export function PeopleTab({
   for (const r of rels) byGroup.set(r.group, [...(byGroup.get(r.group) ?? []), r])
   const memberships = sheet.groups.filter(([, , link]) => link !== 'POSITION')
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+    <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
       {GROUPS.map((group) => (
         <PeopleSection
           key={group.key}
@@ -70,7 +71,7 @@ export function PeopleTab({
           <Muted>No civilization, faith or guild on record.</Muted>
         )}
       </Section>
-    </div>
+    </SectionGrid>
   )
 }
 

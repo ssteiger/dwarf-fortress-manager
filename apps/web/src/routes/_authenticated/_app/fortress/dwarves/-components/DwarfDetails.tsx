@@ -1,10 +1,9 @@
 import type { FortBuilding, FortUnit } from '@fortress/db-drizzle'
 import {
   Badge,
-  Card,
-  CardContent,
   DataTable,
   Skeleton,
+  Stats,
   Tabs,
   TabsContent,
   TabsList,
@@ -29,6 +28,7 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { SectionGrid, SectionStack } from '~/lib/components/Section'
 import { CreatureSprite, ItemSprite } from '~/lib/df-assets/components'
 import { makeNameLinker, storyKind } from '~/lib/fortress/chronicle/announcements'
 import { useFortOverview, useFortUnit, useFortUnits } from '~/lib/fortress/client/queries'
@@ -62,8 +62,8 @@ import type { CarriedItem, FortUnitDetail } from '~/lib/fortress/server/units'
 import { type GameTime, gameTimeOf } from '~/lib/fortress/time'
 import {
   EmptyState,
+  Reading,
   SectionBoundary,
-  StatCard,
   UnitConditionBadges,
 } from '../../-components/FortChrome'
 import { AnnouncementText, StoryIcon } from '../../-components/Insights'
@@ -206,7 +206,7 @@ export function DwarfDetails({
 
   if (isLoading) {
     return (
-      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-3')}>
+      <div className={cn('grid gap-4 p-4', compact ? 'grid-cols-1' : 'lg:grid-cols-3')}>
         <Skeleton className="h-48" />
         <Skeleton className="h-48" />
         <Skeleton className="h-48" />
@@ -217,7 +217,7 @@ export function DwarfDetails({
   const unit = data?.unit ?? null
   if (!unit) {
     return (
-      <EmptyState title="Not in the last dump">
+      <EmptyState title="Not in the last dump" className="m-4">
         There is no unit with id {unitId} in the fortress dump. They may have left the map, or no
         dump has been taken yet.
       </EmptyState>
@@ -229,9 +229,9 @@ export function DwarfDetails({
   const concerns = archived ? [] : unitConcerns(unit, now)
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card className="gap-3 py-4">
-        <CardContent className="flex flex-col gap-3 px-4">
+    <SectionStack>
+      <div className="p-4">
+        <div className="flex flex-col gap-3">
           {archived ? <ArchivedNote unit={unit} archived={archived} /> : null}
           <p className="text-base">{unitStory(unit, now)}</p>
           {archived ? null : concerns.length ? (
@@ -245,23 +245,25 @@ export function DwarfDetails({
               Nothing troubles them that you could fix.
             </p>
           ) : null}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       <StatStrip unit={unit} detail={data} compact={compact} />
 
-      <Tabs value={current} onValueChange={(v) => isDwarfTab(v) && setTab(v)} className="gap-4">
-        <TabsList className="h-auto w-full flex-wrap justify-start gap-0.5">
-          {DWARF_TABS.map(({ key, label, Icon }) => (
-            <TabsTrigger key={key} value={key} className="flex-none gap-1.5 px-2.5">
-              <Icon className="size-3.5" aria-hidden />
-              {label}
-              {key === 'actions' && !archived && unit.sheet && !unit.sheet.error ? (
-                <TipCount unit={unit} />
-              ) : null}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+      <Tabs value={current} onValueChange={(v) => isDwarfTab(v) && setTab(v)} className="gap-0">
+        <div className="border-b px-4 py-3">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-0.5">
+            {DWARF_TABS.map(({ key, label, Icon }) => (
+              <TabsTrigger key={key} value={key} className="flex-none gap-1.5 px-2.5">
+                <Icon className="size-3.5" aria-hidden />
+                {label}
+                {key === 'actions' && !archived && unit.sheet && !unit.sheet.error ? (
+                  <TipCount unit={unit} />
+                ) : null}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
         <TabsContent value="overview">
           <SectionBoundary name="The overview">
             <OverviewTab
@@ -306,7 +308,7 @@ export function DwarfDetails({
           </SectionBoundary>
         </TabsContent>
       </Tabs>
-    </div>
+    </SectionStack>
   )
 }
 
@@ -321,7 +323,7 @@ function ArchivedNote({
   const when = formatGameTick(archived.year, archived.tick)
   const what = archived.reason === 'died' ? 'died' : 'left the map'
   return (
-    <p className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
+    <p className="rounded-md bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
       {firstName(unit)} {what} on {when}. The game no longer lists {p.them}, so this page shows{' '}
       {p.them} as the worker last read {p.them}, before then.
     </p>
@@ -357,8 +359,13 @@ function StatStrip({
   const syndromes = sheet ? syndromeNames(sheet) : []
   const citizenish = isCitizenish(unit)
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-2' : 'sm:grid-cols-2 lg:grid-cols-4')}>
-      <StatCard
+    <Stats
+      className={cn(
+        'border-b-0',
+        compact && 'grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2',
+      )}
+    >
+      <Reading
         title="Doing"
         value={
           detail?.archived?.reason === 'left'
@@ -383,7 +390,7 @@ function StatStrip({
             : (unit.squad ?? undefined)
         }
       />
-      <StatCard
+      <Reading
         title="Condition"
         value={hurt > 0 ? `${hurt} wound${hurt === 1 ? '' : 's'}` : 'Unhurt'}
         hint={
@@ -399,8 +406,8 @@ function StatStrip({
         <div className="mt-3">
           <UnitConditionBadges unit={unit} />
         </div>
-      </StatCard>
-      <StatCard
+      </Reading>
+      <Reading
         title={citizenish ? 'Mood' : 'Stress'}
         value={
           citizenish ? capitalize(stressLabel(unit.stress_category)) : unit.stress.toLocaleString()
@@ -420,7 +427,7 @@ function StatStrip({
               : undefined
         }
       />
-      <StatCard
+      <Reading
         title="Where"
         value={
           unit.x !== null ? (
@@ -443,7 +450,7 @@ function StatStrip({
           ) : undefined
         }
       />
-    </div>
+    </Stats>
   )
 }
 
@@ -493,11 +500,11 @@ function OverviewTab({
     </button>
   )
   return (
-    <div className="flex flex-col gap-4">
+    <SectionStack>
       {unit.strange_mood && isLiving(unit) ? (
         <StrangeMoodSection unit={unit} workshop={detail?.moodWorkshop ?? null} />
       ) : null}
-      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-3')}>
+      <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-3'}>
         <Section
           title={
             <span className="flex w-full items-center justify-between gap-3">
@@ -637,9 +644,9 @@ function OverviewTab({
             <Muted>No skills recorded.</Muted>
           )}
         </Section>
-      </div>
+      </SectionGrid>
 
-      <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+      <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
         {unit.thoughts?.length ? (
           <Section
             title="Lately"
@@ -659,7 +666,7 @@ function OverviewTab({
           </Section>
         ) : null}
         <ChronicleSection unit={unit} legends={legends} compact={compact} units={units} />
-      </div>
+      </SectionGrid>
 
       {isCitizenish(unit) ? <LifeSection unit={unit} units={units} compact={compact} /> : null}
 
@@ -677,7 +684,7 @@ function OverviewTab({
           </div>
         </Section>
       ) : null}
-    </div>
+    </SectionStack>
   )
 }
 
@@ -855,15 +862,15 @@ function GearTab({ detail, compact }: { detail: FortUnitDetail | undefined; comp
   const inventory = detail?.inventory ?? []
   const carriedValue = inventory.reduce((sum, row) => sum + (row.item?.value ?? 0), 0)
   return (
-    <Card className="overflow-hidden p-0">
-      <div className="border-b px-5 py-4">
-        <div className="text-base font-semibold">Carried and worn</div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {inventory.length
-            ? `${inventory.length} item${inventory.length === 1 ? '' : 's'} · ${formatValue(carriedValue)}`
-            : 'Nothing in their hands or on their person.'}
-        </p>
-      </div>
+    <Section
+      bleed
+      title="Carried and worn"
+      description={
+        inventory.length
+          ? `${inventory.length} item${inventory.length === 1 ? '' : 's'} · ${formatValue(carriedValue)}`
+          : 'Nothing in their hands or on their person.'
+      }
+    >
       {inventory.length ? (
         <DataTable
           data={inventory}
@@ -877,7 +884,7 @@ function GearTab({ detail, compact }: { detail: FortUnitDetail | undefined; comp
           pageSize={compact ? 25 : 50}
         />
       ) : null}
-    </Card>
+    </Section>
   )
 }
 

@@ -23,6 +23,8 @@ import { PinButton } from '../-components/Journal'
 import {
   Breadcrumbs,
   Section,
+  SectionGrid,
+  SectionStack,
   parseWorldSearch,
   recordName,
   useLegendsWorlds,
@@ -164,84 +166,86 @@ function RecordPage() {
   const statusChips = [...new Set(chips)]
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
-      <Breadcrumbs
-        items={[
-          { label: 'Legends', to: '/legends', search: { world: worldId ?? undefined } },
-          ...(selectedWorld
-            ? [
-                {
-                  label: titleCase(selectedWorld.name ?? selectedWorld.key),
-                  to: '/legends/world',
-                  search: { world: worldId ?? undefined },
-                },
-              ]
-            : []),
-          {
-            label: kindPlural(kind),
-            to: '/legends/archive',
-            search: { world: worldId ?? undefined, archive: tab.key },
-          },
-          { label: title },
-        ]}
-      />
-      {worldId !== null ? <TrailBar worldId={worldId} current={{ kind, id: numericId }} /> : null}
+    <div className="flex flex-1 flex-col">
+      <div className="flex flex-col gap-4 border-b p-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Legends', to: '/legends', search: { world: worldId ?? undefined } },
+            ...(selectedWorld
+              ? [
+                  {
+                    label: titleCase(selectedWorld.name ?? selectedWorld.key),
+                    to: '/legends/world',
+                    search: { world: worldId ?? undefined },
+                  },
+                ]
+              : []),
+            {
+              label: kindPlural(kind),
+              to: '/legends/archive',
+              search: { world: worldId ?? undefined, archive: tab.key },
+            },
+            { label: title },
+          ]}
+        />
+        {worldId !== null ? <TrailBar worldId={worldId} current={{ kind, id: numericId }} /> : null}
 
-      <header className="flex flex-wrap items-start gap-4">
-        {spriteSubject ? (
-          <LegendsSprite
-            subject={spriteSubject}
-            size={72}
-            className="mt-1 shrink-0"
-            title={`${title} as drawn in the game`}
-          />
-        ) : null}
-        <div className="min-w-0 flex-1 basis-64">
-          <h1 className="text-2xl font-medium">{title}</h1>
-          <p className="mt-2 max-w-3xl text-base text-muted-foreground">
-            {kindLabel(kind)}
-            {subtitle ? ` · ${subtitle}` : null}
-          </p>
-          {statusChips.length ? (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {statusChips.map((chip) => (
-                <Badge key={chip} variant="outline" className="text-sm font-normal">
-                  {chip}
-                </Badge>
-              ))}
+        <header className="flex flex-wrap items-start gap-4">
+          {spriteSubject ? (
+            <LegendsSprite
+              subject={spriteSubject}
+              size={72}
+              className="mt-1 shrink-0"
+              title={`${title} as drawn in the game`}
+            />
+          ) : null}
+          <div className="min-w-0 flex-1 basis-64">
+            <h1 className="text-2xl font-medium">{title}</h1>
+            <p className="mt-2 max-w-3xl text-base text-muted-foreground">
+              {kindLabel(kind)}
+              {subtitle ? ` · ${subtitle}` : null}
+            </p>
+            {statusChips.length ? (
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {statusChips.map((chip) => (
+                  <Badge key={chip} variant="outline" className="text-sm font-normal">
+                    {chip}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {record && worldId !== null ? (
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              {NARRATED_KINDS.has(kind) && kind !== 'historical_figure' ? (
+                <NarrateButton
+                  worldId={worldId}
+                  subject={{ kind: 'record', recordKind: kind, id: numericId }}
+                  title={title}
+                />
+              ) : null}
+              <PinButton
+                worldId={worldId}
+                target={{ kind, id: String(numericId), title }}
+                size="sm"
+                label="Pin to journal"
+              />
             </div>
           ) : null}
-        </div>
-        {record && worldId !== null ? (
-          <div className="ml-auto flex shrink-0 items-center gap-2">
-            {NARRATED_KINDS.has(kind) && kind !== 'historical_figure' ? (
-              <NarrateButton
-                worldId={worldId}
-                subject={{ kind: 'record', recordKind: kind, id: numericId }}
-                title={title}
-              />
-            ) : null}
-            <PinButton
-              worldId={worldId}
-              target={{ kind, id: String(numericId), title }}
-              size="sm"
-              label="Pin to journal"
-            />
-          </div>
-        ) : null}
-      </header>
+        </header>
+      </div>
 
       {detail.isLoading || (worldId === null && legends.isLoading) ? (
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 p-4 lg:grid-cols-3">
           <Skeleton className="h-64" />
           <Skeleton className="h-64 lg:col-span-2" />
         </div>
       ) : !record || worldId === null ? (
-        <EmptyState title="Not in the archive">
+        <EmptyState title="Not in the archive" className="m-4">
           There is no {kindLabel(kind).toLowerCase()} with id {id} in this legends export.
         </EmptyState>
       ) : (
-        <>
+        <SectionStack className="border-b">
           {kind === 'historical_figure' ? (
             <TheirLife
               worldId={worldId}
@@ -250,7 +254,7 @@ function RecordPage() {
               before={<FortressTieLine worldId={worldId} figureId={numericId} />}
             />
           ) : null}
-          <div className="grid gap-4 lg:grid-cols-3">
+          <SectionGrid className="lg:grid-cols-3">
             <KindSections
               record={record}
               payload={payload}
@@ -284,7 +288,7 @@ function RecordPage() {
                 ) : null
               }
             />
-          </div>
+          </SectionGrid>
 
           <Section
             collapsed
@@ -301,7 +305,7 @@ function RecordPage() {
               </>
             ) : null}
           </Section>
-        </>
+        </SectionStack>
       )}
     </div>
   )

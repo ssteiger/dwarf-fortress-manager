@@ -1,6 +1,6 @@
 import type { FortEvent, FortSummary, FortUnit } from '@fortress/db-drizzle'
 import { STRESS_LABELS } from '@fortress/db-drizzle/fortress-types'
-import { Button, Card, CardContent, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { Button, Stats, cn } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { formatDistanceToNow } from 'date-fns'
@@ -52,7 +52,14 @@ import { watchNews } from '~/lib/fortress/people/watchChanges'
 import { getFortWork } from '~/lib/fortress/server/work'
 import { absTicks, gameSpan, gameTimeOf } from '~/lib/fortress/time'
 import { seasonAt, seasonIndex } from '~/lib/fortress/time'
-import { EmptyState, PageHeader, SectionBoundary, StatusBanner } from './-components/FortChrome'
+import {
+  EmptyState,
+  PageHeader,
+  Reading,
+  Section,
+  SectionBoundary,
+  StatusBand,
+} from './-components/FortChrome'
 import { GuideProvider, useOpenGuide } from './-components/Guide'
 import {
   ActivityBoard,
@@ -62,7 +69,7 @@ import {
   NoticeList,
   StoryFeed,
 } from './-components/Insights'
-import { TrendsCard } from './-components/Trends'
+import { Trends } from './-components/Trends'
 import { HelpStrip } from './dwarves/-components/PeoplePanels'
 
 const KEY_STOCKS = [
@@ -168,8 +175,9 @@ function OverviewBody() {
   )
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title={state?.fort_name ?? 'No fortress yet'}
         description={
           world ? (
@@ -194,18 +202,18 @@ function OverviewBody() {
         }
       />
 
-      <StatusBanner state={state} />
+      <StatusBand state={state} />
 
       {summary ? (
         <>
           {dangers.length ? (
-            <SectionBoundary name="What is dangerous right now">
+            <SectionBoundary name="What is dangerous right now" className="border-b p-4">
               <DangerStrip notices={dangers} onGuide={guideNotice} />
             </SectionBoundary>
           ) : null}
 
           {lastSeen ? (
-            <SectionBoundary name="What changed since your last look">
+            <SectionBoundary name="What changed since your last look" className="border-b p-4">
               <SinceLastLook
                 lastSeen={lastSeen}
                 events={events}
@@ -218,12 +226,12 @@ function OverviewBody() {
           ) : null}
 
           {struggling.length ? (
-            <SectionBoundary name="Who is struggling">
-              <HelpStrip entries={struggling} />
+            <SectionBoundary name="Who is struggling" className="border-b p-4">
+              <HelpStrip entries={struggling} className="border-b" />
             </SectionBoundary>
           ) : null}
 
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-4">
+          <Stats className="grid-cols-2">
             <Reading
               title="Citizens"
               value={population}
@@ -264,17 +272,15 @@ function OverviewBody() {
                   : `${summary.visitors} visitors · ${summary.merchants} merchants`
               }
             />
-          </div>
+          </Stats>
 
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <TriangleAlertIcon className="size-4 text-primary" />
-                    Needs your attention
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
+          <div className="grid flex-1 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <div className="flex min-w-0 flex-col divide-y">
+              <Section
+                title="Needs your attention"
+                icon={<TriangleAlertIcon className="size-4 text-primary" />}
+                description={
+                  <>
                     What the dump says could go wrong, and what you can do about it.{' '}
                     <Link
                       to="/fortress/work"
@@ -282,89 +288,66 @@ function OverviewBody() {
                     >
                       Step-by-step advice for the whole fortress
                     </Link>
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SectionBoundary name="The list of problems">
-                    {dangers.length && dangers.length === notices.length ? (
-                      <p className="text-sm text-muted-foreground">
-                        Nothing else needs you right now.
-                      </p>
-                    ) : (
-                      <NoticeList
-                        notices={notices.filter((n) => n.severity !== 'danger')}
-                        onGuide={guideNotice}
-                      />
-                    )}
-                  </SectionBoundary>
-                </CardContent>
-              </Card>
+                  </>
+                }
+              >
+                <SectionBoundary name="The list of problems">
+                  {dangers.length && dangers.length === notices.length ? (
+                    <p className="text-sm text-muted-foreground">
+                      Nothing else needs you right now.
+                    </p>
+                  ) : (
+                    <NoticeList
+                      notices={notices.filter((n) => n.severity !== 'danger')}
+                      onGuide={guideNotice}
+                    />
+                  )}
+                </SectionBoundary>
+              </Section>
 
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <HeartIcon className="size-4 text-primary" />
-                    How the fortress feels
-                  </CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    What went through your citizens’ heads this past month. Click a line to see who.
-                  </p>
-                </CardHeader>
-                <CardContent>
-                  <SectionBoundary name="The fortress’s feelings">
-                    <FeelingsPanel feelings={feelings} onGuide={guideFeeling} />
-                  </SectionBoundary>
-                </CardContent>
-              </Card>
+              <Section
+                title="How the fortress feels"
+                icon={<HeartIcon className="size-4 text-primary" />}
+                description="What went through your citizens’ heads this past month. Click a line to see who."
+              >
+                <SectionBoundary name="The fortress’s feelings">
+                  <FeelingsPanel feelings={feelings} onGuide={guideFeeling} />
+                </SectionBoundary>
+              </Section>
 
-              <SectionBoundary name="The story so far">
-                <StoryCard
-                  events={events}
-                  link={link}
-                  newAfter={lastSeen?.eventId ?? null}
-                  undone={data?.undone ?? 0}
-                  present={world ? `${world.day} ${world.month_name} ${world.year}` : null}
-                />
-              </SectionBoundary>
+              <StorySection
+                events={events}
+                link={link}
+                newAfter={lastSeen?.eventId ?? null}
+                undone={data?.undone ?? 0}
+                present={world ? `${world.day} ${world.month_name} ${world.year}` : null}
+              />
             </div>
 
-            <div className="flex min-w-0 flex-col gap-4">
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="text-base">Right now</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    What every citizen is up to. Hover for names, click to open.
-                  </p>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-5">
-                  <SectionBoundary name="What everyone is doing">
-                    <MoodBar counts={summary.mood} />
-                    <ActivityBoard groups={board} />
-                  </SectionBoundary>
-                </CardContent>
-              </Card>
+            <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
+              <Section
+                title="Right now"
+                description="What every citizen is up to. Hover for names, click to open."
+                className="gap-5"
+              >
+                <SectionBoundary name="What everyone is doing">
+                  <MoodBar counts={summary.mood} />
+                  <ActivityBoard groups={board} />
+                </SectionBoundary>
+              </Section>
 
-              <Card className="gap-4">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <BeerIcon className="size-4" /> Stores
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <SectionBoundary name="The stores">
-                    <Stores summary={summary} population={population} />
-                  </SectionBoundary>
-                </CardContent>
-              </Card>
+              <Section title="Stores" icon={<BeerIcon className="size-4" />}>
+                <SectionBoundary name="The stores">
+                  <Stores summary={summary} population={population} />
+                </SectionBoundary>
+              </Section>
 
-              <SectionBoundary name="The trends">
-                <TrendsCard />
-              </SectionBoundary>
+              <Trends />
             </div>
           </div>
         </>
       ) : (
-        <EmptyState title="Nothing to show yet">
+        <EmptyState title="Nothing to show yet" className="m-4">
           Once the worker has talked to the game, the population, mood, stores, and alerts appear
           here.
         </EmptyState>
@@ -384,7 +367,7 @@ function DangerStrip({
   return (
     <section
       aria-label="Dangerous right now"
-      className="rounded-xl border border-red-500/40 bg-red-500/5 dark:bg-red-500/10"
+      className="border-b border-red-500/30 bg-red-500/5 dark:bg-red-500/10"
     >
       <ul className="divide-y divide-red-500/20">
         {notices.map((notice) => (
@@ -427,36 +410,6 @@ function GlanceButton() {
       <PanelRightIcon className="size-3.5" />
       While playing
     </Button>
-  )
-}
-
-/** One cell of the overview's reading strip: label, big number, the detail beneath it. */
-function Reading({
-  title,
-  value,
-  hint,
-  Icon,
-  accentClassName,
-}: {
-  title: string
-  value: React.ReactNode
-  hint?: React.ReactNode
-  Icon: React.ComponentType<{ className?: string }>
-  accentClassName?: string
-}) {
-  return (
-    <div className="bg-card p-4 text-card-foreground">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-        <Icon className={cn('size-3.5 shrink-0', accentClassName)} />
-        {title}
-      </div>
-      <div className="mt-1 text-2xl leading-tight font-medium tracking-tight tabular-nums">
-        {value}
-      </div>
-      {hint ? (
-        <div className="mt-1.5 text-sm leading-snug text-muted-foreground">{hint}</div>
-      ) : null}
-    </div>
   )
 }
 
@@ -512,7 +465,7 @@ function SinceLastLook({
   const headline = told[0]?.key === 'headline' ? told[0] : null
   const lines = headline ? told.slice(1) : told
   return (
-    <div className="flex flex-col gap-3 rounded-xl border bg-muted/30 px-4 py-3 text-sm">
+    <div className="flex flex-col gap-3 border-b bg-muted/30 p-4 text-sm">
       <p className="flex items-start gap-2">
         <HistoryIcon className="mt-0.5 size-4 shrink-0 text-primary" />
         <span>
@@ -615,7 +568,7 @@ function SinceLastLook({
   )
 }
 
-function StoryCard({
+function StorySection({
   events,
   link,
   newAfter,
@@ -634,17 +587,11 @@ function StoryCard({
     [events, filter],
   )
   return (
-    <Card className="gap-4">
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <ScrollTextIcon className="size-4 text-primary" />
-            The story so far
-          </CardTitle>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Deaths, births, moods, arrivals and finds, by season. Names open the dwarf.
-          </p>
-        </div>
+    <Section
+      title="The story so far"
+      icon={<ScrollTextIcon className="size-4 text-primary" />}
+      description="Deaths, births, moods, arrivals and finds, by season. Names open the dwarf."
+      action={
         <div className="flex items-center gap-1">
           {(
             [
@@ -666,24 +613,22 @@ function StoryCard({
             </button>
           ))}
         </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
+      }
+    >
+      <SectionBoundary name="The story so far">
         <StoryFeed events={shown} link={link} newAfter={newAfter} limit={50} />
-        <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-          <span>
-            {undone
-              ? `${undone.toLocaleString()} announcement${undone === 1 ? '' : 's'} dated after ${present ?? 'today'} ${undone === 1 ? 'is' : 'are'} hidden: an earlier save was loaded since, so ${undone === 1 ? 'it' : 'they'} never happened.`
-              : null}
-          </span>
-          <Link
-            to="/fortress/chronicle"
-            className="text-primary underline-offset-4 hover:underline"
-          >
-            Full chronicle
-          </Link>
-        </div>
-      </CardContent>
-    </Card>
+      </SectionBoundary>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
+        <span>
+          {undone
+            ? `${undone.toLocaleString()} announcement${undone === 1 ? '' : 's'} dated after ${present ?? 'today'} ${undone === 1 ? 'is' : 'are'} hidden: an earlier save was loaded since, so ${undone === 1 ? 'it' : 'they'} never happened.`
+            : null}
+        </span>
+        <Link to="/fortress/chronicle" className="text-primary underline-offset-4 hover:underline">
+          Full chronicle
+        </Link>
+      </div>
+    </Section>
   )
 }
 
@@ -741,11 +686,17 @@ function PerDwarf({
   low: boolean
 }) {
   return (
-    <div
-      className={cn('rounded-lg border px-3 py-2', low && 'border-amber-500/50 bg-amber-500/10')}
-    >
-      <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="text-xl font-semibold tabular-nums">
+    <div>
+      <div className="text-sm text-muted-foreground">
+        {label}
+        {low ? <span className="text-amber-600 dark:text-amber-400"> · running low</span> : null}
+      </div>
+      <div
+        className={cn(
+          'text-xl font-semibold tabular-nums',
+          low && 'text-amber-600 dark:text-amber-400',
+        )}
+      >
         {each}
         <span className="ml-1 text-sm font-normal text-muted-foreground">per dwarf</span>
       </div>

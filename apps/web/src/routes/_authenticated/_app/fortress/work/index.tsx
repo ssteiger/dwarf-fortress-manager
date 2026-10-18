@@ -1,17 +1,5 @@
 import type { FortBuilding, FortJob, FortOrder } from '@fortress/db-drizzle'
-import {
-  Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  DataTable,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  cn,
-} from '@fortress/ui'
+import { Badge, DataTable, Tabs, TabsContent, TabsList, TabsTrigger, cn } from '@fortress/ui'
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -31,6 +19,7 @@ import {
 } from 'lucide-react'
 import * as React from 'react'
 
+import { Section, SectionGrid } from '~/lib/components/Section'
 import { fortAdvice } from '~/lib/fortress/advice/checks'
 import { seasonNotes, situations } from '~/lib/fortress/advice/situations'
 import { jobQueue, workshopBoard } from '~/lib/fortress/advice/workshops'
@@ -51,7 +40,7 @@ import {
   SituationList,
   WorkshopList,
 } from '../-components/Advice'
-import { EmptyState, PageHeader, SectionBoundary, StatusBanner } from '../-components/FortChrome'
+import { EmptyState, PageHeader, SectionBoundary, StatusBand } from '../-components/FortChrome'
 import { GuideProvider } from '../-components/Guide'
 import {
   FailingJobs,
@@ -395,8 +384,9 @@ function WorkPage() {
 
   return (
     <GuideProvider>
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <div className="flex flex-1 flex-col">
         <PageHeader
+          className="border-b p-4"
           title="Work and advice"
           description={
             ready
@@ -407,7 +397,7 @@ function WorkPage() {
           isFetching={isFetching}
           onRefresh={() => refetch()}
         />
-        <StatusBanner state={overview.data?.state} />
+        <StatusBand state={overview.data?.state} />
 
         {ready ? (
           <Tabs
@@ -420,152 +410,133 @@ function WorkPage() {
                 resetScroll: false,
               })
             }}
-            className="gap-4"
+            className="gap-0"
           >
-            <TabsList className="h-auto flex-wrap">
-              {TABS.map(({ key, label, icon: Icon }) => (
-                <TabsTrigger key={key} value={key} className="gap-1.5">
-                  <Icon className="size-3.5" />
-                  {label}
-                  {tabCounts[key] ? (
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {formatNumber(tabCounts[key])}
-                    </span>
-                  ) : null}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="border-b px-4 py-3">
+              <TabsList className="h-auto flex-wrap">
+                {TABS.map(({ key, label, icon: Icon }) => (
+                  <TabsTrigger key={key} value={key} className="gap-1.5">
+                    <Icon className="size-3.5" />
+                    {label}
+                    {tabCounts[key] ? (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {formatNumber(tabCounts[key])}
+                      </span>
+                    ) : null}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
 
             <TabsContent value="checklist">
-              <SectionBoundary name="The checklist">
-                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-                  <div className="flex min-w-0 flex-col gap-4">
-                    <Card className="gap-4">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <ListChecksIcon className="size-4 text-primary" />
-                          To see to
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
+              <SectionBoundary name="The checklist" className="p-4">
+                <div className="grid border-b xl:grid-cols-[minmax(0,1fr)_380px]">
+                  <div className="flex min-w-0 flex-col divide-y">
+                    <Section
+                      icon={<ListChecksIcon className="size-4 text-primary" />}
+                      title="To see to"
+                      description={
+                        <>
                           {counts.problem
                             ? `${counts.problem} problem${counts.problem === 1 ? '' : 's'} and `
                             : ''}
                           {counts.attention} thing{counts.attention === 1 ? '' : 's'} to see to, the
                           worst first. Open one for the steps in the game.
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <NextSteps advice={advice} max={advice.length} />
-                      </CardContent>
-                    </Card>
-                    <Card className="gap-4">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <CircleCheckIcon className="size-4 text-primary" />
+                        </>
+                      }
+                    >
+                      <NextSteps advice={advice} max={advice.length} />
+                    </Section>
+                    <Section
+                      icon={<CircleCheckIcon className="size-4 text-primary" />}
+                      title={
+                        <>
                           Already fine
                           <span className="text-sm font-normal text-muted-foreground tabular-nums">
                             {counts.good}
                           </span>
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          What a thriving fortress has that yours has too.
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <FineChecks advice={advice} />
-                      </CardContent>
-                    </Card>
+                        </>
+                      }
+                      description="What a thriving fortress has that yours has too."
+                    >
+                      <FineChecks advice={advice} />
+                    </Section>
                   </div>
 
-                  <div className="flex min-w-0 flex-col gap-4">
+                  <div className="flex min-w-0 flex-col divide-y border-t xl:border-t-0 xl:border-l">
                     {season ? (
-                      <Card className="gap-3">
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-base">
-                            <SeasonIcon season={season.season} />
+                      <Section
+                        className="gap-3"
+                        icon={<SeasonIcon season={season.season} />}
+                        title={
+                          <>
                             {season.season.charAt(0).toUpperCase()}
                             {season.season.slice(1)}
                             {state?.world ? ` of ${state.world.year}` : ''}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="flex flex-col gap-1.5 text-sm">
-                            {season.notes.map((note) => (
-                              <li key={note} className="flex gap-2">
-                                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
-                                {note}
-                              </li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
+                          </>
+                        }
+                      >
+                        <ul className="flex flex-col gap-1.5 text-sm">
+                          {season.notes.map((note) => (
+                            <li key={note} className="flex gap-2">
+                              <span className="mt-2 size-1.5 shrink-0 rounded-full bg-muted-foreground" />
+                              {note}
+                            </li>
+                          ))}
+                        </ul>
+                      </Section>
                     ) : null}
-                    <Card className="gap-4">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <LifeBuoyIcon className="size-4 text-primary" />
-                          When things go wrong
-                        </CardTitle>
-                        <p className="text-sm text-muted-foreground">
-                          What to do when trouble comes. What seems to be happening now is on top.
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <SituationList situations={playbook} />
-                      </CardContent>
-                    </Card>
+                    <Section
+                      icon={<LifeBuoyIcon className="size-4 text-primary" />}
+                      title="When things go wrong"
+                      description="What to do when trouble comes. What seems to be happening now is on top."
+                    >
+                      <SituationList situations={playbook} />
+                    </Section>
                   </div>
                 </div>
               </SectionBoundary>
             </TabsContent>
 
-            <TabsContent value="stuck" className="flex flex-col gap-4">
-              <SectionBoundary name="The stuck work">
+            <TabsContent value="stuck" className="flex flex-col divide-y border-b">
+              <SectionBoundary name="The stuck work" className="p-4">
                 <StuckFixes suspended={suspended} failing={failing} />
-                <div className="grid items-start gap-4 xl:grid-cols-2">
+                <SectionGrid className="xl:grid-cols-2">
                   <SuspendedJobs
                     jobs={jobs}
                     buildingNames={buildingNames}
                     advice={adviceByKey('suspended')}
                   />
                   <FailingJobs alerts={alerts} advice={adviceByKey('failing')} />
-                </div>
+                </SectionGrid>
                 <UnworkableWork rows={shops} idle={idle} />
               </SectionBoundary>
             </TabsContent>
 
-            <TabsContent value="queue" className="flex flex-col gap-4">
-              <SectionBoundary name="The work queue">
-                <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-                  <Card className="gap-4">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2 text-base">
-                        <ListTodoIcon className="size-4 text-primary" />
-                        The work queue
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground">
+            <TabsContent value="queue" className="flex flex-col divide-y border-b">
+              <SectionBoundary name="The work queue" className="p-4">
+                <SectionGrid className="xl:grid-cols-[minmax(0,1fr)_340px]">
+                  <Section
+                    icon={<ListTodoIcon className="size-4 text-primary" />}
+                    title="The work queue"
+                    description={
+                      <>
                         {formatNumber(jobs.length)} jobs in {queue.length} kinds:{' '}
                         {formatNumber(working)} being worked,{' '}
                         {formatNumber(jobs.length - working - suspended)} waiting and{' '}
                         {formatNumber(suspended)} suspended. Open a kind for what to do about it.
-                      </p>
-                    </CardHeader>
-                    <CardContent>
-                      <JobQueueList groups={queue} advice={advice} />
-                    </CardContent>
-                  </Card>
+                      </>
+                    }
+                  >
+                    <JobQueueList groups={queue} advice={advice} />
+                  </Section>
                   <IdleHands idle={idle} advice={adviceByKey('idle')} />
-                </div>
-                <Card className="gap-0 overflow-hidden p-0">
-                  <CardHeader className="px-4 pt-4">
-                    <CardTitle className="text-base">Every job</CardTitle>
-                  </CardHeader>
+                </SectionGrid>
+                <Section bleed title="Every job">
                   {jobs.length === 0 ? (
-                    <div className="p-6">
-                      <EmptyState title="No jobs">
-                        Nothing is queued, or no dump has been taken.
-                      </EmptyState>
-                    </div>
+                    <EmptyState title="No jobs" className="mx-4 mb-4">
+                      Nothing is queued, or no dump has been taken.
+                    </EmptyState>
                   ) : (
                     <DataTable
                       data={jobs}
@@ -579,27 +550,27 @@ function WorkPage() {
                       rowClassName={(job) => (job.suspended ? 'opacity-60' : undefined)}
                     />
                   )}
-                </Card>
+                </Section>
               </SectionBoundary>
             </TabsContent>
 
-            <TabsContent value="orders" className="flex flex-col gap-4">
-              <SectionBoundary name="The work orders">
-                <Card className="gap-0 overflow-hidden p-0">
-                  <CardHeader className="gap-1.5 px-4 pt-4 pb-4">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <ClipboardListIcon className="size-4 text-primary" />
-                      Work orders
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
+            <TabsContent value="orders" className="flex flex-col divide-y border-b">
+              <SectionBoundary name="The work orders" className="p-4">
+                <Section
+                  bleed
+                  icon={<ClipboardListIcon className="size-4 text-primary" />}
+                  title="Work orders"
+                  description={
+                    <>
                       {orders.length
                         ? `${formatNumber(orders.length)} orders at the manager: ${formatNumber(orderCounts.active)} active, ${formatNumber(orderCounts.waiting)} waiting for their conditions${orderCounts.unchecked ? `, and ${formatNumber(orderCounts.unchecked)} the manager has not checked yet` : ''}.`
                         : 'No work orders, or the dump predates them. Restart the worker so it installs the new dump script.'}
                       {orderCounts.unchecked
                         ? ' Orders run only once the manager has checked them: appoint a manager if nobody holds the post.'
                         : ''}
-                    </p>
-                  </CardHeader>
+                    </>
+                  }
+                >
                   {orders.length ? (
                     <DataTable
                       data={orders}
@@ -613,27 +584,24 @@ function WorkPage() {
                       rowClassName={(order) => (order.validated ? undefined : 'opacity-60')}
                     />
                   ) : null}
-                </Card>
+                </Section>
               </SectionBoundary>
             </TabsContent>
 
-            <TabsContent value="workshops" className="flex flex-col gap-4">
-              <SectionBoundary name="The workshops">
-                <Card className="gap-4">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <HammerIcon className="size-4 text-primary" />
-                      Workshops and who can work them
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
+            <TabsContent value="workshops" className="flex flex-col divide-y border-b">
+              <SectionBoundary name="The workshops" className="p-4">
+                <Section
+                  icon={<HammerIcon className="size-4 text-primary" />}
+                  title="Workshops and who can work them"
+                  description={
+                    <>
                       Missing essentials first, then the ones nobody can work, then the busy ones.
                       The best hands at each, by skill.
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <WorkshopList rows={shops} idle={idle} max={shops.length} />
-                  </CardContent>
-                </Card>
+                    </>
+                  }
+                >
+                  <WorkshopList rows={shops} idle={idle} max={shops.length} />
+                </Section>
                 <BuildingTable
                   title="Every workshop"
                   buildings={groups.workshops}
@@ -645,28 +613,30 @@ function WorkPage() {
             </TabsContent>
 
             <TabsContent value="buildings">
-              <SectionBoundary name="The buildings">
-                <Tabs defaultValue="stockpiles" className="gap-3">
-                  <TabsList>
-                    <TabsTrigger value="stockpiles" className="gap-1.5">
-                      Stockpiles
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {groups.stockpiles.length}
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="zones" className="gap-1.5">
-                      Zones
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {groups.zones.length}
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="furniture" className="gap-1.5">
-                      Furniture and other
-                      <span className="text-xs text-muted-foreground tabular-nums">
-                        {groups.furniture.length}
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
+              <SectionBoundary name="The buildings" className="p-4">
+                <Tabs defaultValue="stockpiles" className="gap-0 border-b">
+                  <div className="border-b px-4 py-3">
+                    <TabsList>
+                      <TabsTrigger value="stockpiles" className="gap-1.5">
+                        Stockpiles
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {groups.stockpiles.length}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="zones" className="gap-1.5">
+                        Zones
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {groups.zones.length}
+                        </span>
+                      </TabsTrigger>
+                      <TabsTrigger value="furniture" className="gap-1.5">
+                        Furniture and other
+                        <span className="text-xs text-muted-foreground tabular-nums">
+                          {groups.furniture.length}
+                        </span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </div>
                   {(['stockpiles', 'zones', 'furniture'] as const).map((key) => (
                     <TabsContent key={key} value={key}>
                       <BuildingTable
@@ -683,7 +653,7 @@ function WorkPage() {
             </TabsContent>
           </Tabs>
         ) : (
-          <p className="text-sm text-muted-foreground">Reading the fortress…</p>
+          <p className="p-4 text-sm text-muted-foreground">Reading the fortress…</p>
         )}
       </div>
     </GuideProvider>
@@ -796,19 +766,11 @@ function BuildingTable({
   )
 
   if (buildings.length === 0) {
-    return (
-      <Card className="p-6">
-        <EmptyState title="Nothing here" />
-      </Card>
-    )
+    return <EmptyState title="Nothing here" className="m-4" />
   }
   return (
-    <Card className="gap-0 overflow-hidden p-0">
-      {title ? (
-        <CardHeader className="px-4 pt-4">
-          <CardTitle className="text-base">{title}</CardTitle>
-        </CardHeader>
-      ) : null}
+    <div className={cn('flex flex-col', title && 'gap-4 pt-4')}>
+      {title ? <h2 className="px-4 text-base leading-none font-medium">{title}</h2> : null}
       <DataTable
         data={grouped}
         columns={columns}
@@ -819,7 +781,7 @@ function BuildingTable({
         defaultSort={[{ id: 'count', desc: true }]}
         getRowId={(group) => group.label}
       />
-    </Card>
+    </div>
   )
 }
 

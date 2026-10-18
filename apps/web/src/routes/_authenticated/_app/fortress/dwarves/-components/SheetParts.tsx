@@ -1,13 +1,14 @@
 import type { FortUnit, SheetPerson } from '@fortress/db-drizzle'
-import { Badge, Card, CardContent, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { Link } from '@tanstack/react-router'
 import { InfoIcon } from 'lucide-react'
 import type * as React from 'react'
 
+import { Section as FlatSection } from '~/lib/components/Section'
 import { CreatureSprite } from '~/lib/df-assets/components'
 import type { Standing, Tone } from '~/lib/fortress/people/character'
 
-/** A titled card; `count` shows as a badge next to the title. */
+/** A titled band of the sheet; `count` shows as a badge next to the title when above zero. */
 export function Section({
   title,
   count,
@@ -15,6 +16,7 @@ export function Section({
   description,
   className,
   contentClassName,
+  bleed,
   children,
 }: {
   title: React.ReactNode
@@ -23,28 +25,20 @@ export function Section({
   description?: React.ReactNode
   className?: string
   contentClassName?: string
+  bleed?: boolean
   children: React.ReactNode
 }) {
   return (
-    <Card className={cn('gap-3 py-4', className)}>
-      <CardHeader className="px-4">
-        <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
-          <span className="flex items-center gap-2">
-            {title}
-            {count !== undefined && count > 0 ? (
-              <Badge variant="secondary" className="tabular-nums">
-                {count}
-              </Badge>
-            ) : null}
-          </span>
-          {action ? <span className="text-sm font-normal">{action}</span> : null}
-        </CardTitle>
-        {description ? (
-          <p className="text-sm leading-snug text-muted-foreground">{description}</p>
-        ) : null}
-      </CardHeader>
-      <CardContent className={cn('px-4', contentClassName)}>{children}</CardContent>
-    </Card>
+    <FlatSection
+      bleed={bleed}
+      title={title}
+      count={count !== undefined && count > 0 ? count : undefined}
+      action={action ? <span className="text-sm">{action}</span> : undefined}
+      description={description}
+      className={cn('gap-3', className)}
+    >
+      {contentClassName ? <div className={contentClassName}>{children}</div> : children}
+    </FlatSection>
   )
 }
 
@@ -55,7 +49,7 @@ export function Muted({ children, className }: { children: React.ReactNode; clas
 /** Shown where the dump predates the sheet the updated worker collects. */
 export function SheetMissing({ what }: { what: string }) {
   return (
-    <p className="flex gap-2 rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
+    <p className="flex gap-2 bg-muted/30 p-4 text-sm text-muted-foreground">
       <InfoIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>
         {what} come with the next dump from the updated worker. Restart it (

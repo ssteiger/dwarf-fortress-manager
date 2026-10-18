@@ -11,7 +11,13 @@ import {
   presenceByPower,
   stanceOf,
 } from '~/lib/fortress/diplomacy'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import {
+  EmptyState,
+  PageHeader,
+  SectionGrid,
+  SectionStack,
+  StatusBand,
+} from '../-components/FortChrome'
 import { UnitDrawer } from '../dwarves/-components/UnitDrawer'
 import { useFortLegendsWorldId } from '../dwarves/-components/UnitLinks'
 import { Forecast } from './-components/Forecast'
@@ -75,6 +81,7 @@ function DiplomacyAndWarPage() {
 
   const header = (
     <PageHeader
+      className="border-b p-4"
       title="Diplomacy & War"
       description={
         d
@@ -89,11 +96,11 @@ function DiplomacyAndWarPage() {
 
   if (!d || !derived)
     return (
-      <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <div className="flex flex-1 flex-col">
         {header}
-        <StatusBanner state={overview.data?.state} />
+        <StatusBand state={overview.data?.state} />
         {data ? (
-          <EmptyState title="Neighbours and wars come with the next read">
+          <EmptyState title="Neighbours and wars come with the next read" className="m-4">
             The last read of your game is from before the app learnt to read diplomacy. Read the
             game again and this page fills in.
           </EmptyState>
@@ -107,52 +114,56 @@ function DiplomacyAndWarPage() {
   const power = powerId !== null ? (d.powers.find((p) => p.id === powerId) ?? null) : null
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       {header}
-      <StatusBanner state={overview.data?.state} />
+      <StatusBand state={overview.data?.state} />
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <RightNow
-          d={d}
-          presence={presence}
-          caravans={caravans}
-          onOpenPower={setPowerId}
-          onOpenUnit={setUnit}
-        />
-        <Forecast d={d} powers={listed} stances={stances} values={values} onOpen={setPowerId} />
-      </div>
+      <SectionStack className="border-b">
+        <SectionGrid className="lg:grid-cols-2">
+          <RightNow
+            d={d}
+            presence={presence}
+            caravans={caravans}
+            onOpenPower={setPowerId}
+            onOpenUnit={setUnit}
+          />
+          <Forecast d={d} powers={listed} stances={stances} values={values} onOpen={setPowerId} />
+        </SectionGrid>
 
-      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_28rem]">
-        <Neighbours
-          d={d}
-          powers={powers}
-          stances={stances}
-          presence={presence}
-          caravans={caravans}
-          showDistant={showDistant}
-          onShowDistant={setShowDistant}
-          distantCount={d.powers.length - listed.length}
-          onOpen={setPowerId}
-        />
-        <div className="xl:sticky xl:top-4">
-          <NeighbourMap
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_28rem]">
+          <Neighbours
+            d={d}
             powers={powers}
             stances={stances}
-            selectedId={powerId}
+            presence={presence}
+            caravans={caravans}
+            showDistant={showDistant}
+            onShowDistant={setShowDistant}
+            distantCount={d.powers.length - listed.length}
             onOpen={setPowerId}
           />
+          <div className="min-w-0 border-t xl:border-t-0 xl:border-l">
+            <div className="xl:sticky xl:top-0">
+              <NeighbourMap
+                powers={powers}
+                stances={stances}
+                selectedId={powerId}
+                onOpen={setPowerId}
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Wars d={d} nearIds={nearIds} worldId={worldId} onOpen={setPowerId} />
-        <RelationsGrid powers={listed} onOpen={setPowerId} />
-      </div>
+        <SectionGrid className="lg:grid-cols-2">
+          <Wars d={d} nearIds={nearIds} worldId={worldId} onOpen={setPowerId} />
+          <RelationsGrid powers={listed} onOpen={setPowerId} />
+        </SectionGrid>
 
-      <div className="grid items-start gap-6 lg:grid-cols-2">
-        <Petitions d={d} onOpen={setPowerId} />
-        <Playbook d={d} stances={stances} />
-      </div>
+        <SectionGrid className="lg:grid-cols-2">
+          <Petitions d={d} onOpen={setPowerId} />
+          <Playbook d={d} stances={stances} />
+        </SectionGrid>
+      </SectionStack>
 
       <PowerDrawer
         d={d}

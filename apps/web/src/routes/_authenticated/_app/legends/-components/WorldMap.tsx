@@ -765,8 +765,8 @@ export function WorldMap({
           else pz.handlers.onKeyDown(e)
         }}
         className={cn(
-          'relative w-full overflow-hidden rounded-lg border bg-[#28527f] outline-none focus-visible:ring-2 focus-visible:ring-ring',
-          inset && 'aspect-square',
+          'relative w-full overflow-hidden bg-[#28527f] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
+          inset && 'aspect-square rounded-lg border',
         )}
         style={
           inset ? undefined : { aspectRatio: `${data.width} / ${data.height}`, maxHeight: '78vh' }
@@ -874,7 +874,12 @@ export function WorldMap({
       </div>
 
       {showLegend && sprites ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
+        <div
+          className={cn(
+            'flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground',
+            !inset && 'px-4 pb-4',
+          )}
+        >
           {legendTypes.map((type) => (
             <span key={type} className="inline-flex items-center gap-1.5">
               <TerrainChip index={sprites.index} type={type} />

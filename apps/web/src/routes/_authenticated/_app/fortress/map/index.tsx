@@ -1,4 +1,4 @@
-import { Badge, Button, Card, cn } from '@fortress/ui'
+import { Badge, Button, cn } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react'
@@ -17,7 +17,7 @@ import {
 import { type FortMapLevel, getFortMapLevel } from '~/lib/fortress/server/map'
 import { MapHint, MapMinimap, MapZoomControls } from '~/lib/map/MapControls'
 import { usePanZoom } from '~/lib/map/usePanZoom'
-import { EmptyState, PageHeader, StatusBanner } from '../-components/FortChrome'
+import { EmptyState, PageHeader, StatusBand } from '../-components/FortChrome'
 
 const UNIT_COLORS = {
   citizen: '#facc15',
@@ -56,23 +56,24 @@ function MapPage() {
   )
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="Map"
         description="One z-level at a time, drawn from the last map dump. Scroll or pinch to zoom, drag to pan, double-click to zoom in, and use < and > to change level like in the game. Unrevealed rock stays dark unless you choose to see it."
         updatedAt={data?.capturedAt}
         isFetching={isFetching}
         onRefresh={() => refetch()}
       />
-      <StatusBanner state={overview.data?.state} />
+      <StatusBand state={overview.data?.state} />
 
       {!data || !grid ? (
-        <EmptyState title="No map yet">
+        <EmptyState title="No map yet" className="m-4">
           The map is dumped on its own schedule (every few minutes). Give the worker a moment.
         </EmptyState>
       ) : (
-        <div className="grid items-start gap-4 lg:grid-cols-[1fr_260px]">
-          <Card className="overflow-hidden p-0">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="min-w-0 overflow-hidden">
             {/* Remount (and refit) if the embark size ever changes. */}
             <MapCanvas
               key={`${data.xCount}x${data.yCount}`}
@@ -83,9 +84,9 @@ function MapPage() {
               onHover={setHover}
               onStepLevel={step}
             />
-          </Card>
-          <div className="flex flex-col gap-4">
-            <Card className="flex flex-col gap-3 p-4">
+          </div>
+          <div className="flex flex-col divide-y border-t lg:border-t-0 lg:border-l">
+            <div className="flex flex-col gap-3 p-4">
               <div className="text-sm font-medium text-muted-foreground">Level</div>
               <div className="flex items-center justify-between">
                 <Button
@@ -147,8 +148,8 @@ function MapPage() {
                 />
                 Outline buildings
               </label>
-            </Card>
-            <Card className="flex flex-col gap-2 p-4 text-sm">
+            </div>
+            <div className="flex flex-col gap-2 p-4 text-sm">
               <div className="text-sm font-medium text-muted-foreground">On this level</div>
               <div className="flex flex-wrap gap-1">
                 <Badge
@@ -181,7 +182,7 @@ function MapPage() {
                 )}
               </div>
               <Legend />
-            </Card>
+            </div>
             <MineralList data={data} grid={grid} reveal={reveal} />
           </div>
         </div>
@@ -258,7 +259,7 @@ function MineralList({
   }, [data.minerals, data.tiletypes, grid, reveal])
   if (!Object.keys(data.minerals).length) return null
   return (
-    <Card className="flex flex-col gap-2 p-4 text-sm">
+    <div className="flex flex-col gap-2 p-4 text-sm">
       <div className="text-sm font-medium text-muted-foreground">Ores and gems on this level</div>
       {rows.length ? (
         <ul className="flex flex-col gap-1.5">
@@ -292,7 +293,7 @@ function MineralList({
             : 'No veins in sight here. Dig further, or show unrevealed tiles.'}
         </p>
       )}
-    </Card>
+    </div>
   )
 }
 

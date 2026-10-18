@@ -12,6 +12,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
   Button,
+  Stat,
+  StatDescription,
+  StatTitle,
+  StatValue,
   cn,
 } from '@fortress/ui'
 import { useQueryClient } from '@tanstack/react-query'
@@ -34,6 +38,7 @@ import {
   useTick,
 } from '~/lib/fortress/client/queries'
 import { useWatchList } from '~/lib/fortress/client/watch'
+export { Section, SectionGrid, SectionStack } from '~/lib/components/Section'
 import { STRESS_CLASSES, isLiving, stressLabel, unitNeeds } from '~/lib/fortress/format'
 import { firstName } from '~/lib/fortress/people/units'
 
@@ -45,6 +50,7 @@ export function PageHeader({
   isFetching,
   onRefresh,
   actions,
+  className,
 }: {
   title: React.ReactNode
   description?: React.ReactNode
@@ -52,13 +58,16 @@ export function PageHeader({
   isFetching?: boolean
   onRefresh?: () => void
   actions?: React.ReactNode
+  className?: string
 }) {
   useTick(1000)
   const updatedLabel = updatedAt
     ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true })
     : null
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <div
+      className={cn('flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between', className)}
+    >
       <div className="max-w-3xl">
         <h1 className="text-2xl font-medium">{title}</h1>
         {description ? <p className="mt-2 text-base text-muted-foreground">{description}</p> : null}
@@ -96,6 +105,15 @@ export function StatusBanner({ state }: { state: FortState | null | undefined })
       <VersionNotice />
       {failing.length && !state ? null : <GameStatus state={state} />}
     </>
+  )
+}
+
+/** `StatusBanner` as a band of a flat page; gone when there is nothing to say. */
+export function StatusBand({ state }: { state: FortState | null | undefined }) {
+  return (
+    <div className="flex flex-col gap-3 border-b p-4 empty:hidden">
+      <StatusBanner state={state} />
+    </div>
   )
 }
 
@@ -251,26 +269,37 @@ function GameStatus({ state }: { state: FortState | null | undefined }) {
  * A part of a page that fails to render says so in its place while the rest
  * of the page stays, and tries again when the next dump lands.
  */
-export function SectionBoundary({ name, children }: { name: string; children: React.ReactNode }) {
+export function SectionBoundary({
+  name,
+  className,
+  children,
+}: {
+  name: string
+  /** Wraps the error in its place, for a part that brings its own padding. */
+  className?: string
+  children: React.ReactNode
+}) {
   const dumpAt = useLastDumpState()?.dumpCapturedAt ?? ''
   return (
     <CatchBoundary
       getResetKey={() => dumpAt}
       errorComponent={({ error, reset }) => (
-        <Alert>
-          <TriangleAlertIcon className="size-4" />
-          <AlertTitle>{name} could not be shown</AlertTitle>
-          <AlertDescription>
-            <p>
-              Something in the last read did not fit what this part of the page expects: “
-              {error.message}”. The rest of the page is unaffected, and this part tries again when
-              the next dump lands.
-            </p>
-            <Button size="sm" variant="outline" className="mt-2" onClick={reset}>
-              Try again now
-            </Button>
-          </AlertDescription>
-        </Alert>
+        <div className={className}>
+          <Alert>
+            <TriangleAlertIcon className="size-4" />
+            <AlertTitle>{name} could not be shown</AlertTitle>
+            <AlertDescription>
+              <p>
+                Something in the last read did not fit what this part of the page expects: “
+                {error.message}”. The rest of the page is unaffected, and this part tries again when
+                the next dump lands.
+              </p>
+              <Button size="sm" variant="outline" className="mt-2" onClick={reset}>
+                Try again now
+              </Button>
+            </AlertDescription>
+          </Alert>
+        </div>
       )}
     >
       {children}
@@ -368,7 +397,8 @@ export function MoodBadge({ category, className }: { category: number; className
   )
 }
 
-export function StatCard({
+/** One cell of a `Stats` strip: label, big number, the detail beneath it. */
+export function Reading({
   title,
   value,
   hint,
@@ -384,23 +414,29 @@ export function StatCard({
   children?: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 text-card-foreground">
-      <div className="text-sm font-medium text-muted-foreground">{title}</div>
-      <div className="mt-1.5 flex items-center gap-2 text-2xl font-semibold tabular-nums">
-        {Icon ? <Icon className={cn('size-5', accentClassName)} /> : null}
-        {value}
-      </div>
-      {hint ? (
-        <div className="mt-1.5 text-sm leading-snug text-muted-foreground">{hint}</div>
-      ) : null}
+    <Stat className="justify-start">
+      <StatTitle className="flex items-center gap-1.5">
+        {Icon ? <Icon className={cn('size-3.5 shrink-0', accentClassName)} /> : null}
+        {title}
+      </StatTitle>
+      <StatValue>{value}</StatValue>
+      {hint ? <StatDescription className="leading-snug">{hint}</StatDescription> : null}
       {children}
-    </div>
+    </Stat>
   )
 }
 
-export function EmptyState({ title, children }: { title: string; children?: React.ReactNode }) {
+export function EmptyState({
+  title,
+  children,
+  className,
+}: {
+  title: string
+  children?: React.ReactNode
+  className?: string
+}) {
   return (
-    <div className="rounded-xl border border-dashed p-10 text-center">
+    <div className={cn('rounded-xl border border-dashed p-10 text-center', className)}>
       <div className="font-medium">{title}</div>
       {children ? <div className="mt-1 text-sm text-muted-foreground">{children}</div> : null}
     </div>

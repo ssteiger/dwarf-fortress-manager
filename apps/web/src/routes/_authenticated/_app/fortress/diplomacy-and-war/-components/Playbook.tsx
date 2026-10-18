@@ -1,17 +1,8 @@
 import type { FortDiplomacy } from '@fortress/db-drizzle'
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@fortress/ui'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@fortress/ui'
 import { BookMarkedIcon } from 'lucide-react'
 
+import { Section } from '~/lib/components/Section'
 import { type Guide, playbookGuide } from '~/lib/fortress/advice/guides'
 import { type Stance, powerName } from '~/lib/fortress/diplomacy'
 import { GuideBody } from '../../-components/Guide'
@@ -217,38 +208,35 @@ function topics(d: FortDiplomacy, stances: Map<number, Stance>): Topic[] {
 /** How to deal with envoys, caravans, sieges, thieves, missions and petitions. */
 export function Playbook({ d, stances }: { d: FortDiplomacy; stances: Map<number, Stance> }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <BookMarkedIcon className="size-4 text-primary" />
-          How to handle them
-        </CardTitle>
-        <CardDescription>
+    <Section
+      icon={<BookMarkedIcon className="size-4 text-primary" />}
+      title="How to handle them"
+      description={
+        <>
           What to do in the game, step by step, and the DFHack commands that help. Commands marked
           as cheats change the world in ways the game would not.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Accordion type="multiple">
-          {topics(d, stances).map(({ guide, intro, commands }) => (
-            <AccordionItem key={guide.key} value={guide.key}>
-              <AccordionTrigger>{guide.title}</AccordionTrigger>
-              <AccordionContent className="flex flex-col gap-4">
-                {intro ? <p className="text-sm text-muted-foreground">{intro}</p> : null}
-                {guide.steps.length || guide.signs ? <GuideBody guide={guide} compact /> : null}
-                {commands.length ? (
-                  <div className="flex flex-col gap-3">
-                    <h3 className="text-sm font-medium">DFHack</h3>
-                    {commands.map((c) => (
-                      <CommandItem key={c.command} {...c} />
-                    ))}
-                  </div>
-                ) : null}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
-        </Accordion>
-      </CardContent>
-    </Card>
+        </>
+      }
+    >
+      <Accordion type="multiple">
+        {topics(d, stances).map(({ guide, intro, commands }) => (
+          <AccordionItem key={guide.key} value={guide.key}>
+            <AccordionTrigger>{guide.title}</AccordionTrigger>
+            <AccordionContent className="flex flex-col gap-4">
+              {intro ? <p className="text-sm text-muted-foreground">{intro}</p> : null}
+              {guide.steps.length || guide.signs ? <GuideBody guide={guide} compact /> : null}
+              {commands.length ? (
+                <div className="flex flex-col gap-3">
+                  <h3 className="text-sm font-medium">DFHack</h3>
+                  {commands.map((c) => (
+                    <CommandItem key={c.command} {...c} />
+                  ))}
+                </div>
+              ) : null}
+            </AccordionContent>
+          </AccordionItem>
+        ))}
+      </Accordion>
+    </Section>
   )
 }

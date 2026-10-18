@@ -14,6 +14,7 @@ import {
 import * as React from 'react'
 import { toast } from 'sonner'
 
+import { SectionGrid } from '~/lib/components/Section'
 import { formatGameTick, unitDisplayName } from '~/lib/fortress/format'
 import {
   type CharacterSheet,
@@ -112,7 +113,7 @@ export function RolePlayTab({
   })
   const rows = SHEET_ROWS.filter(([key]) => character[key].length)
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+    <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
       <Section
         title="Character sheet"
         className={compact ? undefined : 'lg:row-span-2'}
@@ -149,9 +150,9 @@ export function RolePlayTab({
         description="Loose threads in their life, each worth a scene."
       >
         {hooks.length ? (
-          <ul className="flex flex-col gap-2 text-sm">
+          <ul className="flex flex-col divide-y text-sm">
             {hooks.map((hook) => (
-              <li key={hook.key} className="rounded-lg border px-3 py-2">
+              <li key={hook.key} className="py-2 first:pt-0 last:pb-0">
                 {hook.text}
               </li>
             ))}
@@ -237,7 +238,7 @@ export function RolePlayTab({
           </div>
         </form>
       </Section>
-    </div>
+    </SectionGrid>
   )
 }
 
@@ -409,7 +410,7 @@ function VoiceSection({
         ) : (
           <div className="flex flex-col gap-3">
             {result ? (
-              <div className="flex flex-col gap-2 rounded-lg border bg-muted/30 p-3 text-base">
+              <div className="flex flex-col gap-2 rounded-lg bg-muted/40 p-3 text-base">
                 {result.text.split(/\n{2,}/).map((para, i) => (
                   <p
                     // Paragraphs of one reply never reorder.

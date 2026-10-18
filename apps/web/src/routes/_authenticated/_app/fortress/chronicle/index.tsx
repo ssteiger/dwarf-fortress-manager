@@ -1,5 +1,5 @@
 import type { FortEvent, FortHistoryRow, FortUnit } from '@fortress/db-drizzle'
-import { Badge, Card, DataTable, cn } from '@fortress/ui'
+import { Badge, DataTable, cn } from '@fortress/ui'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import type { ColumnDef } from '@tanstack/react-table'
@@ -11,7 +11,7 @@ import { useFortOverview, useFortSeasons, useFortUnits } from '~/lib/fortress/cl
 import { formatGameTick, humanize } from '~/lib/fortress/format'
 import { getFortEvents } from '~/lib/fortress/server/events'
 import { getFortHistory } from '~/lib/fortress/server/history'
-import { PageHeader, StatusBanner } from '../-components/FortChrome'
+import { PageHeader, StatusBand } from '../-components/FortChrome'
 import { AnnouncementText } from '../-components/Insights'
 import { useFortLegendsWorldId, useKnownHistFigures } from '../dwarves/-components/UnitLinks'
 import { Seasons } from './-components/Seasons'
@@ -157,16 +157,19 @@ function BySeason() {
   const overview = useFortOverview()
   const seasons = useFortSeasons()
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col">
       <PageHeader
+        className="border-b p-4"
         title="Chronicle"
         description="Each season of the fortress told in a few lines: who came and went, what happened, how their lives changed and what the world’s history records. Written from the announcements, the daily snapshots and the game’s own history."
         updatedAt={seasons.dataUpdatedAt}
         isFetching={seasons.isFetching}
         onRefresh={() => void seasons.refetch()}
       />
-      <StatusBanner state={overview.data?.state} />
-      <ViewSwitch current="seasons" />
+      <StatusBand state={overview.data?.state} />
+      <div className="border-b px-4 py-3">
+        <ViewSwitch current="seasons" />
+      </div>
       <Seasons />
     </div>
   )
@@ -218,8 +221,9 @@ function EveryEntry() {
   }, [data, history.data, everyone.data, filter])
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader
+        className="shrink-0 border-b p-4"
         title="Chronicle"
         description="Every announcement the game has made since the worker started, and what the world’s history records of the fortress and its people, newest first. Whatever loading an earlier save undid is left out."
         updatedAt={dataUpdatedAt}
@@ -229,10 +233,9 @@ function EveryEntry() {
           void history.refetch()
         }}
       />
-      <StatusBanner state={overview.data?.state} />
-      <ViewSwitch current="entries" />
-
-      <div className="flex flex-wrap gap-2">
+      <StatusBand state={overview.data?.state} />
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-3">
+        <ViewSwitch current="entries" />
         {(Object.keys(FILTERS) as Filter[]).map((key) => (
           <button
             type="button"
@@ -252,31 +255,30 @@ function EveryEntry() {
         </span>
       </div>
 
-      <Card className="overflow-hidden p-0">
-        <DataTable
-          data={rows}
-          columns={columns}
-          showSelectColumn={false}
-          showActionsColumn={false}
-          showToolbar={false}
-          enableSortingRemoval={false}
-          defaultSort={[{ id: 'when', desc: true }]}
-          search={search}
-          onSearch={setSearch}
-          getRowId={(row) => row.key}
-          rowClassName={(row) =>
-            row.filters.includes('cancellations') ? 'text-muted-foreground' : undefined
-          }
-          emptyState={{
-            title: filter === 'history' ? 'No history recorded yet' : 'The chronicle is empty',
-            subtitle: q
-              ? 'Nothing matches this search.'
-              : filter === 'history'
-                ? 'The worker reads the world’s history with each dump: masterpieces, artifacts, marriages, deaths and offices. Restart the worker so the game runs the new dump script.'
-                : 'Announcements are recorded each time the worker dumps the game. Play a little and come back.',
-          }}
-        />
-      </Card>
+      <DataTable
+        fill
+        data={rows}
+        columns={columns}
+        showSelectColumn={false}
+        showActionsColumn={false}
+        showToolbar={false}
+        enableSortingRemoval={false}
+        defaultSort={[{ id: 'when', desc: true }]}
+        search={search}
+        onSearch={setSearch}
+        getRowId={(row) => row.key}
+        rowClassName={(row) =>
+          row.filters.includes('cancellations') ? 'text-muted-foreground' : undefined
+        }
+        emptyState={{
+          title: filter === 'history' ? 'No history recorded yet' : 'The chronicle is empty',
+          subtitle: q
+            ? 'Nothing matches this search.'
+            : filter === 'history'
+              ? 'The worker reads the world’s history with each dump: masterpieces, artifacts, marriages, deaths and offices. Restart the worker so the game runs the new dump script.'
+              : 'Announcements are recorded each time the worker dumps the game. Play a little and come back.',
+        }}
+      />
     </div>
   )
 }

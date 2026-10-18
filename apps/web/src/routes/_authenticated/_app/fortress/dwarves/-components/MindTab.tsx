@@ -2,6 +2,7 @@ import type { FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 import { LightbulbIcon } from 'lucide-react'
 
+import { SectionGrid } from '~/lib/components/Section'
 import { formatGameTick, humanize, splitPascal } from '~/lib/fortress/format'
 import {
   deityText,
@@ -54,10 +55,10 @@ export function MindTab({
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   const noMind = unit.traits == null && unit.values == null && unit.thoughts == null
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+    <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
       {sheet ? <NeedsSection unit={unit} sheet={sheet} /> : null}
       {noMind ? (
-        <Muted>Personality and thoughts arrive with the next fortress dump.</Muted>
+        <Muted className="p-4">Personality and thoughts arrive with the next fortress dump.</Muted>
       ) : (
         <PersonalitySection unit={unit} />
       )}
@@ -82,7 +83,7 @@ export function MindTab({
           <SheetMissing what="Needs, likes, dreams, faith and memories" />
         </div>
       ) : null}
-    </div>
+    </SectionGrid>
   )
 }
 

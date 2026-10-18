@@ -1,8 +1,9 @@
 import type { FortCaravan, FortDiplomacy, FortUnit } from '@fortress/db-drizzle'
 import { CARAVAN_TICKS_PER_DAY } from '@fortress/db-drizzle/fortress-types'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, cn } from '@fortress/ui'
+import { cn } from '@fortress/ui'
 import { RadarIcon } from 'lucide-react'
 
+import { Section } from '~/lib/components/Section'
 import { plural } from '~/lib/fortress/advice/phrasing'
 import { powerById, powerIdOf, presenceRole, presenceText } from '~/lib/fortress/diplomacy'
 import { humanize } from '~/lib/fortress/format'
@@ -146,46 +147,39 @@ export function RightNow({
     })
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <RadarIcon className="size-4 text-primary" />
-          Right now
-        </CardTitle>
-        <CardDescription>
-          Invaders, envoys, caravans and armies on the move, as of the last read.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {lines.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            All quiet: no invaders, envoys or caravans on the map, and no armies on the move.
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {lines.map((line) => (
-              <li key={line.key} className="flex gap-3">
-                <span
-                  className={cn(
-                    'mt-1.5 size-2 shrink-0 rounded-full',
-                    line.tone === 'danger'
-                      ? 'bg-red-600'
-                      : line.tone === 'warn'
-                        ? 'bg-amber-500'
-                        : 'bg-sky-500',
-                  )}
-                />
-                <div className="flex min-w-0 flex-col gap-1.5 text-sm">
-                  <p>{line.body}</p>
-                  {line.units?.length ? (
-                    <UnitChips units={line.units} onOpen={onOpenUnit} max={8} />
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </CardContent>
-    </Card>
+    <Section
+      icon={<RadarIcon className="size-4 text-primary" />}
+      title="Right now"
+      description="Invaders, envoys, caravans and armies on the move, as of the last read."
+    >
+      {lines.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          All quiet: no invaders, envoys or caravans on the map, and no armies on the move.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {lines.map((line) => (
+            <li key={line.key} className="flex gap-3">
+              <span
+                className={cn(
+                  'mt-1.5 size-2 shrink-0 rounded-full',
+                  line.tone === 'danger'
+                    ? 'bg-red-600'
+                    : line.tone === 'warn'
+                      ? 'bg-amber-500'
+                      : 'bg-sky-500',
+                )}
+              />
+              <div className="flex min-w-0 flex-col gap-1.5 text-sm">
+                <p>{line.body}</p>
+                {line.units?.length ? (
+                  <UnitChips units={line.units} onOpen={onOpenUnit} max={8} />
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   )
 }

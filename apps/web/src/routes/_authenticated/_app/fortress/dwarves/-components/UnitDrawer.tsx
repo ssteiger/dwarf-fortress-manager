@@ -92,7 +92,7 @@ export function UnitDrawer({ unit, onClose }: { unit: FortUnit | null; onClose: 
                 </div>
               </div>
             </DrawerHeader>
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               <DwarfDetails
                 unitId={unit.id}
                 compact

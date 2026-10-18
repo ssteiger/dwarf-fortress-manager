@@ -66,36 +66,38 @@ function GlancePage() {
   const events = overview.data?.events ?? []
 
   return (
-    <div className="flex h-dvh flex-col gap-3 overflow-hidden p-3 text-sm">
+    <>
       <Toaster position="bottom-center" />
       <FortWatcher />
-      <Header state={state} />
-      {state ? (
-        <>
-          <SectionBoundary name="The most urgent">
-            <Urgent notices={urgent} />
-          </SectionBoundary>
-          <SectionBoundary name="The dwarves you watch">
-            <Watched units={units} watched={watched} />
-          </SectionBoundary>
-          <SectionBoundary name="Who is struggling">
-            <Struggling units={units} watched={watched} />
-          </SectionBoundary>
-          <SectionBoundary name="The warnings">
-            <Warnings notices={warnings} />
-          </SectionBoundary>
-          <SectionBoundary name="The chronicle">
-            <Chronicle events={events} />
-          </SectionBoundary>
-        </>
-      ) : (
-        <p className="text-muted-foreground">
-          {overview.isPending
-            ? 'Reading the fortress…'
-            : 'No fortress yet. Once the worker has read the game, it shows here.'}
-        </p>
-      )}
-    </div>
+      <div className="flex h-dvh flex-col divide-y overflow-hidden text-sm">
+        <Header state={state} />
+        {state ? (
+          <>
+            <SectionBoundary name="The most urgent">
+              <Urgent notices={urgent} />
+            </SectionBoundary>
+            <SectionBoundary name="The dwarves you watch">
+              <Watched units={units} watched={watched} />
+            </SectionBoundary>
+            <SectionBoundary name="Who is struggling">
+              <Struggling units={units} watched={watched} />
+            </SectionBoundary>
+            <SectionBoundary name="The warnings">
+              <Warnings notices={warnings} />
+            </SectionBoundary>
+            <SectionBoundary name="The chronicle">
+              <Chronicle events={events} />
+            </SectionBoundary>
+          </>
+        ) : (
+          <p className="px-3 py-2 text-muted-foreground">
+            {overview.isPending
+              ? 'Reading the fortress…'
+              : 'No fortress yet. Once the worker has read the game, it shows here.'}
+          </p>
+        )}
+      </div>
+    </>
   )
 }
 
@@ -107,7 +109,7 @@ function Header({ state }: { state: FortState | null }) {
     ? formatDistanceToNow(new Date(state.captured_at), { addSuffix: true })
     : null
   return (
-    <header className="flex shrink-0 flex-col gap-1 border-b pb-2">
+    <header className="flex shrink-0 flex-col gap-1 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
         <h1 className="truncate text-base font-medium">{state?.fort_name ?? 'No fortress yet'}</h1>
         <a
@@ -174,18 +176,13 @@ function Urgent({ notices }: { notices: Notice[] }) {
   const top = notices[0]
   if (!top)
     return (
-      <section className="shrink-0 rounded-lg border px-3 py-2 text-muted-foreground">
+      <section className="shrink-0 px-3 py-2 text-muted-foreground">
         Nothing needs you right now.
       </section>
     )
   const danger = top.severity === 'danger'
   return (
-    <section
-      className={cn(
-        'shrink-0 rounded-lg border px-3 py-2',
-        danger ? 'border-red-500/40 bg-red-500/10' : 'border-amber-500/40 bg-amber-500/10',
-      )}
-    >
+    <section className={cn('shrink-0 px-3 py-2', danger ? 'bg-red-500/10' : 'bg-amber-500/10')}>
       <p className="flex items-start gap-2 font-medium">
         <TriangleAlertIcon
           className={cn('mt-0.5 size-4 shrink-0', danger ? 'text-red-500' : 'text-amber-500')}
@@ -216,12 +213,12 @@ function Watched({ units, watched }: { units: FortUnit[]; watched: ReadonlySet<n
   const shown = units.filter((u) => watched.has(u.id) && isLiving(u))
   if (!shown.length)
     return watched.size ? null : (
-      <p className="shrink-0 text-xs text-muted-foreground">
+      <p className="shrink-0 px-3 py-2 text-xs text-muted-foreground">
         Watch a dwarf from their page and they show here.
       </p>
     )
   return (
-    <section className="shrink-0">
+    <section className="shrink-0 px-3 py-2">
       <Heading>
         <EyeIcon className="size-3" />
         Watching
@@ -274,7 +271,7 @@ function Struggling({ units, watched }: { units: FortUnit[]; watched: ReadonlySe
     .sort((a, b) => a.stress_category - b.stress_category || b.wounds - a.wounds)
   if (!struggling.length) return null
   return (
-    <section className="shrink-0">
+    <section className="shrink-0 px-3 py-2">
       <Heading count={struggling.length}>Struggling</Heading>
       <ul className="flex flex-col gap-0.5">
         {struggling.slice(0, MAX_STRUGGLING).map((unit) => (
@@ -303,7 +300,7 @@ function Struggling({ units, watched }: { units: FortUnit[]; watched: ReadonlySe
 function Warnings({ notices }: { notices: Notice[] }) {
   if (!notices.length) return null
   return (
-    <section className="shrink-0">
+    <section className="shrink-0 px-3 py-2">
       <Heading>Jobs and stores</Heading>
       <ul className="flex flex-col gap-0.5">
         {notices.slice(0, MAX_WARNINGS).map((n) => (
@@ -340,7 +337,7 @@ function Chronicle({ events }: { events: FortEvent[] }) {
     .sort((a, b) => b.id - a.id)
     .slice(0, MAX_CHRONICLE)
   return (
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
       <Heading>The chronicle</Heading>
       {story.length ? (
         <ul className="flex min-h-0 flex-col gap-1.5 overflow-hidden [mask-image:linear-gradient(to_bottom,black_85%,transparent)]">

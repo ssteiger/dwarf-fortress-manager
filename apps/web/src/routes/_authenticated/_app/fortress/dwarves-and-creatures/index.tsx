@@ -5,7 +5,7 @@ import * as React from 'react'
 import { useFortOverview, useFortUnits } from '~/lib/fortress/client/queries'
 import { isLiving, unitGroup } from '~/lib/fortress/format'
 import { gameTimeOf } from '~/lib/fortress/time'
-import { PageHeader, StatusBanner } from '../-components/FortChrome'
+import { PageHeader, StatusBand } from '../-components/FortChrome'
 import { UnitDrawer } from '../dwarves/-components/UnitDrawer'
 import { GROUP_LABELS, type Group, Roster } from './-components/Roster'
 
@@ -28,8 +28,9 @@ function DwarvesAndCreaturesPage() {
   const [selected, setSelected] = React.useState<FortUnit | null>(null)
   const units = data?.units ?? []
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className="flex flex-1 flex-col has-[[data-fill]]:min-h-0">
       <PageHeader
+        className="border-b p-4"
         title="Dwarves and creatures"
         description={
           units.length
@@ -40,7 +41,7 @@ function DwarvesAndCreaturesPage() {
         isFetching={isFetching}
         onRefresh={() => refetch()}
       />
-      <StatusBanner state={overview.data?.state} />
+      <StatusBand state={overview.data?.state} />
       <Roster units={units} now={gameTimeOf(overview.data?.state)} onOpen={setSelected} />
       <UnitDrawer unit={selected} onClose={() => setSelected(null)} />
     </div>

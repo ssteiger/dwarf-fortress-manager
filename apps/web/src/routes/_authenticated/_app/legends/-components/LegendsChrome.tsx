@@ -1,10 +1,6 @@
 import type { FortState, JsonObject, LegendsRecord, LegendsWorld } from '@fortress/db-drizzle'
 import {
   Badge,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Select,
   SelectContent,
   SelectItem,
@@ -26,6 +22,7 @@ import {
 } from 'lucide-react'
 import type * as React from 'react'
 
+export { Section, SectionGrid, SectionStack } from '~/lib/components/Section'
 import { LegendsSprite } from '~/lib/df-assets/legends'
 import { useFortOverview } from '~/lib/fortress/client/queries'
 import { formatNumber } from '~/lib/fortress/format'
@@ -145,10 +142,13 @@ export function useSelectedWorld(requestedId?: number) {
 export function LegendsShell({
   section,
   world: requestedWorld,
+  fill = false,
   children,
 }: {
   section: LegendsSection
   world?: number
+  /** The page ends in a table that fills the window and scrolls inside itself. */
+  fill?: boolean
   children: (ctx: {
     worldId: number
     selectedWorld: LegendsWorld
@@ -176,8 +176,9 @@ export function LegendsShell({
   const setWorld = (id: number) => navigate({ to: '.', search: (prev) => ({ ...prev, world: id }) })
 
   return (
-    <div className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+    <div className={cn('flex flex-1 flex-col', fill && 'min-h-0')}>
       <PageHeader
+        className="shrink-0 border-b p-4"
         title={selectedWorld ? titleCase(selectedWorld.name ?? selectedWorld.key) : 'Legends'}
         description={
           selectedWorld ? (
@@ -225,7 +226,7 @@ export function LegendsShell({
 
       {!selectedWorld || worldId === null ? (
         legends.isLoading ? null : (
-          <EmptyState title="No legends imported yet">
+          <EmptyState title="No legends imported yet" className="m-4">
             Export legends from the game (Legends mode, or DFHack's <code>exportlegends</code>) into
             the Dwarf Fortress folder. The worker picks up <code>*-legends.xml</code> and{' '}
             <code>*-legends_plus.xml</code> on its next start.
@@ -233,7 +234,7 @@ export function LegendsShell({
         )
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
             <nav
               aria-label="Legends sections"
               className="bg-muted text-muted-foreground inline-flex h-10 w-fit max-w-full items-center overflow-x-auto rounded-lg p-[3px] [scrollbar-width:none]"
@@ -375,70 +376,6 @@ export function Breadcrumbs({
         </span>
       ))}
     </nav>
-  )
-}
-
-export function Section({
-  title,
-  count,
-  description,
-  action,
-  children,
-  className,
-  collapsed = false,
-}: {
-  title: React.ReactNode
-  count?: number | null
-  description?: React.ReactNode
-  action?: React.ReactNode
-  children: React.ReactNode
-  className?: string
-  /** Start closed. The title is the disclosure control; the body uses the same card. */
-  collapsed?: boolean
-}) {
-  const heading = (
-    <div>
-      <CardTitle className="flex items-center gap-2 text-base">
-        {collapsed ? (
-          <ChevronRightIcon className="size-4 text-muted-foreground transition-transform group-open:rotate-90" />
-        ) : null}
-        {title}
-        {typeof count === 'number' ? (
-          <Badge variant="secondary" className="tabular-nums">
-            {count.toLocaleString()}
-          </Badge>
-        ) : null}
-      </CardTitle>
-      {description ? (
-        <p className="mt-1 text-sm font-normal text-muted-foreground">{description}</p>
-      ) : null}
-    </div>
-  )
-  if (collapsed) {
-    return (
-      <Card className={cn('gap-0 py-0', className)}>
-        <details className="group">
-          <summary className="cursor-pointer select-none list-none px-5 py-4 font-normal [&::-webkit-details-marker]:hidden">
-            <div className="flex items-start justify-between gap-3">
-              {heading}
-              {action}
-            </div>
-          </summary>
-          <CardContent className="border-t px-5 py-4">{children}</CardContent>
-        </details>
-      </Card>
-    )
-  }
-  return (
-    <Card className={cn('gap-4 py-5', className)}>
-      <CardHeader className="px-5">
-        <div className="flex items-start justify-between gap-3">
-          {heading}
-          {action}
-        </div>
-      </CardHeader>
-      <CardContent className="px-5">{children}</CardContent>
-    </Card>
   )
 }
 

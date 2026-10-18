@@ -9,7 +9,14 @@ import type { Story } from '~/lib/legends/server/chronicle'
 import type { LegendsWorldSummary } from '~/lib/legends/server/summary'
 import { ChroniclePanel } from '../-components/Chronicle'
 import { HistoryChart, type YearSpan } from '../-components/HistoryChart'
-import { LegendsShell, RecordLink, Section, parseWorldParam } from '../-components/LegendsChrome'
+import {
+  LegendsShell,
+  RecordLink,
+  Section,
+  SectionGrid,
+  SectionStack,
+  parseWorldParam,
+} from '../-components/LegendsChrome'
 import { StoryCard, useStories } from '../-components/Stories'
 
 interface HistorySearch {
@@ -67,7 +74,7 @@ function HistoryBody({
 
   if (!summary) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="p-4 text-sm text-muted-foreground">
         {loading ? 'Reading the chronicles…' : 'No history yet.'}
       </p>
     )
@@ -79,10 +86,10 @@ function HistoryBody({
     (years ? { from: Math.max(years.max - summary.binYears + 1, years.min), to: years.max } : null)
 
   return (
-    <div className="flex flex-col gap-4">
+    <SectionStack className="border-b">
       <StoriesStrip worldId={worldId} />
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <SectionGrid className="lg:grid-cols-2">
         <Section
           collapsed
           title="Names that fill the chronicles"
@@ -271,7 +278,7 @@ function HistoryBody({
             ))}
           </ul>
         </Section>
-      </div>
+      </SectionGrid>
 
       <Section
         title={
@@ -312,7 +319,7 @@ function HistoryBody({
       {years && current ? (
         <ChroniclePanel worldId={worldId} span={current} years={years} onSpan={onSpan} />
       ) : null}
-    </div>
+    </SectionStack>
   )
 }
 

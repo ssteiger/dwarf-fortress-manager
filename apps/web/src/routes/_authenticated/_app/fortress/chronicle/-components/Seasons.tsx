@@ -1,4 +1,4 @@
-import { Button, Card, CardContent, CardHeader, CardTitle, Skeleton, cn } from '@fortress/ui'
+import { Button, Skeleton, cn } from '@fortress/ui'
 import { EyeIcon } from 'lucide-react'
 import * as React from 'react'
 
@@ -56,18 +56,18 @@ export function Seasons() {
 
   if (seasons.isPending)
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-4">
         <Skeleton className="h-40 w-full rounded-xl" />
         <Skeleton className="h-40 w-full rounded-xl" />
       </div>
     )
   if (!all.length)
     return seasons.isError ? (
-      <EmptyState title="The seasons could not be read">
+      <EmptyState title="The seasons could not be read" className="m-4">
         {seasons.error instanceof Error ? seasons.error.message : String(seasons.error)}
       </EmptyState>
     ) : (
-      <EmptyState title="No seasons yet">
+      <EmptyState title="No seasons yet" className="m-4">
         Each season gets its recap once the worker has read some of it from the game.
       </EmptyState>
     )
@@ -75,10 +75,12 @@ export function Seasons() {
   const startedIn = readingSince ? seasonAt(readingSince) : null
   const current = present ? seasonIndex(seasonAt(present)) : null
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col divide-y">
       {years.map(({ year, seasons: inYear }) => (
-        <section key={year} aria-label={`The year ${year}`} className="flex flex-col gap-4">
-          <h2 className="text-lg font-medium tracking-tight tabular-nums">{year}</h2>
+        <section key={year} aria-label={`The year ${year}`} className="flex flex-col divide-y">
+          <h2 className="bg-muted/30 px-4 py-2 text-lg font-medium tracking-tight tabular-nums">
+            {year}
+          </h2>
           {inYear.map(({ season, recap }) => (
             <SeasonCard
               key={seasonIndex(season)}
@@ -96,14 +98,16 @@ export function Seasons() {
       {seasons.hasNextPage ? (
         <Button
           variant="outline"
-          className="self-start"
+          className="m-4 self-start"
           disabled={seasons.isFetchingNextPage}
           onClick={() => void seasons.fetchNextPage()}
         >
           {seasons.isFetchingNextPage ? 'Reading earlier seasons…' : 'Earlier seasons'}
         </Button>
       ) : (
-        <p className="text-sm text-muted-foreground">Nothing earlier is known of the fortress.</p>
+        <p className="p-4 text-sm text-muted-foreground">
+          Nothing earlier is known of the fortress.
+        </p>
       )}
     </div>
   )
@@ -124,12 +128,12 @@ function SeasonCard({
   legends: Legends
 }) {
   return (
-    <Card className="gap-4">
-      <CardHeader className="gap-1.5">
-        <CardTitle className="text-base">
+    <section className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-1.5">
+        <h2 className="text-base leading-none font-medium">
           {seasonTitle(season)}
           {current ? <span className="font-normal text-muted-foreground">, so far</span> : null}
-        </CardTitle>
+        </h2>
         {recap.headline.length ? (
           <p className="text-base leading-snug text-pretty">
             <AnnouncementText parts={recap.headline} legends={legends} />
@@ -141,15 +145,15 @@ function SeasonCard({
             world’s history alone.
           </p>
         ) : null}
-      </CardHeader>
+      </div>
       {recap.sections.length ? (
-        <CardContent className="gap-x-10 lg:columns-2">
+        <div className="gap-x-10 lg:columns-2">
           {recap.sections.map((section) => (
             <SectionLines key={section.key} section={section} legends={legends} />
           ))}
-        </CardContent>
+        </div>
       ) : null}
-    </Card>
+    </section>
   )
 }
 

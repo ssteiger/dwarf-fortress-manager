@@ -1,6 +1,7 @@
 import type { FortHealth, FortUnit, UnitSheet } from '@fortress/db-drizzle'
 import { Badge, cn } from '@fortress/ui'
 
+import { SectionGrid } from '~/lib/components/Section'
 import {
   type PatientNeed,
   needBlockers,
@@ -27,7 +28,7 @@ import { Meter, Muted, Section, SheetMissing, capitalize } from './SheetParts'
 export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }) {
   const sheet = unit.sheet && !unit.sheet.error ? unit.sheet : null
   return (
-    <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'lg:grid-cols-2')}>
+    <SectionGrid className={compact ? 'grid-cols-1' : 'lg:grid-cols-2'}>
       <SkillsSection unit={unit} sheet={sheet} />
       {sheet?.attributes.length ? <AttributesSection unit={unit} sheet={sheet} /> : null}
       <HealthSection unit={unit} sheet={sheet} />
@@ -37,7 +38,7 @@ export function BodyTab({ unit, compact }: { unit: FortUnit; compact?: boolean }
           <SheetMissing what="All skills with progress, attributes and injury details" />
         </div>
       ) : null}
-    </div>
+    </SectionGrid>
   )
 }
 
