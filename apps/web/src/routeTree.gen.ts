@@ -17,6 +17,7 @@ import { Route as AuthRegisterIndexRouteImport } from './routes/auth/register/in
 import { Route as AuthLoginIndexRouteImport } from './routes/auth/login/index'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/_app/index'
 import { Route as AuthenticatedAppSettingsRouteRouteImport } from './routes/_authenticated/_app/settings/route'
+import { Route as AuthenticatedAppWorldMapIndexRouteImport } from './routes/_authenticated/_app/world-map/index'
 import { Route as AuthenticatedAppSettingsIndexRouteImport } from './routes/_authenticated/_app/settings/index'
 import { Route as AuthenticatedAppNicknameDwarvesIndexRouteImport } from './routes/_authenticated/_app/nickname-dwarves/index'
 import { Route as AuthenticatedAppLegendsIndexRouteImport } from './routes/_authenticated/_app/legends/index'
@@ -82,6 +83,12 @@ const AuthenticatedAppSettingsRouteRoute =
   AuthenticatedAppSettingsRouteRouteImport.update({
     id: '/settings',
     path: '/settings',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
+const AuthenticatedAppWorldMapIndexRoute =
+  AuthenticatedAppWorldMapIndexRouteImport.update({
+    id: '/world-map/',
+    path: '/world-map/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
 const AuthenticatedAppSettingsIndexRoute =
@@ -259,6 +266,7 @@ export interface FileRoutesByFullPath {
   '/legends/': typeof AuthenticatedAppLegendsIndexRoute
   '/nickname-dwarves/': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/settings/': typeof AuthenticatedAppSettingsIndexRoute
+  '/world-map/': typeof AuthenticatedAppWorldMapIndexRoute
   '/fortress/citizens/$id': typeof AuthenticatedAppFortressCitizensIdRoute
   '/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -293,6 +301,7 @@ export interface FileRoutesByTo {
   '/legends': typeof AuthenticatedAppLegendsIndexRoute
   '/nickname-dwarves': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/settings': typeof AuthenticatedAppSettingsIndexRoute
+  '/world-map': typeof AuthenticatedAppWorldMapIndexRoute
   '/fortress/citizens/$id': typeof AuthenticatedAppFortressCitizensIdRoute
   '/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -331,6 +340,7 @@ export interface FileRoutesById {
   '/_authenticated/_app/legends/': typeof AuthenticatedAppLegendsIndexRoute
   '/_authenticated/_app/nickname-dwarves/': typeof AuthenticatedAppNicknameDwarvesIndexRoute
   '/_authenticated/_app/settings/': typeof AuthenticatedAppSettingsIndexRoute
+  '/_authenticated/_app/world-map/': typeof AuthenticatedAppWorldMapIndexRoute
   '/_authenticated/_app/fortress/citizens/$id': typeof AuthenticatedAppFortressCitizensIdRoute
   '/_authenticated/_app/fortress/items/$id': typeof AuthenticatedAppFortressItemsIdRoute
   '/_authenticated/_app/legends/$kind/$id': typeof AuthenticatedAppLegendsKindIdRoute
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/legends/'
     | '/nickname-dwarves/'
     | '/settings/'
+    | '/world-map/'
     | '/fortress/citizens/$id'
     | '/fortress/items/$id'
     | '/legends/$kind/$id'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/legends'
     | '/nickname-dwarves'
     | '/settings'
+    | '/world-map'
     | '/fortress/citizens/$id'
     | '/fortress/items/$id'
     | '/legends/$kind/$id'
@@ -439,6 +451,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_app/legends/'
     | '/_authenticated/_app/nickname-dwarves/'
     | '/_authenticated/_app/settings/'
+    | '/_authenticated/_app/world-map/'
     | '/_authenticated/_app/fortress/citizens/$id'
     | '/_authenticated/_app/fortress/items/$id'
     | '/_authenticated/_app/legends/$kind/$id'
@@ -526,6 +539,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof AuthenticatedAppSettingsRouteRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/_authenticated/_app/world-map/': {
+      id: '/_authenticated/_app/world-map/'
+      path: '/world-map'
+      fullPath: '/world-map/'
+      preLoaderRoute: typeof AuthenticatedAppWorldMapIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
     '/_authenticated/_app/settings/': {
@@ -753,6 +773,7 @@ interface AuthenticatedAppRouteChildren {
   AuthenticatedAppFortressIndexRoute: typeof AuthenticatedAppFortressIndexRoute
   AuthenticatedAppLegendsIndexRoute: typeof AuthenticatedAppLegendsIndexRoute
   AuthenticatedAppNicknameDwarvesIndexRoute: typeof AuthenticatedAppNicknameDwarvesIndexRoute
+  AuthenticatedAppWorldMapIndexRoute: typeof AuthenticatedAppWorldMapIndexRoute
   AuthenticatedAppFortressCitizensIdRoute: typeof AuthenticatedAppFortressCitizensIdRoute
   AuthenticatedAppFortressItemsIdRoute: typeof AuthenticatedAppFortressItemsIdRoute
   AuthenticatedAppLegendsKindIdRoute: typeof AuthenticatedAppLegendsKindIdRoute
@@ -783,6 +804,7 @@ const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppLegendsIndexRoute: AuthenticatedAppLegendsIndexRoute,
   AuthenticatedAppNicknameDwarvesIndexRoute:
     AuthenticatedAppNicknameDwarvesIndexRoute,
+  AuthenticatedAppWorldMapIndexRoute: AuthenticatedAppWorldMapIndexRoute,
   AuthenticatedAppFortressCitizensIdRoute:
     AuthenticatedAppFortressCitizensIdRoute,
   AuthenticatedAppFortressItemsIdRoute: AuthenticatedAppFortressItemsIdRoute,

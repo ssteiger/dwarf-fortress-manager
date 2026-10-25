@@ -25,6 +25,7 @@ export type AppPath =
   | '/legends/stories'
   | '/legends/archive'
   | '/legends/journal'
+  | '/world-map'
   | '/nickname-dwarves'
   | '/activity-logs'
   | '/settings'
@@ -128,6 +129,12 @@ export const PAGES: PageEntry[] = [
     title: 'Journal',
     detail: 'Your notes and pinned records',
     keywords: 'notes pins bookmarks',
+  },
+  {
+    to: '/world-map',
+    title: 'World map',
+    detail: 'The whole world, filling the screen',
+    keywords: 'atlas geography sites regions terrain full screen map',
   },
   {
     to: '/nickname-dwarves',

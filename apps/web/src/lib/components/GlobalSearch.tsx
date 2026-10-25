@@ -86,6 +86,7 @@ const PAGE_ICON: Record<AppPath, LucideIcon> = {
   '/legends/stories': SparklesIcon,
   '/legends/archive': LibraryIcon,
   '/legends/journal': NotebookPenIcon,
+  '/world-map': GlobeIcon,
   '/nickname-dwarves': LibraryIcon,
   '/activity-logs': ClipboardListIcon,
   '/settings': SettingsIcon,

@@ -243,7 +243,7 @@ const WorkPage = () => {
           job.building_id !== null ? (buildingNames.get(job.building_id) ?? null) : null,
         sortUndefined: 'last',
         meta: { cellClassName: 'text-muted-foreground' },
-        cell: ({ getValue }) => getValue<string | null>() ?? '—',
+        cell: ({ getValue }) => getValue<string | null>() ?? '-',
       },
       {
         id: 'needs',
@@ -253,7 +253,7 @@ const WorkPage = () => {
         meta: { cellClassName: 'max-w-[320px] text-sm text-muted-foreground' },
         cell: ({ row }) => {
           const needs = row.original.needs ?? []
-          if (!needs.length) return '—'
+          if (!needs.length) return '-'
           return (
             <span className="flex flex-wrap gap-x-2 gap-y-0.5">
               {needs.map(([label, need, have], i) => (
@@ -304,7 +304,7 @@ const WorkPage = () => {
         meta: { align: 'right', cellClassName: 'font-mono text-muted-foreground' },
         // Jobs without a place yet, like a strange mood's, sit at -30000.
         cell: ({ row }) =>
-          row.original.x <= -30000 ? '—' : `${row.original.x},${row.original.y} z${row.original.z}`,
+          row.original.x <= -30000 ? '-' : `${row.original.x},${row.original.y} z${row.original.z}`,
       },
     ],
     [buildingNames, unitNames],

@@ -301,7 +301,7 @@ const VoiceSection = ({
   const result = mode === 'ask' ? null : results[mode]
   const busy = speak.isPending && speak.variables?.mode === mode
   const date = now ? ` (${formatGameTick(now.year, now.tick)})` : ''
-  const keep = (text: string) => onKeep(`— ${spec.label}${date}\n${text}`)
+  const keep = (text: string) => onKeep(`- ${spec.label}${date}\n${text}`)
   return (
     <Section
       title={

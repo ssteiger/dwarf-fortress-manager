@@ -158,7 +158,7 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
     header: 'Material',
     accessorFn: (row) => row.item?.material ?? '',
     meta: { cellClassName: 'max-w-[200px] truncate text-sm' },
-    cell: ({ row }) => row.original.item?.material || '—',
+    cell: ({ row }) => row.original.item?.material || '-',
   },
   {
     id: 'quality',
@@ -167,13 +167,13 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
     meta: { cellClassName: 'text-sm' },
     cell: ({ row }) => {
       const item = row.original.item
-      if (!item) return '—'
+      if (!item) return '-'
       return (
         <>
           {item.quality !== 'Ordinary' ? (
             item.quality
           ) : (
-            <span className="text-muted-foreground">—</span>
+            <span className="text-muted-foreground">-</span>
           )}
           {item.wear > 0 ? (
             <span className="ml-1 text-xs text-amber-600">worn {item.wear}</span>
@@ -187,7 +187,7 @@ const INVENTORY_COLUMNS: ColumnDef<CarriedItem>[] = [
     header: 'Value',
     accessorFn: (row) => row.item?.value ?? 0,
     meta: { align: 'right', cellClassName: 'tabular-nums' },
-    cell: ({ row }) => (row.original.item ? formatValue(row.original.item.value) : '—'),
+    cell: ({ row }) => (row.original.item ? formatValue(row.original.item.value) : '-'),
   },
 ]
 
@@ -470,7 +470,7 @@ const StatStrip = ({
               {unit.x},{unit.y} z{unit.z}
             </span>
           ) : (
-            '—'
+            '-'
           )
         }
         hint={
@@ -930,7 +930,7 @@ const ChronicleSection = ({
                   <AnnouncementText parts={link(event.text)} />
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {formatGameTick(event.game_year, event.game_tick) || '—'}
+                  {formatGameTick(event.game_year, event.game_tick) || '-'}
                 </span>
               </li>
             ))}

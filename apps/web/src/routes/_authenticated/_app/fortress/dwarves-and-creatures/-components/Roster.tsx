@@ -243,7 +243,7 @@ export const Roster = ({
         meta: { align: 'right', cellClassName: 'font-mono text-sm text-muted-foreground' },
         cell: ({ row }) => {
           const unit = row.original
-          return unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '—'
+          return unit.x !== null ? `${unit.x},${unit.y} z${unit.z}` : '-'
         },
       },
       {
@@ -257,7 +257,7 @@ export const Roster = ({
         meta: { align: 'right', cellClassName: 'tabular-nums' },
         cell: ({ row }) => {
           const name = row.original.name.trim()
-          if (!name) return '—'
+          if (!name) return '-'
           const count = chronicleCounts.get(name) ?? 0
           return (
             <Link
@@ -283,7 +283,7 @@ export const Roster = ({
         meta: { align: 'right', cellClassName: 'tabular-nums' },
         cell: ({ row }) => {
           const legends = legendsRefFor(row.original, legendsWorldId, knownFigures)
-          if (!legends) return '—'
+          if (!legends) return '-'
           const count = legendCounts.get(legends.figureId) ?? 0
           return (
             <Link

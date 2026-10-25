@@ -249,7 +249,7 @@ const OverviewBody = () => {
             />
             <Reading
               title="Created wealth"
-              value={summary.wealth ? formatValue(summary.wealth.total) : '—'}
+              value={summary.wealth ? formatValue(summary.wealth.total) : '-'}
               Icon={CoinsIcon}
               accentClassName="text-amber-500"
               hint={

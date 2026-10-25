@@ -59,7 +59,7 @@ function targetLink(note: LegendsNote, worldId: number) {
 }
 
 function exportText(notes: LegendsNote[], worldName: string): string {
-  const lines = [`# Journal — ${worldName}`, '']
+  const lines = [`# Journal - ${worldName}`, '']
   for (const note of notes) {
     lines.push(`## ${note.title || `${targetLabel(note.target_kind)} ${note.target_id}`}`)
     lines.push(

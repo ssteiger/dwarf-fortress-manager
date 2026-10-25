@@ -46,6 +46,8 @@ export interface WorldMapProps {
   showLegend?: boolean
   /** `inset` is the small map on record pages: no minimap or labels, page scrolling left alone. */
   variant?: 'full' | 'inset'
+  /** Take the parent's height instead of the world's aspect ratio; the parent must be a flex column. */
+  fill?: boolean
   className?: string
   /**
    * Show the world as it stood in this year: sites appear when founded, fall
@@ -363,6 +365,7 @@ export const WorldMap = ({
   onSelectRegion,
   showLegend = true,
   variant,
+  fill = false,
   className,
   year = null,
   history = null,
@@ -806,7 +809,7 @@ export const WorldMap = ({
   const zoomedIn = view && view.scale > pz.fitScale * 1.25
 
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
+    <div className={cn('flex flex-col gap-3', fill && 'min-h-0 flex-1', className)}>
       <div
         ref={pz.containerRef}
         // biome-ignore lint/a11y/noNoninteractiveTabindex: focus enables the keyboard shortcuts
@@ -818,9 +821,12 @@ export const WorldMap = ({
         className={cn(
           'relative w-full overflow-hidden bg-[#28527f] outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
           inset && 'aspect-square rounded-lg border',
+          fill && 'min-h-0 flex-1',
         )}
         style={
-          inset ? undefined : { aspectRatio: `${data.width} / ${data.height}`, maxHeight: '78vh' }
+          inset || fill
+            ? undefined
+            : { aspectRatio: `${data.width} / ${data.height}`, maxHeight: '78vh' }
         }
       >
         <canvas

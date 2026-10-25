@@ -80,7 +80,7 @@ function eventColumns(
       header: 'When',
       accessorFn: (row) => (row.year ?? 0) * 1_000_000 + (row.tick ?? 0),
       meta: { cellClassName: 'whitespace-nowrap text-sm tabular-nums' },
-      cell: ({ row }) => formatGameTick(row.original.year, row.original.tick) || '—',
+      cell: ({ row }) => formatGameTick(row.original.year, row.original.tick) || '-',
     },
     {
       id: 'text',
@@ -112,7 +112,7 @@ function eventColumns(
       header: 'Kind',
       accessorFn: (row) => row.kind,
       meta: { cellClassName: 'whitespace-nowrap text-sm text-muted-foreground' },
-      cell: ({ row }) => row.original.kind || '—',
+      cell: ({ row }) => row.original.kind || '-',
     },
   ]
 }

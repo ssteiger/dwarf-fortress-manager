@@ -116,7 +116,7 @@ const ITEM_COLUMNS: ColumnDef<FortItem>[] = [
         {row.original.quality !== 'Ordinary' ? (
           row.original.quality
         ) : (
-          <span className="text-muted-foreground">—</span>
+          <span className="text-muted-foreground">-</span>
         )}
         {row.original.wear > 0 ? (
           <span className="ml-1 text-xs text-amber-600">worn {row.original.wear}</span>

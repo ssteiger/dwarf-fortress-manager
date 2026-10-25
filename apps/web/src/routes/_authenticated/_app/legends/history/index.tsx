@@ -150,7 +150,6 @@ const HistoryBody = ({
         </Section>
 
         <Section
-          collapsed
           title="Peoples and beasts"
           description="Everyone with a place in history, by race. Click a race to browse its figures."
         >
@@ -265,7 +264,6 @@ const HistoryBody = ({
         </Section>
 
         <Section
-          collapsed
           title="Gods and forces"
           count={summary.deitiesTotal}
           description="Deities worshipped by the civilizations, and the spheres they hold."

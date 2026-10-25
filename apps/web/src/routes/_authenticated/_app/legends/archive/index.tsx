@@ -112,7 +112,7 @@ const ARCHIVE_COLUMNS: (worldId: number) => ColumnDef<LegendsHit>[] = (worldId) 
       row.original.kind === 'historical_figure'
         ? row.original.type
           ? words(row.original.type)
-          : '—'
+          : '-'
         : [kindLabel(row.original.kind), row.original.type ? words(row.original.type) : null]
             .filter(Boolean)
             .join(' · '),
@@ -123,21 +123,21 @@ const ARCHIVE_COLUMNS: (worldId: number) => ColumnDef<LegendsHit>[] = (worldId) 
     accessorFn: (hit) => hit.detail ?? '',
     enableSorting: false,
     meta: { cellClassName: 'text-sm text-muted-foreground' },
-    cell: ({ row }) => row.original.detail || '—',
+    cell: ({ row }) => row.original.detail || '-',
   },
   {
     id: 'year',
     header: 'Years',
     accessorFn: (hit) => hit.year,
     meta: { align: 'right', cellClassName: 'tabular-nums text-sm' },
-    cell: ({ row }) => yearSpan(row.original.year, row.original.endYear) || '—',
+    cell: ({ row }) => yearSpan(row.original.year, row.original.endYear) || '-',
   },
   {
     id: 'events',
     header: 'Events',
     accessorFn: (hit) => hit.events,
     meta: { align: 'right', cellClassName: 'tabular-nums text-sm' },
-    cell: ({ row }) => (row.original.events == null ? '—' : row.original.events.toLocaleString()),
+    cell: ({ row }) => (row.original.events == null ? '-' : row.original.events.toLocaleString()),
   },
 ]
 

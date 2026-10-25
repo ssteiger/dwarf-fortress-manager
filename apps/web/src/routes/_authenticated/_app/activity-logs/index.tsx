@@ -112,7 +112,7 @@ const EntryRow = ({ entry }: { entry: LogEntry }) => {
         }
         className="w-11 shrink-0 pt-0.5 text-sm text-muted-foreground tabular-nums"
       >
-        {at ? format(at, 'HH:mm') : '—'}
+        {at ? format(at, 'HH:mm') : '-'}
       </time>
       <Icon
         role="img"

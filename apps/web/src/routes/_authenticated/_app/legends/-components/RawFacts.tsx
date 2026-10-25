@@ -35,7 +35,7 @@ const FactValue = ({
   if (value === true) return <span>yes</span>
   if (value === false) return <span>no</span>
   if (value === null || value === undefined || value === '')
-    return <span className="text-muted-foreground">—</span>
+    return <span className="text-muted-foreground">-</span>
   if (typeof value === 'number') {
     const kind = kindForKey(keyName)
     if (kind && value >= 0) {

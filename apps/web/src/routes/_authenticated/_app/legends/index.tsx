@@ -263,7 +263,7 @@ const AtAGlance = ({
         const figure = (
           <>
             <span className="block text-lg font-medium tabular-nums">
-              {item.value === null || item.value === undefined ? '—' : formatNumber(item.value)}
+              {item.value === null || item.value === undefined ? '-' : formatNumber(item.value)}
             </span>
             <span className="block text-sm text-muted-foreground group-hover:text-foreground">
               {item.label}

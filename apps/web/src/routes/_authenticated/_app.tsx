@@ -6,6 +6,7 @@ import {
   BookOpenIcon,
   ClipboardListIcon,
   DatabaseIcon,
+  GlobeIcon,
   HammerIcon,
   LibraryIcon,
   MapIcon,
@@ -75,18 +76,20 @@ const NAV = [
   { title: 'Overview', url: '/fortress', icon: MountainIcon },
   { title: 'Dwarves and creatures', url: '/fortress/dwarves-and-creatures', icon: PawPrintIcon },
   { title: 'Citizens', url: '/fortress/citizens', icon: UsersIcon, matchPrefix: true },
-  { title: 'The dead', url: '/fortress/dead', icon: SkullIcon },
+  { title: 'The Dead', url: '/fortress/dead', icon: SkullIcon },
   { title: 'Items', url: '/fortress/items', icon: PackageIcon },
   { title: 'Work', url: '/fortress/work', icon: HammerIcon },
   { title: 'Diplomacy & War', url: '/fortress/diplomacy-and-war', icon: SwordsIcon },
   { title: 'Chronicle', url: '/fortress/chronicle', icon: ScrollTextIcon },
   { title: 'Legends', url: '/legends', icon: BookOpenIcon, matchPrefix: true },
-  { title: 'Map', url: '/fortress/map', icon: MapIcon },
+  { title: 'World Map', url: '/world-map', icon: GlobeIcon },
+  { title: 'Fortress Map', url: '/fortress/map', icon: MapIcon },
   { title: 'Nickname Dwarves', url: '/nickname-dwarves', icon: LibraryIcon },
 ]
 
 function headerTitle(pathname: string): string {
   if (pathname.startsWith('/legends')) return 'Legends'
+  if (pathname.startsWith('/world-map')) return 'World map'
   if (pathname.startsWith('/fortress')) return 'Fortress'
   if (pathname.startsWith('/activity-logs')) return 'Worker logs'
   if (pathname.startsWith('/settings')) return 'Settings'

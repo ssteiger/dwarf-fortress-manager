@@ -133,7 +133,7 @@ const NarrationDialog = ({
         target: {
           kind: 'narration',
           id: `${subjectId(subject)}:${style}`,
-          title: `${title} — narrated`,
+          title: `${title} - narrated`,
         },
         note: result.text,
         tags: ['narration', style],
